@@ -421,15 +421,15 @@ export default function RankingsPage() {
           </g>
         ))}
 
-        {/* Single point labels */}
+                {/* Single point labels */}
         {playerHistory.length === 1 && showDgrade && (
-          <text x={xScale(0) + 12} y={yDgrade(playerHistory[0].dgrade_value) + 4} fontSize="11" fill="#16a34a">
-            {playerHistory[0].dgrade_value}
+          <text x={xScale(0) + 12} y={yDgrade(playerHistory[0].dgrade_value) - 8} fontSize="11" fill="#16a34a">
+            dGrade: {playerHistory[0].dgrade_value}
           </text>
         )}
         {playerHistory.length === 1 && showRanking && (
-          <text x={xScale(0) + 12} y={yRank(playerHistory[0].world_ranking) + 4} fontSize="11" fill="#2563eb">
-            #{playerHistory[0].world_ranking}
+          <text x={xScale(0) + 12} y={yRank(playerHistory[0].world_ranking) + 16} fontSize="11" fill="#2563eb">
+            Rank: #{playerHistory[0].world_ranking}
           </text>
         )}
       </svg>
@@ -795,7 +795,9 @@ export default function RankingsPage() {
                 </div>
 
                 <p className="text-xs text-gray-400 mb-3">
-                  History recorded since GCLab first synced on 2 Mar 2026. {playerHistory.length} data point{playerHistory.length !== 1 ? 's' : ''}. Monthly snapshots taken on the 1st of each month.
+                  {playerHistory.length <= 1
+                    ? 'GCLab has been tracking dGrade history since 2 Mar 2026. As daily syncs and monthly snapshots accumulate, this chart will show your full ranking journey over time.'
+                    : `Tracking since 2 Mar 2026 · ${playerHistory.length} data points recorded`}
                 </p>
 
                 <div className="bg-white rounded-lg shadow-sm p-4 mb-4">{renderChart()}</div>
