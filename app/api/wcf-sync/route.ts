@@ -59,8 +59,55 @@ function parsePlayers(html: string) {
   return players
 }
 
+function isFirstOfMonth(date: Date): boolean {
+  return date.getDate() === 1
+}
+
+async function writeMonthlySnapshots(players: any[], now: string) {
+  const BATCH_SIZE = 100
+  const allPlayers = await supabase
+    .from('wcf_players')
+    .select('id, dgrade, world_ranking')
+  if (!allPlayers.data) return
+  for (let i = 0; i < allPlayers.data.length; i += BATCH_SIZE) {
+    const batch = allPlayers.data.slice(i, i + BATCH_SIZE)
+    await Promise.all(batch.map(async (player) => {
+      await supabase.from('wcf_dgrade_history').insert({
+        wcf_player_id: player.id,
+        dgrade_value: player.dgrade,
+        world_ranking: player.world_ranking,
+        recorded_at: now,
+      })
+    }))
+  }
+}
+
+async function writeCountrySnapshot(activeYear: number, snapshotDate: string) {
+  const { data } = await supabase.rpc('get_country_stats', { active_year: activeYear })
+  if (!data) return
+  const BATCH_SIZE = 50
+  for (let i = 0; i < data.length; i += BATCH_SIZE) {
+    const batch = data.slice(i, i + BATCH_SIZE)
+    await Promise.all(batch.map(async (row: any) => {
+      await supabase.from('country_stats_snapshots').upsert({
+        snapshot_date: snapshotDate,
+        country: row.country,
+        total_players: row.total_players,
+        active_players: row.active_players,
+        avg_top6_dgrade: row.avg_top6_dgrade,
+      }, { onConflict: 'snapshot_date,country' })
+    }))
+  }
+}
+
 async function runSync(logId: string) {
   try {
+    const now = new Date()
+    const nowISO = now.toISOString()
+    const isMonthly = isFirstOfMonth(now)
+    const activeYear = now.getFullYear() - 1
+    const snapshotDate = now.toISOString().split('T')[0]
+
     const response = await fetch(WCF_URL)
     const html = await response.text()
     const players = parsePlayers(html)
@@ -69,14 +116,13 @@ async function runSync(logId: string) {
       await supabase.from('sync_log').update({
         status: 'error',
         error: 'No players parsed',
-        completed_at: new Date().toISOString(),
+        completed_at: nowISO,
       }).eq('id', logId)
       return
     }
 
     let updated = 0
     let created = 0
-    const now = new Date().toISOString()
 
     const BATCH_SIZE = 50
     for (let i = 0; i < players.length; i += BATCH_SIZE) {
@@ -95,11 +141,12 @@ async function runSync(logId: string) {
               wcf_player_id: existing.id,
               dgrade_value: player.dgrade,
               world_ranking: player.world_ranking,
+              recorded_at: nowISO,
             })
             if (existing.linked_user_id) {
               await supabase.from('profiles').update({
                 dgrade: player.dgrade,
-                dgrade_last_synced_at: now,
+                dgrade_last_synced_at: nowISO,
               }).eq('id', existing.linked_user_id)
               await supabase.from('dgrade_history').insert({
                 user_id: existing.linked_user_id,
@@ -108,18 +155,18 @@ async function runSync(logId: string) {
             }
           } else if (existing.linked_user_id) {
             await supabase.from('profiles').update({
-              dgrade_last_synced_at: now,
+              dgrade_last_synced_at: nowISO,
             }).eq('id', existing.linked_user_id)
           }
           await supabase
             .from('wcf_players')
-            .update({ ...player, last_synced_at: now })
+            .update({ ...player, last_synced_at: nowISO })
             .eq('id', existing.id)
           updated++
         } else {
           const { data: newPlayer } = await supabase
             .from('wcf_players')
-            .insert({ ...player, last_synced_at: now })
+            .insert({ ...player, last_synced_at: nowISO })
             .select('id')
             .single()
           if (newPlayer) {
@@ -127,6 +174,7 @@ async function runSync(logId: string) {
               wcf_player_id: newPlayer.id,
               dgrade_value: player.dgrade,
               world_ranking: player.world_ranking,
+              recorded_at: nowISO,
             })
           }
           created++
@@ -134,12 +182,17 @@ async function runSync(logId: string) {
       }))
     }
 
+    if (isMonthly) {
+      await writeMonthlySnapshots(players, nowISO)
+      await writeCountrySnapshot(activeYear, snapshotDate)
+    }
+
     await supabase.from('sync_log').update({
       status: 'complete',
       total: players.length,
       created,
       updated,
-      completed_at: now,
+      completed_at: nowISO,
     }).eq('id', logId)
 
   } catch (error) {
