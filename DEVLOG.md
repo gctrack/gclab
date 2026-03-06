@@ -114,3 +114,20 @@ NEXT_PUBLIC_CRON_SECRET=gclab_wcf_sync_secret_2026
 - Do NOT use vercel --prod from terminal, just use git push
 - Environment variables must be set in Vercel dashboard
 - Vercel project: gctracks-projects/gclab
+
+## Completed Steps
+1. ✅ Deployed to Vercel - https://gclab-een9.vercel.app
+2. ✅ Weekly WCF sync cron job - runs every Tuesday 3am UTC (vercel.json)
+3. ⬜ WCF player matching flow on signup
+4. ⬜ Rankings/Movers page
+5. ⬜ Game logging UI
+6. ⬜ Clubs page
+7. ⬜ iPhone app
+8. ⬜ Apple Watch app
+
+## Important Notes for Next Session
+- Always send one code block per response - never mix instructions and git commands in same block
+- Full file replacements preferred over partial edits
+- Terminal commands always in their own separate code block
+- Deployment: just use git push - Vercel auto-deploys from GitHub
+- Do NOT run vercel --prod from terminal
