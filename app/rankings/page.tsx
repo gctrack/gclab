@@ -337,7 +337,15 @@ export default function RankingsPage() {
 
   const renderChart = () => {
     if (playerHistory.length === 0) return <p className="text-sm text-gray-400 py-4">No history recorded yet.</p>
-    if (playerHistory.length === 1) return <p className="text-sm text-gray-400 py-4">Only one data point so far — the chart will fill in as daily syncs accumulate.</p>
+    if (playerHistory.length === 1) return (
+  <svg viewBox="0 0 800 240" className="w-full" style={{ minWidth: 400 }}>
+    {showDgrade && <circle cx="400" cy="100" r="5" fill="#16a34a"><title>{formatDate(playerHistory[0].recorded_at)}: dGrade {playerHistory[0].dgrade_value}</title></circle>}
+    {showDgrade && <text x="412" y="104" fontSize="11" fill="#16a34a">dGrade: {playerHistory[0].dgrade_value}</text>}
+    {showRanking && <circle cx="400" cy="140" r="5" fill="#2563eb"><title>{formatDate(playerHistory[0].recorded_at)}: Rank #{playerHistory[0].world_ranking}</title></circle>}
+    {showRanking && <text x="412" y="144" fontSize="11" fill="#2563eb">World Rank: #{playerHistory[0].world_ranking}</text>}
+    <text x="400" y="200" fontSize="10" fill="#9ca3af" textAnchor="middle">More data points will appear as daily syncs accumulate</text>
+  </svg>
+)
 
     const W = 800, H = 240
     const padL = 55, padR = 55, padT = 20, padB = 30
@@ -413,7 +421,7 @@ export default function RankingsPage() {
         <a href="/dashboard" className="text-sm text-gray-600 hover:text-green-600">← Dashboard</a>
       </nav>
       <main className="max-w-5xl mx-auto px-6 py-10">
-        <h2 className="text-2xl font-bold mb-6">WCF Rankings & Stats</h2>
+        <h2 className="text-2xl font-bold mb-6 text-gray-900">WCF Rankings & Stats</h2>
 
         <div className="flex gap-2 mb-6 flex-wrap">
           {TABS.map(tab => (
