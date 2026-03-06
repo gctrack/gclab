@@ -80,9 +80,9 @@ export default function DashboardPage() {
           <div className="flex items-baseline gap-2 mb-6">
             <p className="text-gray-600">dGrade: <span className="font-semibold text-gray-800">{profile.dgrade}</span></p>
             {profile.dgrade_last_synced_at ? (
-              <p className="text-xs text-gray-400">WCF synced {formatSyncDate(profile.dgrade_last_synced_at)}</p>
+              <p className="text-xs text-gray-400">Last updated {formatSyncDate(profile.dgrade_last_synced_at)}</p>
             ) : profile.wcf_player_id ? (
-              <p className="text-xs text-gray-400">Updates automatically each Tuesday</p>
+              <p className="text-xs text-gray-400">Updates automatically every day</p>
             ) : null}
           </div>
         ) : (
@@ -98,7 +98,7 @@ export default function DashboardPage() {
           />
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <a href="/profile" className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition">
             <h3 className="font-semibold text-gray-800 mb-1">My Profile</h3>
             <p className="text-sm text-gray-500">Update your details, dGrade and equipment</p>
@@ -110,6 +110,10 @@ export default function DashboardPage() {
           <a href="/clubs" className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition">
             <h3 className="font-semibold text-gray-800 mb-1">Clubs</h3>
             <p className="text-sm text-gray-500">Manage your club memberships</p>
+          </a>
+          <a href="/rankings" className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition">
+            <h3 className="font-semibold text-gray-800 mb-1">Rankings</h3>
+            <p className="text-sm text-gray-500">WCF rankings, movers and country stats</p>
           </a>
         </div>
       </main>
