@@ -41,12 +41,19 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
         <h1 className="text-xl font-bold text-green-600">GCLab</h1>
-        <button
-          onClick={handleSignOut}
-          className="text-sm text-gray-600 hover:text-red-500"
-        >
-          Sign Out
-        </button>
+        <div className="flex items-center gap-4">
+          {profile && ['admin', 'super_admin'].includes(profile.role) && (
+            <a href="/admin" className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-medium hover:bg-purple-200 transition">
+              Admin
+            </a>
+          )}
+          <button
+            onClick={handleSignOut}
+            className="text-sm text-gray-600 hover:text-red-500"
+          >
+            Sign Out
+          </button>
+        </div>
       </nav>
       <main className="max-w-4xl mx-auto px-6 py-10">
         <h2 className="text-2xl font-bold mb-2">
