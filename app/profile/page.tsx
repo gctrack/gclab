@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import WcfMatchBanner from '@/components/WcfMatchBanner'
@@ -234,8 +234,10 @@ function Toggle({ enabled, onChange }: { enabled: boolean, onChange: (v: boolean
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [message, setMessage] = useState('')
   const [userId, setUserId] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
   const [profile, setProfile] = useState({
     first_name: '',
     last_name: '',
@@ -256,6 +258,7 @@ export default function ProfilePage() {
     show_contact_email: false,
   })
   const [selectedGrips, setSelectedGrips] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -293,11 +296,35 @@ export default function ProfilePage() {
           show_contact_email: data.show_contact_email || false,
         })
         setSelectedGrips(data.grips || [])
+        if (data.avatar_url) setAvatarUrl(data.avatar_url)
       }
       setLoading(false)
     }
     getProfile()
   }, [])
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !userId) return
+    setUploadingAvatar(true)
+    const fileExt = file.name.split('.').pop()
+    const filePath = `${userId}/avatar.${fileExt}`
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true })
+    if (uploadError) {
+      setMessage('Error uploading photo')
+      setUploadingAvatar(false)
+      return
+    }
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath)
+    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId)
+    setAvatarUrl(publicUrl)
+    setUploadingAvatar(false)
+    setMessage('Photo updated successfully')
+  }
 
   const toggleGrip = (grip: string) => {
     setSelectedGrips(prev =>
@@ -419,6 +446,40 @@ export default function ProfilePage() {
         )}
 
         <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Profile photo"
+                  className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center text-gray-400 text-2xl">
+                  {profile.first_name ? profile.first_name.charAt(0).toUpperCase() : '?'}
+                </div>
+              )}
+            </div>
+            <div>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-md hover:bg-gray-200 transition disabled:opacity-50"
+              >
+                {uploadingAvatar ? 'Uploading...' : avatarUrl ? 'Change photo' : 'Upload photo'}
+              </button>
+              <p className="text-xs text-gray-400 mt-1">JPG or PNG, max 2MB</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -604,6 +665,7 @@ export default function ProfilePage() {
           >
             {saving ? 'Saving...' : 'Save Profile'}
           </button>
+
         </div>
       </main>
     </div>
