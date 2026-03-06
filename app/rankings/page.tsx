@@ -80,6 +80,7 @@ const MOVER_PERIODS = [
 ]
 const PAGE_SIZES = [50, 100, 200]
 const FIRST_SYNC_DATE = '2026-03-02'
+const NEW_PLAYERS_SINCE = '2026-03-03T00:00:00Z'
 
 type SortKey = 'dgrade' | 'world_ranking' | 'games' | 'win_percentage'
 type SortDir = 'asc' | 'desc'
@@ -142,47 +143,25 @@ export default function RankingsPage() {
     init()
   }, [])
 
-  useEffect(() => {
-    if (activeTab === 'Rankings') loadRankings()
-  }, [activeTab, activeOnly, rankingsPage, pageSize, sortKey, sortDir])
-
-  useEffect(() => {
-    if (activeTab === 'Movers') loadMovers()
-  }, [activeTab, moverPeriod])
-
-  useEffect(() => {
-    if (activeTab === 'New Players') loadNewPlayers()
-  }, [activeTab, newPlayerDays, newPlayerCountry])
-
-  useEffect(() => {
-    if (activeTab === 'Country Stats') loadCountryStats()
-  }, [activeTab])
-
+  useEffect(() => { if (activeTab === 'Rankings') loadRankings() }, [activeTab, activeOnly, rankingsPage, pageSize, sortKey, sortDir])
+  useEffect(() => { if (activeTab === 'Movers') loadMovers() }, [activeTab, moverPeriod])
+  useEffect(() => { if (activeTab === 'New Players') loadNewPlayers() }, [activeTab, newPlayerDays, newPlayerCountry])
+  useEffect(() => { if (activeTab === 'Country Stats') loadCountryStats() }, [activeTab])
   useEffect(() => {
     if (activeTab === 'Historical Rankings' && currentUserProfile?.wcf_player_id && !selectedPlayer) {
       loadPlayerHistory(currentUserProfile.wcf_player_id)
     }
   }, [activeTab, currentUserProfile])
-
-  useEffect(() => {
-    if (selectedPlayer) fetchHistory(selectedPlayer.id)
-  }, [historyRange, historyFrom, historyTo])
-
-  useEffect(() => {
-    if (compareMode) loadCompareStats()
-  }, [compareMode, compareDate])
+  useEffect(() => { if (selectedPlayer) fetchHistory(selectedPlayer.id) }, [historyRange, historyFrom, historyTo])
+  useEffect(() => { if (compareMode) loadCompareStats() }, [compareMode, compareDate])
 
   const handleRankingSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortKey(key)
-      setSortDir('desc')
-    }
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('desc') }
     setRankingsPage(0)
   }
 
-  const sortArrow = (key: SortKey) => sortKey === key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''
+  const sortArrow = (key: SortKey) => sortKey === key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ' ↕'
 
   const handleCountrySort = (key: string) => {
     const newDir: SortDir = countrySortKey === key && countrySortDir === 'desc' ? 'asc' : 'desc'
@@ -192,7 +171,7 @@ export default function RankingsPage() {
     setCountryStats(sorted)
   }
 
-  const countryArrow = (key: string) => countrySortKey === key ? (countrySortDir === 'desc' ? ' ↓' : ' ↑') : ''
+  const countryArrow = (key: string) => countrySortKey === key ? (countrySortDir === 'desc' ? ' ↓' : ' ↑') : ' ↕'
 
   const loadRankings = async () => {
     setLoading(true)
@@ -223,7 +202,7 @@ export default function RankingsPage() {
     setLoading(true)
     const since = new Date()
     since.setDate(since.getDate() - newPlayerDays)
-    const sinceDate = '2026-03-03T00:00:00Z'
+    const sinceDate = since < new Date(NEW_PLAYERS_SINCE) ? NEW_PLAYERS_SINCE : since.toISOString()
     let query = supabase
       .from('wcf_players')
       .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, wcf_profile_url, created_at')
@@ -260,10 +239,7 @@ export default function RankingsPage() {
 
   const loadCompareStats = async () => {
     if (!compareDate) return
-    const { data } = await supabase
-      .from('country_stats_snapshots')
-      .select('*')
-      .eq('snapshot_date', compareDate)
+    const { data } = await supabase.from('country_stats_snapshots').select('*').eq('snapshot_date', compareDate)
     if (data) setCompareStats(data)
   }
 
@@ -273,10 +249,7 @@ export default function RankingsPage() {
       .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, wcf_profile_url')
       .eq('id', wcfPlayerId)
       .single()
-    if (player) {
-      setSelectedPlayer(player)
-      await fetchHistory(player.id)
-    }
+    if (player) { setSelectedPlayer(player); await fetchHistory(player.id) }
   }
 
   const fetchHistory = async (playerId: string) => {
@@ -337,40 +310,45 @@ export default function RankingsPage() {
 
   const renderChart = () => {
     if (playerHistory.length === 0) return <p className="text-sm text-gray-400 py-4">No history recorded yet.</p>
-    if (playerHistory.length === 1) return (
-      <svg viewBox="0 0 800 240" className="w-full" style={{ minWidth: 400 }}>
-        {showDgrade && <circle cx="400" cy="100" r="5" fill="#16a34a"><title>{formatDate(playerHistory[0].recorded_at)}: dGrade {playerHistory[0].dgrade_value}</title></circle>}
-        {showDgrade && <text x="412" y="104" fontSize="11" fill="#16a34a">dGrade: {playerHistory[0].dgrade_value}</text>}
-        {showRanking && <circle cx="400" cy="140" r="5" fill="#2563eb"><title>{formatDate(playerHistory[0].recorded_at)}: Rank #{playerHistory[0].world_ranking}</title></circle>}
-        {showRanking && <text x="412" y="144" fontSize="11" fill="#2563eb">World Rank: #{playerHistory[0].world_ranking}</text>}
-        <text x="400" y="200" fontSize="10" fill="#9ca3af" textAnchor="middle">More data points will appear as daily syncs accumulate</text>
-      </svg>
-    )
 
     const W = 800, H = 260
-    const padL = 60, padR = 60, padT = 20, padB = 40
+    const padL = 60, padR = 60, padT = 24, padB = 40
     const chartW = W - padL - padR
     const chartH = H - padT - padB
 
     const dgrades = playerHistory.map(h => h.dgrade_value)
     const wranks = playerHistory.map(h => h.world_ranking)
 
-    const dgradeMin = Math.min(...dgrades) - 50
-    const dgradeMax = Math.max(...dgrades) + 50
-    const rankMin = Math.max(1, Math.min(...wranks) - 10)
-    const rankMax = Math.max(...wranks) + 10
+    const dgradeSpread = Math.max(...dgrades) - Math.min(...dgrades)
+    const dgradeMin = Math.min(...dgrades) - Math.max(50, dgradeSpread * 0.2)
+    const dgradeMax = Math.max(...dgrades) + Math.max(50, dgradeSpread * 0.2)
 
-    const xScale = (i: number) => padL + (i / Math.max(playerHistory.length - 1, 1)) * chartW
-    const yDgrade = (v: number) => padT + chartH - ((v - dgradeMin) / (dgradeMax - dgradeMin)) * chartH
-    const yRank = (v: number) => padT + chartH - ((rankMax - v) / (rankMax - rankMin)) * chartH
+    const rankSpread = Math.max(...wranks) - Math.min(...wranks)
+    const rankMin = Math.max(1, Math.min(...wranks) - Math.max(10, rankSpread * 0.2))
+    const rankMax = Math.max(...wranks) + Math.max(10, rankSpread * 0.2)
+
+    const xScale = (i: number) => playerHistory.length === 1
+      ? padL + chartW / 2
+      : padL + (i / (playerHistory.length - 1)) * chartW
+
+    const yDgrade = (v: number) => {
+      if (dgradeMax === dgradeMin) return padT + chartH / 2
+      return padT + chartH - ((v - dgradeMin) / (dgradeMax - dgradeMin)) * chartH
+    }
+
+    const yRank = (v: number) => {
+      if (rankMax === rankMin) return padT + chartH / 2
+      return padT + chartH - ((rankMax - v) / (rankMax - rankMin)) * chartH
+    }
 
     const gridLines = 5
 
-    // X axis date labels — show up to 6 evenly spaced
     const xLabelCount = Math.min(6, playerHistory.length)
-    const xLabelIndices = Array.from({ length: xLabelCount }, (_, i) =>
-      Math.round(i * (playerHistory.length - 1) / Math.max(xLabelCount - 1, 1))
-    )
+    const xLabelIndices = playerHistory.length === 1
+      ? [0]
+      : Array.from({ length: xLabelCount }, (_, i) =>
+          Math.round(i * (playerHistory.length - 1) / Math.max(xLabelCount - 1, 1))
+        )
 
     return (
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 400 }}>
@@ -380,14 +358,19 @@ export default function RankingsPage() {
           return <line key={i} x1={padL} y1={y} x2={W - padR} y2={y} stroke="#e5e7eb" strokeWidth="1" />
         })}
 
-        {/* Left Y axis — dGrade */}
+        {/* Border lines */}
+        <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
+        <line x1={W - padR} y1={padT} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
+        <line x1={padL} y1={padT + chartH} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
+
+        {/* Left Y axis labels — dGrade */}
         {showDgrade && Array.from({ length: gridLines + 1 }).map((_, i) => {
           const val = Math.round(dgradeMax - i * ((dgradeMax - dgradeMin) / gridLines))
           const y = padT + (i / gridLines) * chartH
           return <text key={i} x={padL - 8} y={y + 4} fontSize="10" fill="#16a34a" textAnchor="end">{val}</text>
         })}
 
-        {/* Right Y axis — World Ranking */}
+        {/* Right Y axis labels — World Ranking */}
         {showRanking && Array.from({ length: gridLines + 1 }).map((_, i) => {
           const val = Math.round(rankMin + i * ((rankMax - rankMin) / gridLines))
           const y = padT + chartH - (i / gridLines) * chartH
@@ -398,16 +381,15 @@ export default function RankingsPage() {
         {xLabelIndices.map((idx) => {
           const x = xScale(idx)
           const label = new Date(playerHistory[idx].recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-          return <text key={idx} x={x} y={H - 5} fontSize="9" fill="#9ca3af" textAnchor="middle">{label}</text>
+          return <text key={idx} x={x} y={H - 6} fontSize="9" fill="#9ca3af" textAnchor="middle">{label}</text>
         })}
 
-        {/* Axis border lines */}
-        <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
-        <line x1={W - padR} y1={padT} x2={W - padR} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
-        <line x1={padL} y1={padT + chartH} x2={W - padR} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
+        {/* Axis titles */}
+        {showDgrade && <text x={padL} y={padT - 8} fontSize="10" fill="#16a34a" fontWeight="500">dGrade</text>}
+        {showRanking && <text x={W - padR} y={padT - 8} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank</text>}
 
         {/* dGrade line */}
-        {showDgrade && (
+        {showDgrade && playerHistory.length > 1 && (
           <polyline
             points={playerHistory.map((h, i) => `${xScale(i)},${yDgrade(h.dgrade_value)}`).join(' ')}
             fill="none" stroke="#16a34a" strokeWidth="2"
@@ -415,7 +397,7 @@ export default function RankingsPage() {
         )}
 
         {/* Ranking line */}
-        {showRanking && (
+        {showRanking && playerHistory.length > 1 && (
           <polyline
             points={playerHistory.map((h, i) => `${xScale(i)},${yRank(h.world_ranking)}`).join(' ')}
             fill="none" stroke="#2563eb" strokeWidth="2"
@@ -426,27 +408,35 @@ export default function RankingsPage() {
         {playerHistory.map((h, i) => (
           <g key={i}>
             {showDgrade && (
-              <circle cx={xScale(i)} cy={yDgrade(h.dgrade_value)} r="3" fill="#16a34a">
+              <circle cx={xScale(i)} cy={yDgrade(h.dgrade_value)} r="4" fill="#16a34a">
                 <title>{formatDate(h.recorded_at)}: dGrade {h.dgrade_value}</title>
               </circle>
             )}
             {showRanking && (
-              <circle cx={xScale(i)} cy={yRank(h.world_ranking)} r="3" fill="#2563eb">
+              <circle cx={xScale(i)} cy={yRank(h.world_ranking)} r="4" fill="#2563eb">
                 <title>{formatDate(h.recorded_at)}: Rank #{h.world_ranking}</title>
               </circle>
             )}
           </g>
         ))}
 
-        {/* Axis labels */}
-        {showDgrade && <text x={padL} y={padT - 6} fontSize="10" fill="#16a34a">dGrade</text>}
-        {showRanking && <text x={W - padR} y={padT - 6} fontSize="10" fill="#2563eb" textAnchor="end">World Rank</text>}
+        {/* Single point labels */}
+        {playerHistory.length === 1 && showDgrade && (
+          <text x={xScale(0) + 12} y={yDgrade(playerHistory[0].dgrade_value) + 4} fontSize="11" fill="#16a34a">
+            {playerHistory[0].dgrade_value}
+          </text>
+        )}
+        {playerHistory.length === 1 && showRanking && (
+          <text x={xScale(0) + 12} y={yRank(playerHistory[0].world_ranking) + 4} fontSize="11" fill="#2563eb">
+            #{playerHistory[0].world_ranking}
+          </text>
+        )}
       </svg>
     )
   }
 
-  const thClass = "px-4 py-3 text-gray-600 font-medium"
-  const thClickClass = "px-4 py-3 text-gray-600 font-medium cursor-pointer hover:text-green-600 select-none"
+  const thBase = "px-4 py-3 text-gray-700 font-semibold"
+  const thClick = "px-4 py-3 text-gray-700 font-semibold cursor-pointer hover:text-green-600 select-none"
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -468,7 +458,7 @@ export default function RankingsPage() {
 
         {loading && <p className="text-gray-400 text-sm">Loading...</p>}
 
-        {/* RANKINGS TAB */}
+        {/* ── RANKINGS ── */}
         {activeTab === 'Rankings' && !loading && (
           <div>
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -494,14 +484,14 @@ export default function RankingsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className={`text-left ${thClass}`}>Active Rank</th>
-                    <th className={`text-left ${thClass}`}>All Time Rank</th>
-                    <th className={`text-left ${thClass}`}>Player</th>
-                    <th className={`text-left ${thClass}`}>Country</th>
-                    <th className={`text-right ${thClickClass}`} onClick={() => handleRankingSort('dgrade')}>dGrade{sortArrow('dgrade')}</th>
-                    <th className={`text-right ${thClickClass}`} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>
-                    <th className={`text-right ${thClickClass}`} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>
-                    <th className={`text-right ${thClass}`}>Last Active</th>
+                    <th className={`text-left ${thBase}`}>Active Rank</th>
+                    <th className={`text-left ${thBase}`}>All Time</th>
+                    <th className={`text-left ${thBase}`}>Player</th>
+                    <th className={`text-left ${thBase}`}>Country</th>
+                    <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('dgrade')}>dGrade{sortArrow('dgrade')}</th>
+                    <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>
+                    <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>
+                    <th className={`text-right ${thBase}`}>Last Active</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -514,11 +504,8 @@ export default function RankingsPage() {
                           {player.wcf_first_name} {player.wcf_last_name}
                         </a>
                       </td>
-                      <td className="px-4 py-2">
-                        <span className="mr-1">{getFlag(player.country)}</span>
-                        <span className="text-gray-800">{getCountryName(player.country)}</span>
-                      </td>
-                      <td className="px-4 py-2 text-right font-medium text-gray-800">{player.dgrade}</td>
+                      <td className="px-4 py-2 text-gray-900"><span className="mr-1">{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
+                      <td className="px-4 py-2 text-right font-semibold text-gray-900">{player.dgrade}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{player.games || '—'}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{player.win_percentage ? `${player.win_percentage}%` : '—'}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{player.last_active_year || '—'}</td>
@@ -537,7 +524,7 @@ export default function RankingsPage() {
           </div>
         )}
 
-        {/* MOVERS TAB */}
+        {/* ── MOVERS ── */}
         {activeTab === 'Movers' && !loading && (
           <div>
             <div className="flex gap-2 mb-2 flex-wrap">
@@ -548,7 +535,7 @@ export default function RankingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mb-4">GCLab dGrade tracking started 2 Mar 2026. Data will grow richer over time as daily syncs accumulate.</p>
+            <p className="text-xs text-gray-400 mb-4">GCLab dGrade baseline set 6 Mar 2026. Movers will appear as daily syncs detect changes going forward.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
                 { title: '📈 Biggest Gains', data: movers.gains, positive: true },
@@ -563,25 +550,25 @@ export default function RankingsPage() {
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50 border-b">
                           <tr>
-                            <th className="text-left px-4 py-2 text-gray-600 font-medium">Player</th>
-                            <th className="text-right px-4 py-2 text-gray-600 font-medium">Change</th>
-                            <th className="text-right px-4 py-2 text-gray-600 font-medium">dGrade</th>
-                            <th className="text-right px-4 py-2 text-gray-600 font-medium">Games</th>
-                            <th className="text-right px-4 py-2 text-gray-600 font-medium">Win%</th>
+                            <th className="text-left px-4 py-2 text-gray-700 font-semibold">Player</th>
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Change</th>
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">dGrade</th>
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Games</th>
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Win%</th>
                           </tr>
                         </thead>
                         <tbody>
                           {data.map((p, i) => (
                             <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                               <td className="px-4 py-2">
-                                <a href={p.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">
+                                <a href={p.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline font-medium">
                                   {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
                                 </a>
                               </td>
-                              <td className={`px-4 py-2 text-right font-medium ${positive ? 'text-green-600' : 'text-red-500'}`}>
+                              <td className={`px-4 py-2 text-right font-semibold ${positive ? 'text-green-600' : 'text-red-500'}`}>
                                 {positive ? `+${p.change}` : p.change}
                               </td>
-                              <td className="px-4 py-2 text-right text-gray-800 font-medium">{p.current_dgrade}</td>
+                              <td className="px-4 py-2 text-right font-semibold text-gray-900">{p.current_dgrade}</td>
                               <td className="px-4 py-2 text-right text-gray-700">{p.games || '—'}</td>
                               <td className="px-4 py-2 text-right text-gray-700">{p.win_percentage ? `${p.win_percentage}%` : '—'}</td>
                             </tr>
@@ -596,7 +583,7 @@ export default function RankingsPage() {
           </div>
         )}
 
-        {/* NEW PLAYERS TAB */}
+        {/* ── NEW PLAYERS ── */}
         {activeTab === 'New Players' && !loading && (
           <div>
             <div className="flex gap-3 mb-4 flex-wrap items-center">
@@ -612,17 +599,17 @@ export default function RankingsPage() {
                 {countryList.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>)}
               </select>
             </div>
-            <p className="text-sm text-gray-500 mb-1">{newPlayers.length} new players found</p>
+            <p className="text-sm text-gray-700 mb-1">{newPlayers.length} new players found</p>
             <p className="text-xs text-gray-400 mb-3">Showing players first recorded by GCLab from 3 Mar 2026 onwards.</p>
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="text-left px-4 py-3 text-gray-600 font-medium">Player</th>
-                    <th className="text-left px-4 py-3 text-gray-600 font-medium">Country</th>
-                    <th className="text-right px-4 py-3 text-gray-600 font-medium">dGrade</th>
-                    <th className="text-right px-4 py-3 text-gray-600 font-medium">World Rank</th>
-                    <th className="text-right px-4 py-3 text-gray-600 font-medium">First Seen</th>
+                    <th className="text-left px-4 py-3 text-gray-700 font-semibold">Player</th>
+                    <th className="text-left px-4 py-3 text-gray-700 font-semibold">Country</th>
+                    <th className="text-right px-4 py-3 text-gray-700 font-semibold">dGrade</th>
+                    <th className="text-right px-4 py-3 text-gray-700 font-semibold">World Rank</th>
+                    <th className="text-right px-4 py-3 text-gray-700 font-semibold">First Seen</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -635,10 +622,10 @@ export default function RankingsPage() {
                           {player.wcf_first_name} {player.wcf_last_name}
                         </a>
                       </td>
-                      <td className="px-4 py-2"><span className="mr-1">{getFlag(player.country)}</span><span className="text-gray-800">{getCountryName(player.country)}</span></td>
-                      <td className="px-4 py-2 text-right font-medium text-gray-800">{player.dgrade}</td>
+                      <td className="px-4 py-2 text-gray-900"><span className="mr-1">{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
+                      <td className="px-4 py-2 text-right font-semibold text-gray-900">{player.dgrade}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{player.world_ranking}</td>
-                      <td className="px-4 py-2 text-right text-gray-400">{formatDate(player.created_at)}</td>
+                      <td className="px-4 py-2 text-right text-gray-500">{formatDate(player.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -647,51 +634,51 @@ export default function RankingsPage() {
           </div>
         )}
 
-        {/* COUNTRY STATS TAB */}
+        {/* ── COUNTRY STATS ── */}
         {activeTab === 'Country Stats' && !loading && (
           <div>
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <p className="text-xs text-gray-400">Click column headers to sort. Active = played a ranked game in the last 12 months.</p>
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <p className="text-xs text-gray-500">Click column headers to sort. Active = played a ranked game in the last 12 months.</p>
               <button onClick={() => setCompareMode(!compareMode)}
                 className={`px-4 py-1 rounded-full text-sm border transition ${compareMode ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
                 {compareMode ? 'Hide Compare' : 'Compare to Past'}
               </button>
             </div>
-
             {compareMode && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm">
                 {availableSnapshots.length === 0 ? (
-                  <p className="text-blue-700">No historical snapshots available yet. Monthly snapshots are stored on the 1st of each month. The first snapshot will be taken 1 Apr 2026. Check back in the future to compare periods.</p>
+                  <p className="text-blue-800">No historical snapshots available yet. Monthly snapshots are stored on the 1st of each month. The first snapshot will be taken 1 Apr 2026. Check back in the future to compare periods.</p>
                 ) : (
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-blue-700">Compare current stats to:</span>
+                    <span className="text-blue-800">Compare current stats to:</span>
                     <select value={compareDate} onChange={(e) => setCompareDate(e.target.value)}
-                      className="border border-blue-300 rounded-md px-2 py-1 text-sm text-gray-700">
+                      className="border border-blue-300 rounded-md px-2 py-1 text-sm text-gray-800">
                       {availableSnapshots.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
                 )}
               </div>
             )}
-
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="text-left px-4 py-3 text-gray-600 font-medium">Country</th>
-                    <th className={`text-right ${thClickClass}`} onClick={() => handleCountrySort('total_players')}>Total Players{countryArrow('total_players')}</th>
-                    <th className={`text-right ${thClickClass}`} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
-                    <th className={`text-right ${thClickClass}`} onClick={() => handleCountrySort('avg_top6_dgrade')}>Top 6 Avg dGrade{countryArrow('avg_top6_dgrade')}</th>
+                    <th className="text-left px-4 py-3 text-gray-700 font-semibold w-8">#</th>
+                    <th className="text-left px-4 py-3 text-gray-700 font-semibold">Country</th>
+                    <th className={`text-right ${thClick}`} onClick={() => handleCountrySort('total_players')}>Total Players{countryArrow('total_players')}</th>
+                    <th className={`text-right ${thClick}`} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
+                    <th className={`text-right ${thClick}`} onClick={() => handleCountrySort('avg_top6_dgrade')}>Top 6 Avg dGrade{countryArrow('avg_top6_dgrade')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {countryStats.length === 0 ? (
-                    <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400 text-sm">No data available.</td></tr>
+                    <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400 text-sm">No data available.</td></tr>
                   ) : countryStats.map((row, i) => {
                     const comp = compareMode ? getCompareRow(row.country) : null
                     return (
                       <tr key={row.country} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-4 py-2 font-medium text-gray-800">
+                        <td className="px-4 py-2 text-gray-500 text-xs">{i + 1}</td>
+                        <td className="px-4 py-2 font-medium text-gray-900">
                           <span className="mr-2">{getFlag(row.country)}</span>{getCountryName(row.country)}
                         </td>
                         <td className="px-4 py-2 text-right text-gray-700">
@@ -700,7 +687,7 @@ export default function RankingsPage() {
                         <td className="px-4 py-2 text-right text-gray-700">
                           {row.active_players}{comp && renderDiff(row.active_players, comp.active_players)}
                         </td>
-                        <td className="px-4 py-2 text-right font-medium text-gray-800">
+                        <td className="px-4 py-2 text-right font-semibold text-gray-900">
                           {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
                           {comp && comp.avg_top6_dgrade && renderDiff(Math.round(row.avg_top6_dgrade), Math.round(comp.avg_top6_dgrade))}
                         </td>
@@ -713,11 +700,11 @@ export default function RankingsPage() {
           </div>
         )}
 
-        {/* HISTORICAL RANKINGS TAB */}
+        {/* ── HISTORICAL RANKINGS ── */}
         {activeTab === 'Historical Rankings' && (
           <div>
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-              <h3 className="font-medium text-gray-800 mb-3">Search any player</h3>
+              <h3 className="font-semibold text-gray-900 mb-3">Search any player</h3>
               <div className="flex gap-2 flex-wrap">
                 <input type="text" placeholder="First name" value={lookupFirst}
                   onChange={(e) => setLookupFirst(e.target.value)}
@@ -734,7 +721,7 @@ export default function RankingsPage() {
             </div>
 
             {lookupSearched && lookupResults.length === 0 && !selectedPlayer && (
-              <p className="text-sm text-gray-400 mb-4">No players found.</p>
+              <p className="text-sm text-gray-500 mb-4">No players found.</p>
             )}
 
             {!selectedPlayer && lookupResults.length > 0 && (
@@ -742,22 +729,22 @@ export default function RankingsPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b">
                     <tr>
-                      <th className="text-left px-4 py-3 text-gray-600 font-medium">Player</th>
-                      <th className="text-left px-4 py-3 text-gray-600 font-medium">Country</th>
-                      <th className="text-right px-4 py-3 text-gray-600 font-medium">dGrade</th>
-                      <th className="text-right px-4 py-3 text-gray-600 font-medium">Rank</th>
+                      <th className="text-left px-4 py-3 text-gray-700 font-semibold">Player</th>
+                      <th className="text-left px-4 py-3 text-gray-700 font-semibold">Country</th>
+                      <th className="text-right px-4 py-3 text-gray-700 font-semibold">dGrade</th>
+                      <th className="text-right px-4 py-3 text-gray-700 font-semibold">Rank</th>
                       <th className="px-4 py-3"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {lookupResults.map((player, i) => (
                       <tr key={player.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-4 py-2 font-medium text-gray-800">{player.wcf_first_name} {player.wcf_last_name}</td>
-                        <td className="px-4 py-2 text-gray-800">{getFlag(player.country)} {getCountryName(player.country)}</td>
-                        <td className="px-4 py-2 text-right text-gray-800 font-medium">{player.dgrade}</td>
+                        <td className="px-4 py-2 font-medium text-gray-900">{player.wcf_first_name} {player.wcf_last_name}</td>
+                        <td className="px-4 py-2 text-gray-900">{getFlag(player.country)} {getCountryName(player.country)}</td>
+                        <td className="px-4 py-2 text-right font-semibold text-gray-900">{player.dgrade}</td>
                         <td className="px-4 py-2 text-right text-gray-700">#{player.world_ranking}</td>
                         <td className="px-4 py-2 text-right">
-                          <button onClick={() => handleSelectPlayer(player)} className="text-green-600 hover:underline text-xs">View history →</button>
+                          <button onClick={() => handleSelectPlayer(player)} className="text-green-600 hover:underline text-xs font-medium">View history →</button>
                         </td>
                       </tr>
                     ))}
@@ -771,8 +758,8 @@ export default function RankingsPage() {
                 <div className="flex items-center gap-3 mb-4 flex-wrap">
                   <button onClick={() => { setSelectedPlayer(null); setPlayerHistory([]) }}
                     className="text-sm text-gray-500 hover:text-green-600">← Back to search</button>
-                  <h3 className="font-semibold text-lg">{getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}</h3>
-                  <span className="text-sm text-gray-500">{getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade} · World #{selectedPlayer.world_ranking}</span>
+                  <h3 className="font-semibold text-lg text-gray-900">{getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}</h3>
+                  <span className="text-sm text-gray-600">{getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade} · World #{selectedPlayer.world_ranking}</span>
                   <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline ml-auto">WCF Profile →</a>
                 </div>
 
@@ -787,9 +774,11 @@ export default function RankingsPage() {
                   </div>
                   {historyRange === 'custom' && (
                     <div className="flex items-center gap-2">
-                      <input type="date" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs" />
-                      <span className="text-gray-400 text-xs">to</span>
-                      <input type="date" value={historyTo} onChange={(e) => setHistoryTo(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs" />
+                      <input type="date" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)}
+                        className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-800" />
+                      <span className="text-gray-500 text-xs">to</span>
+                      <input type="date" value={historyTo} onChange={(e) => setHistoryTo(e.target.value)}
+                        className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-800" />
                     </div>
                   )}
                   <div className="flex gap-2 ml-auto">
@@ -812,20 +801,20 @@ export default function RankingsPage() {
 
                 {playerHistory.length > 0 && (
                   <div className="bg-white rounded-lg shadow-sm p-4">
-                    <table className="w-full text-xs text-gray-600">
+                    <table className="w-full text-xs">
                       <thead>
-                        <tr className="text-gray-400 border-b">
-                          <th className="text-left py-1">Date</th>
-                          <th className="text-right py-1">dGrade</th>
-                          <th className="text-right py-1">World Rank</th>
+                        <tr className="text-gray-500 border-b">
+                          <th className="text-left py-1 font-semibold">Date</th>
+                          <th className="text-right py-1 font-semibold">dGrade</th>
+                          <th className="text-right py-1 font-semibold">World Rank</th>
                         </tr>
                       </thead>
                       <tbody>
                         {[...playerHistory].reverse().map((h, i) => (
-                          <tr key={i} className="border-t border-gray-50">
-                            <td className="py-1">{formatDate(h.recorded_at)}</td>
-                            <td className="py-1 text-right font-medium text-gray-800">{h.dgrade_value}</td>
-                            <td className="py-1 text-right text-gray-500">#{h.world_ranking}</td>
+                          <tr key={i} className="border-t border-gray-100">
+                            <td className="py-1 text-gray-700">{formatDate(h.recorded_at)}</td>
+                            <td className="py-1 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
+                            <td className="py-1 text-right text-gray-600">#{h.world_ranking}</td>
                           </tr>
                         ))}
                       </tbody>
