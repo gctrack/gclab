@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import WcfMatchBanner from '@/components/WcfMatchBanner'
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
@@ -35,6 +36,15 @@ export default function DashboardPage() {
     router.push('/login')
   }
 
+  const handleWcfLinked = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+    setProfile(data)
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
 
   return (
@@ -59,9 +69,19 @@ export default function DashboardPage() {
         <h2 className="text-2xl font-bold mb-2">
           Welcome, {profile?.first_name || user.email}
         </h2>
-        <p className="text-gray-600 mb-8">
+        <p className="text-gray-600 mb-6">
           {profile?.dgrade ? `dGrade: ${profile.dgrade}` : 'Set your dGrade in your profile'}
         </p>
+
+        {profile && !profile.wcf_player_id && profile.first_name && profile.last_name && (
+          <WcfMatchBanner
+            userId={user.id}
+            firstName={profile.first_name}
+            lastName={profile.last_name}
+            onLinked={handleWcfLinked}
+          />
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <a href="/profile" className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition">
             <h3 className="font-semibold text-gray-800 mb-1">My Profile</h3>
