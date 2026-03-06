@@ -3,7 +3,62 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 
-function getFlag(code: string) {
+const COUNTRY_NAMES: Record<string, string> = {
+  'AU': 'Australia', 'BE': 'Belgium', 'CA': 'Canada', 'CZ': 'Czech Republic',
+  'EG': 'Egypt', 'GB-ENG': 'England', 'DE': 'Germany', 'HK': 'Hong Kong',
+  'IE': 'Ireland', 'LV': 'Latvia', 'MX': 'Mexico', 'NZ': 'New Zealand',
+  'NO': 'Norway', 'PT': 'Portugal', 'GB-SCT': 'Scotland', 'ZA': 'South Africa',
+  'ES': 'Spain', 'SE': 'Sweden', 'CH': 'Switzerland', 'US': 'USA', 'GB-WLS': 'Wales',
+  'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra',
+  'AO': 'Angola', 'AG': 'Antigua and Barbuda', 'AR': 'Argentina', 'AM': 'Armenia',
+  'AT': 'Austria', 'AZ': 'Azerbaijan', 'BS': 'Bahamas', 'BH': 'Bahrain',
+  'BD': 'Bangladesh', 'BB': 'Barbados', 'BY': 'Belarus', 'BZ': 'Belize',
+  'BJ': 'Benin', 'BT': 'Bhutan', 'BO': 'Bolivia', 'BA': 'Bosnia and Herzegovina',
+  'BW': 'Botswana', 'BR': 'Brazil', 'BN': 'Brunei', 'BG': 'Bulgaria',
+  'BF': 'Burkina Faso', 'BI': 'Burundi', 'CV': 'Cabo Verde', 'KH': 'Cambodia',
+  'CM': 'Cameroon', 'CF': 'Central African Republic', 'TD': 'Chad', 'CL': 'Chile',
+  'CN': 'China', 'CO': 'Colombia', 'KM': 'Comoros', 'CG': 'Congo',
+  'CR': 'Costa Rica', 'HR': 'Croatia', 'CU': 'Cuba', 'CY': 'Cyprus',
+  'DK': 'Denmark', 'DJ': 'Djibouti', 'DM': 'Dominica', 'DO': 'Dominican Republic',
+  'EC': 'Ecuador', 'SV': 'El Salvador', 'GQ': 'Equatorial Guinea', 'ER': 'Eritrea',
+  'EE': 'Estonia', 'SZ': 'Eswatini', 'ET': 'Ethiopia', 'FJ': 'Fiji',
+  'FI': 'Finland', 'FR': 'France', 'GA': 'Gabon', 'GM': 'Gambia',
+  'GE': 'Georgia', 'GH': 'Ghana', 'GR': 'Greece', 'GD': 'Grenada',
+  'GT': 'Guatemala', 'GN': 'Guinea', 'GW': 'Guinea-Bissau', 'GY': 'Guyana',
+  'HT': 'Haiti', 'HN': 'Honduras', 'HU': 'Hungary', 'IS': 'Iceland',
+  'IN': 'India', 'ID': 'Indonesia', 'IR': 'Iran', 'IQ': 'Iraq',
+  'IL': 'Israel', 'IT': 'Italy', 'JM': 'Jamaica', 'JP': 'Japan',
+  'JO': 'Jordan', 'KZ': 'Kazakhstan', 'KE': 'Kenya', 'KI': 'Kiribati',
+  'KW': 'Kuwait', 'KG': 'Kyrgyzstan', 'LA': 'Laos', 'LB': 'Lebanon',
+  'LS': 'Lesotho', 'LR': 'Liberia', 'LY': 'Libya', 'LI': 'Liechtenstein',
+  'LT': 'Lithuania', 'LU': 'Luxembourg', 'MG': 'Madagascar', 'MW': 'Malawi',
+  'MY': 'Malaysia', 'MV': 'Maldives', 'ML': 'Mali', 'MT': 'Malta',
+  'MH': 'Marshall Islands', 'MR': 'Mauritania', 'MU': 'Mauritius', 'FM': 'Micronesia',
+  'MD': 'Moldova', 'MC': 'Monaco', 'MN': 'Mongolia', 'ME': 'Montenegro',
+  'MA': 'Morocco', 'MZ': 'Mozambique', 'MM': 'Myanmar', 'NA': 'Namibia',
+  'NR': 'Nauru', 'NP': 'Nepal', 'NL': 'Netherlands', 'NI': 'Nicaragua',
+  'NE': 'Niger', 'NG': 'Nigeria', 'MK': 'North Macedonia', 'PK': 'Pakistan',
+  'PW': 'Palau', 'PA': 'Panama', 'PG': 'Papua New Guinea', 'PY': 'Paraguay',
+  'PE': 'Peru', 'PH': 'Philippines', 'PL': 'Poland', 'QA': 'Qatar',
+  'RO': 'Romania', 'RU': 'Russia', 'RW': 'Rwanda', 'KN': 'Saint Kitts and Nevis',
+  'LC': 'Saint Lucia', 'VC': 'Saint Vincent', 'WS': 'Samoa', 'SM': 'San Marino',
+  'ST': 'Sao Tome and Principe', 'SA': 'Saudi Arabia', 'SN': 'Senegal',
+  'RS': 'Serbia', 'SL': 'Sierra Leone', 'SG': 'Singapore', 'SK': 'Slovakia',
+  'SI': 'Slovenia', 'SB': 'Solomon Islands', 'SO': 'Somalia', 'SS': 'South Sudan',
+  'LK': 'Sri Lanka', 'SD': 'Sudan', 'SR': 'Suriname', 'SY': 'Syria',
+  'TW': 'Taiwan', 'TJ': 'Tajikistan', 'TZ': 'Tanzania', 'TH': 'Thailand',
+  'TL': 'Timor-Leste', 'TG': 'Togo', 'TO': 'Tonga', 'TT': 'Trinidad and Tobago',
+  'TN': 'Tunisia', 'TR': 'Turkey', 'TM': 'Turkmenistan', 'TV': 'Tuvalu',
+  'UG': 'Uganda', 'UA': 'Ukraine', 'AE': 'United Arab Emirates', 'UY': 'Uruguay',
+  'UZ': 'Uzbekistan', 'VU': 'Vanuatu', 'VE': 'Venezuela', 'VN': 'Vietnam',
+  'YE': 'Yemen', 'ZM': 'Zambia', 'ZW': 'Zimbabwe',
+}
+
+function getCountryName(code: string): string {
+  return COUNTRY_NAMES[code] || code
+}
+
+function getFlag(code: string): string {
   if (!code) return ''
   if (code === 'GB-ENG') return '🏴󠁧󠁢󠁥󠁮󠁧󠁿'
   if (code === 'GB-SCT') return '🏴󠁧󠁢󠁳󠁣󠁴󠁿'
@@ -29,30 +84,28 @@ const FIRST_SYNC_DATE = '2026-03-03'
 export default function RankingsPage() {
   const [activeTab, setActiveTab] = useState('Rankings')
   const [loading, setLoading] = useState(false)
-  const [currentUserId, setCurrentUserId] = useState('')
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null)
 
-  // Rankings state
   const [rankings, setRankings] = useState<any[]>([])
   const [activeOnly, setActiveOnly] = useState(true)
   const [rankingsPage, setRankingsPage] = useState(0)
   const [pageSize, setPageSize] = useState(50)
 
-  // Movers state
   const [movers, setMovers] = useState<{ gains: any[], losses: any[] }>({ gains: [], losses: [] })
   const [moverPeriod, setMoverPeriod] = useState(30)
 
-  // New Players state
   const [newPlayers, setNewPlayers] = useState<any[]>([])
   const [newPlayerDays, setNewPlayerDays] = useState(30)
   const [newPlayerCountry, setNewPlayerCountry] = useState('')
   const [countryList, setCountryList] = useState<string[]>([])
 
-  // Country stats state
   const [countryStats, setCountryStats] = useState<any[]>([])
   const [countrySortBy, setCountrySortBy] = useState('active_players')
+  const [compareMode, setCompareMode] = useState(false)
+  const [compareDate, setCompareDate] = useState('')
+  const [compareStats, setCompareStats] = useState<any[]>([])
+  const [availableSnapshots, setAvailableSnapshots] = useState<string[]>([])
 
-  // Historical Rankings state
   const [lookupFirst, setLookupFirst] = useState('')
   const [lookupLast, setLookupLast] = useState('')
   const [lookupResults, setLookupResults] = useState<any[]>([])
@@ -60,7 +113,10 @@ export default function RankingsPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null)
   const [playerHistory, setPlayerHistory] = useState<any[]>([])
   const [showDgrade, setShowDgrade] = useState(true)
-  const [showRanking, setShowRanking] = useState(false)
+  const [showRanking, setShowRanking] = useState(true)
+  const [historyRange, setHistoryRange] = useState('5y')
+  const [historyFrom, setHistoryFrom] = useState('')
+  const [historyTo, setHistoryTo] = useState('')
 
   const supabase = createClient()
   const activeYear = new Date().getFullYear() - 1
@@ -69,7 +125,6 @@ export default function RankingsPage() {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        setCurrentUserId(user.id)
         const { data } = await supabase
           .from('profiles')
           .select('first_name, last_name, wcf_player_id')
@@ -86,15 +141,21 @@ export default function RankingsPage() {
     if (activeTab === 'Movers') loadMovers()
     if (activeTab === 'New Players') loadNewPlayers()
     if (activeTab === 'Country Stats') loadCountryStats()
-    if (activeTab === 'Historical Rankings' && currentUserProfile?.wcf_player_id) loadCurrentUserHistory()
+    if (activeTab === 'Historical Rankings' && currentUserProfile?.wcf_player_id && !selectedPlayer) {
+      loadPlayerHistory(currentUserProfile.wcf_player_id)
+    }
   }, [activeTab, activeOnly, moverPeriod, newPlayerDays, newPlayerCountry, rankingsPage, pageSize, currentUserProfile])
+
+  useEffect(() => {
+    if (selectedPlayer) loadPlayerHistoryForRange()
+  }, [historyRange, historyFrom, historyTo])
 
   const loadRankings = async () => {
     setLoading(true)
     let query = supabase
       .from('wcf_players')
-      .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, games, wins, win_percentage, last_active_year, wcf_profile_url')
-      .order('world_ranking', { ascending: true })
+      .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, games, win_percentage, last_active_year, wcf_profile_url')
+      .order('dgrade', { ascending: false })
       .range(rankingsPage * pageSize, (rankingsPage + 1) * pageSize - 1)
     if (activeOnly) query = query.gte('last_active_year', activeYear)
     const { data } = await query
@@ -144,25 +205,69 @@ export default function RankingsPage() {
       const sorted = [...data].sort((a: any, b: any) => b[countrySortBy] - a[countrySortBy])
       setCountryStats(sorted)
     }
+    const { data: snapshots } = await supabase
+      .from('country_stats_snapshots')
+      .select('snapshot_date')
+      .order('snapshot_date', { ascending: false })
+    if (snapshots) {
+      const dates = [...new Set(snapshots.map((s: any) => s.snapshot_date))] as string[]
+      setAvailableSnapshots(dates)
+      if (dates.length > 0 && !compareDate) setCompareDate(dates[0])
+    }
     setLoading(false)
   }
 
-  const loadCurrentUserHistory = async () => {
-    if (!currentUserProfile?.wcf_player_id) return
+  const loadCompareStats = async () => {
+    if (!compareDate) return
+    const { data } = await supabase
+      .from('country_stats_snapshots')
+      .select('*')
+      .eq('snapshot_date', compareDate)
+    if (data) setCompareStats(data)
+  }
+
+  useEffect(() => {
+    if (compareMode) loadCompareStats()
+  }, [compareMode, compareDate])
+
+  const loadPlayerHistory = async (wcfPlayerId: string) => {
     const { data: player } = await supabase
       .from('wcf_players')
       .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, wcf_profile_url')
-      .eq('id', currentUserProfile.wcf_player_id)
+      .eq('id', wcfPlayerId)
       .single()
     if (player) {
       setSelectedPlayer(player)
-      const { data } = await supabase
-        .from('wcf_dgrade_history')
-        .select('dgrade_value, world_ranking, recorded_at')
-        .eq('wcf_player_id', player.id)
-        .order('recorded_at', { ascending: true })
-      setPlayerHistory(data || [])
+      await fetchHistory(player.id)
     }
+  }
+
+  const fetchHistory = async (playerId: string) => {
+    let query = supabase
+      .from('wcf_dgrade_history')
+      .select('dgrade_value, world_ranking, recorded_at')
+      .eq('wcf_player_id', playerId)
+      .order('recorded_at', { ascending: true })
+
+    const now = new Date()
+    if (historyRange === '1y') {
+      const from = new Date(now); from.setFullYear(from.getFullYear() - 1)
+      query = query.gte('recorded_at', from.toISOString())
+    } else if (historyRange === '5y') {
+      const from = new Date(now); from.setFullYear(from.getFullYear() - 5)
+      query = query.gte('recorded_at', from.toISOString())
+    } else if (historyRange === 'custom' && historyFrom) {
+      query = query.gte('recorded_at', historyFrom)
+      if (historyTo) query = query.lte('recorded_at', historyTo)
+    }
+
+    const { data } = await query
+    setPlayerHistory(data || [])
+  }
+
+  const loadPlayerHistoryForRange = async () => {
+    if (!selectedPlayer) return
+    await fetchHistory(selectedPlayer.id)
   }
 
   const handlePlayerSearch = async () => {
@@ -185,52 +290,100 @@ export default function RankingsPage() {
   const handleSelectPlayer = async (player: any) => {
     setSelectedPlayer(player)
     setLookupResults([])
-    const { data } = await supabase
-      .from('wcf_dgrade_history')
-      .select('dgrade_value, world_ranking, recorded_at')
-      .eq('wcf_player_id', player.id)
-      .order('recorded_at', { ascending: true })
-    setPlayerHistory(data || [])
+    setLookupSearched(false)
+    await fetchHistory(player.id)
   }
 
   const formatDate = (str: string) => new Date(str).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 
+  const getCompareRow = (country: string) => compareStats.find((r: any) => r.country === country)
+
+  const renderDiff = (current: number, compare: number | undefined) => {
+    if (compare === undefined || compare === null) return null
+    const diff = current - compare
+    if (diff === 0) return <span className="text-gray-400 text-xs ml-1">—</span>
+    return <span className={`text-xs ml-1 ${diff > 0 ? 'text-green-600' : 'text-red-500'}`}>{diff > 0 ? `+${diff}` : diff}</span>
+  }
+
   const renderChart = () => {
-    if (playerHistory.length === 0) return <p className="text-sm text-gray-400">No history recorded yet for this player.</p>
+    if (playerHistory.length === 0) return <p className="text-sm text-gray-400 py-4">No history recorded yet for this player.</p>
 
     const W = 800
-    const H = 220
-    const pad = { top: 20, right: 20, bottom: 20, left: 50 }
-    const chartW = W - pad.left - pad.right
-    const chartH = H - pad.top - pad.bottom
+    const H = 240
+    const padL = 55
+    const padR = 55
+    const padT = 20
+    const padB = 30
+    const chartW = W - padL - padR
+    const chartH = H - padT - padB
 
     const dgrades = playerHistory.map(h => h.dgrade_value)
-    const rankings = playerHistory.map(h => h.world_ranking)
+    const wranks = playerHistory.map(h => h.world_ranking)
 
-    const dgradeMin = Math.min(...dgrades) - 30
-    const dgradeMax = Math.max(...dgrades) + 30
-    const rankMin = Math.min(...rankings) - 5
-    const rankMax = Math.max(...rankings) + 5
+    const dgradeMin = Math.min(...dgrades) - 50
+    const dgradeMax = Math.max(...dgrades) + 50
+    const rankMin = Math.max(1, Math.min(...wranks) - 10)
+    const rankMax = Math.max(...wranks) + 10
 
-    const xScale = (i: number) => pad.left + (i / Math.max(playerHistory.length - 1, 1)) * chartW
-    const yScaleDgrade = (v: number) => pad.top + chartH - ((v - dgradeMin) / (dgradeMax - dgradeMin)) * chartH
-    const yScaleRank = (v: number) => pad.top + chartH - ((v - rankMin) / (rankMax - rankMin)) * chartH
+    const xScale = (i: number) => padL + (i / Math.max(playerHistory.length - 1, 1)) * chartW
+    const yDgrade = (v: number) => padT + chartH - ((v - dgradeMin) / (dgradeMax - dgradeMin)) * chartH
+    const yRank = (v: number) => padT + chartH - ((rankMax - v) / (rankMax - rankMin)) * chartH
 
-    const dgradePoints = playerHistory.map((h, i) => `${xScale(i)},${yScaleDgrade(h.dgrade_value)}`).join(' ')
-    const rankPoints = playerHistory.map((h, i) => `${xScale(i)},${yScaleRank(h.world_ranking)}`).join(' ')
+    const gridLines = 5
+    const dgradeStep = Math.round((dgradeMax - dgradeMin) / gridLines)
+    const rankStep = Math.round((rankMax - rankMin) / gridLines)
 
     return (
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 400 }}>
-        {showDgrade && <polyline points={dgradePoints} fill="none" stroke="#16a34a" strokeWidth="2" />}
-        {showRanking && <polyline points={rankPoints} fill="none" stroke="#2563eb" strokeWidth="2" />}
+        {Array.from({ length: gridLines + 1 }).map((_, i) => {
+          const y = padT + (i / gridLines) * chartH
+          return (
+            <line key={i} x1={padL} y1={y} x2={W - padR} y2={y} stroke="#e5e7eb" strokeWidth="1" />
+          )
+        })}
+
+        {showDgrade && Array.from({ length: gridLines + 1 }).map((_, i) => {
+          const val = dgradeMax - i * dgradeStep
+          const y = padT + (i / gridLines) * chartH
+          return <text key={i} x={padL - 6} y={y + 4} fontSize="9" fill="#6b7280" textAnchor="end">{val}</text>
+        })}
+
+        {showRanking && Array.from({ length: gridLines + 1 }).map((_, i) => {
+          const val = rankMin + i * rankStep
+          const y = padT + chartH - (i / gridLines) * chartH
+          return <text key={i} x={W - padR + 6} y={y + 4} fontSize="9" fill="#2563eb" textAnchor="start">#{val}</text>
+        })}
+
+        {showDgrade && (
+          <polyline
+            points={playerHistory.map((h, i) => `${xScale(i)},${yDgrade(h.dgrade_value)}`).join(' ')}
+            fill="none" stroke="#16a34a" strokeWidth="2"
+          />
+        )}
+        {showRanking && (
+          <polyline
+            points={playerHistory.map((h, i) => `${xScale(i)},${yRank(h.world_ranking)}`).join(' ')}
+            fill="none" stroke="#2563eb" strokeWidth="2"
+          />
+        )}
+
         {playerHistory.map((h, i) => (
           <g key={i}>
-            {showDgrade && <circle cx={xScale(i)} cy={yScaleDgrade(h.dgrade_value)} r="3" fill="#16a34a"><title>{formatDate(h.recorded_at)}: dGrade {h.dgrade_value}</title></circle>}
-            {showRanking && <circle cx={xScale(i)} cy={yScaleRank(h.world_ranking)} r="3" fill="#2563eb"><title>{formatDate(h.recorded_at)}: Rank #{h.world_ranking}</title></circle>}
+            {showDgrade && (
+              <circle cx={xScale(i)} cy={yDgrade(h.dgrade_value)} r="3" fill="#16a34a">
+                <title>{formatDate(h.recorded_at)}: dGrade {h.dgrade_value}</title>
+              </circle>
+            )}
+            {showRanking && (
+              <circle cx={xScale(i)} cy={yRank(h.world_ranking)} r="3" fill="#2563eb">
+                <title>{formatDate(h.recorded_at)}: Rank #{h.world_ranking}</title>
+              </circle>
+            )}
           </g>
         ))}
-        <text x={pad.left - 5} y={pad.top + 5} fontSize="9" fill="#9ca3af" textAnchor="end">{showDgrade ? dgradeMax : rankMin}</text>
-        <text x={pad.left - 5} y={pad.top + chartH} fontSize="9" fill="#9ca3af" textAnchor="end">{showDgrade ? dgradeMin : rankMax}</text>
+
+        {showDgrade && <text x={padL} y={H - 5} fontSize="9" fill="#16a34a">dGrade</text>}
+        {showRanking && <text x={W - padR} y={H - 5} fontSize="9" fill="#2563eb" textAnchor="end">World Rank</text>}
       </svg>
     )
   }
@@ -273,21 +426,31 @@ export default function RankingsPage() {
                   {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
                 </select>
               </div>
-              <button
-                onClick={() => { setActiveOnly(!activeOnly); setRankingsPage(0) }}
-                className={`flex items-center gap-2 text-xs px-3 py-1 rounded-full border transition ${
-                  activeOnly ? 'bg-green-50 border-green-400 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-500'
-                }`}
-              >
-                <span className={`w-3 h-3 rounded-full ${activeOnly ? 'bg-green-500' : 'bg-gray-300'}`} />
-                {activeOnly ? 'Active last 12 months' : 'All time'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setActiveOnly(true); setRankingsPage(0) }}
+                  className={`px-4 py-1 rounded-full text-sm font-medium border transition ${
+                    activeOnly ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
+                  }`}
+                >
+                  Active last 12 months
+                </button>
+                <button
+                  onClick={() => { setActiveOnly(false); setRankingsPage(0) }}
+                  className={`px-4 py-1 rounded-full text-sm font-medium border transition ${
+                    !activeOnly ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  All Time
+                </button>
+              </div>
             </div>
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="text-left px-4 py-3 text-gray-600 font-medium">Rank</th>
+                    <th className="text-left px-4 py-3 text-gray-600 font-medium">Active Rank</th>
+                    <th className="text-left px-4 py-3 text-gray-600 font-medium">All Time Rank</th>
                     <th className="text-left px-4 py-3 text-gray-600 font-medium">Player</th>
                     <th className="text-left px-4 py-3 text-gray-600 font-medium">Country</th>
                     <th className="text-right px-4 py-3 text-gray-600 font-medium">dGrade</th>
@@ -299,6 +462,7 @@ export default function RankingsPage() {
                 <tbody>
                   {rankings.map((player, i) => (
                     <tr key={player.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-2 text-gray-700">{activeOnly ? rankingsPage * pageSize + i + 1 : '—'}</td>
                       <td className="px-4 py-2 text-gray-700">{player.world_ranking}</td>
                       <td className="px-4 py-2">
                         <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline font-medium">
@@ -307,7 +471,7 @@ export default function RankingsPage() {
                       </td>
                       <td className="px-4 py-2">
                         <span className="mr-1">{getFlag(player.country)}</span>
-                        <span className="text-gray-700">{player.country}</span>
+                        <span className="text-gray-700">{getCountryName(player.country)}</span>
                       </td>
                       <td className="px-4 py-2 text-right font-medium text-gray-800">{player.dgrade}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{player.games || '—'}</td>
@@ -353,7 +517,7 @@ export default function RankingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mb-4">GCLab dGrade tracking started 3 Mar 2026. Historical data will grow over time.</p>
+            <p className="text-xs text-gray-400 mb-4">GCLab dGrade tracking started 3 Mar 2026. Data will grow richer over time.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-semibold text-green-700 mb-3">📈 Biggest Gains</h3>
@@ -450,7 +614,7 @@ export default function RankingsPage() {
               >
                 <option value="">All countries</option>
                 {countryList.map(c => (
-                  <option key={c} value={c}>{getFlag(c)} {c}</option>
+                  <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>
                 ))}
               </select>
             </div>
@@ -479,7 +643,7 @@ export default function RankingsPage() {
                       </td>
                       <td className="px-4 py-2">
                         <span className="mr-1">{getFlag(player.country)}</span>
-                        <span className="text-gray-700">{player.country}</span>
+                        <span className="text-gray-700">{getCountryName(player.country)}</span>
                       </td>
                       <td className="px-4 py-2 text-right font-medium text-gray-800">{player.dgrade}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{player.world_ranking}</td>
@@ -494,27 +658,59 @@ export default function RankingsPage() {
 
         {activeTab === 'Country Stats' && !loading && (
           <div>
-            <div className="flex gap-2 mb-4 flex-wrap">
-              {[
-                { key: 'active_players', label: 'Active Players' },
-                { key: 'total_players', label: 'Total Players' },
-                { key: 'avg_top6_dgrade', label: 'Top 6 Avg dGrade' },
-              ].map(s => (
-                <button
-                  key={s.key}
-                  onClick={() => {
-                    setCountrySortBy(s.key)
-                    const sorted = [...countryStats].sort((a, b) => b[s.key] - a[s.key])
-                    setCountryStats(sorted)
-                  }}
-                  className={`px-3 py-1 rounded-full text-sm border transition ${
-                    countrySortBy === s.key ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { key: 'active_players', label: 'Active Players' },
+                  { key: 'total_players', label: 'Total Players' },
+                  { key: 'avg_top6_dgrade', label: 'Top 6 Avg dGrade' },
+                ].map(s => (
+                  <button
+                    key={s.key}
+                    onClick={() => {
+                      setCountrySortBy(s.key)
+                      const sorted = [...countryStats].sort((a, b) => b[s.key] - a[s.key])
+                      setCountryStats(sorted)
+                    }}
+                    className={`px-3 py-1 rounded-full text-sm border transition ${
+                      countrySortBy === s.key ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setCompareMode(!compareMode)}
+                className={`px-4 py-1 rounded-full text-sm border transition ${
+                  compareMode ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                }`}
+              >
+                {compareMode ? 'Hide Compare' : 'Compare to Past'}
+              </button>
             </div>
+
+            {compareMode && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm">
+                {availableSnapshots.length === 0 ? (
+                  <p className="text-blue-700">No historical snapshots available yet. Monthly snapshots are stored on the 1st of each month starting April 2026. Check back then to compare periods.</p>
+                ) : (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-blue-700">Compare current stats to:</span>
+                    <select
+                      value={compareDate}
+                      onChange={(e) => setCompareDate(e.target.value)}
+                      className="border border-blue-300 rounded-md px-2 py-1 text-sm text-gray-700"
+                    >
+                      {availableSnapshots.map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
             <p className="text-xs text-gray-400 mb-3">Active = played a ranked game in the last 12 months. Top 6 avg dGrade reflects competitive strength.</p>
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <table className="w-full text-sm">
@@ -528,17 +724,29 @@ export default function RankingsPage() {
                 </thead>
                 <tbody>
                   {countryStats.length === 0 ? (
-                    <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400 text-sm">Loading country data...</td></tr>
-                  ) : countryStats.map((row, i) => (
-                    <tr key={row.country} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-4 py-2 font-medium">
-                        <span className="mr-2">{getFlag(row.country)}</span>{row.country}
-                      </td>
-                      <td className="px-4 py-2 text-right text-gray-700">{row.total_players}</td>
-                      <td className="px-4 py-2 text-right text-gray-700">{row.active_players}</td>
-                      <td className="px-4 py-2 text-right font-medium text-gray-800">{row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}</td>
-                    </tr>
-                  ))}
+                    <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400 text-sm">No data available.</td></tr>
+                  ) : countryStats.map((row, i) => {
+                    const comp = compareMode ? getCompareRow(row.country) : null
+                    return (
+                      <tr key={row.country} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-4 py-2 font-medium">
+                          <span className="mr-2">{getFlag(row.country)}</span>{getCountryName(row.country)}
+                        </td>
+                        <td className="px-4 py-2 text-right text-gray-700">
+                          {row.total_players}
+                          {comp && renderDiff(row.total_players, comp.total_players)}
+                        </td>
+                        <td className="px-4 py-2 text-right text-gray-700">
+                          {row.active_players}
+                          {comp && renderDiff(row.active_players, comp.active_players)}
+                        </td>
+                        <td className="px-4 py-2 text-right font-medium text-gray-800">
+                          {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
+                          {comp && comp.avg_top6_dgrade && renderDiff(Math.round(row.avg_top6_dgrade), Math.round(comp.avg_top6_dgrade))}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -547,41 +755,35 @@ export default function RankingsPage() {
 
         {activeTab === 'Historical Rankings' && (
           <div>
-            {!selectedPlayer && (
-              <div className="mb-6">
-                {currentUserProfile?.wcf_player_id ? (
-                  <p className="text-sm text-gray-500 mb-4">Showing your ranking history. Search below to look up any player.</p>
-                ) : (
-                  <p className="text-sm text-gray-500 mb-4">Link your WCF record in your profile to see your own history. Or search for any player below.</p>
-                )}
-                <div className="flex gap-2 flex-wrap">
-                  <input
-                    type="text"
-                    placeholder="First name"
-                    value={lookupFirst}
-                    onChange={(e) => setLookupFirst(e.target.value)}
-                    className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 w-36 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Last name"
-                    value={lookupLast}
-                    onChange={(e) => setLookupLast(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handlePlayerSearch()}
-                    className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 w-36 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                  <button
-                    onClick={handlePlayerSearch}
-                    className="bg-green-600 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 transition"
-                  >
-                    Search
-                  </button>
-                </div>
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+              <h3 className="font-medium text-gray-800 mb-3">Search any player</h3>
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="First name"
+                  value={lookupFirst}
+                  onChange={(e) => setLookupFirst(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 w-36 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Last name"
+                  value={lookupLast}
+                  onChange={(e) => setLookupLast(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handlePlayerSearch()}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 w-36 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <button
+                  onClick={handlePlayerSearch}
+                  className="bg-green-600 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 transition"
+                >
+                  Search
+                </button>
               </div>
-            )}
+            </div>
 
             {lookupSearched && lookupResults.length === 0 && !selectedPlayer && (
-              <p className="text-sm text-gray-400">No players found.</p>
+              <p className="text-sm text-gray-400 mb-4">No players found.</p>
             )}
 
             {!selectedPlayer && lookupResults.length > 0 && (
@@ -600,7 +802,7 @@ export default function RankingsPage() {
                     {lookupResults.map((player, i) => (
                       <tr key={player.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-4 py-2 font-medium text-gray-800">{player.wcf_first_name} {player.wcf_last_name}</td>
-                        <td className="px-4 py-2 text-gray-700">{getFlag(player.country)} {player.country}</td>
+                        <td className="px-4 py-2 text-gray-700">{getFlag(player.country)} {getCountryName(player.country)}</td>
                         <td className="px-4 py-2 text-right text-gray-800 font-medium">{player.dgrade}</td>
                         <td className="px-4 py-2 text-right text-gray-700">#{player.world_ranking}</td>
                         <td className="px-4 py-2 text-right">
@@ -622,36 +824,58 @@ export default function RankingsPage() {
                     onClick={() => { setSelectedPlayer(null); setPlayerHistory([]) }}
                     className="text-sm text-gray-500 hover:text-green-600"
                   >
-                    ← Back
+                    ← Back to search
                   </button>
                   <h3 className="font-semibold text-lg">{getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}</h3>
-                  <span className="text-sm text-gray-500">{selectedPlayer.country} · dGrade {selectedPlayer.dgrade} · World #{selectedPlayer.world_ranking}</span>
+                  <span className="text-sm text-gray-500">{getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade} · World #{selectedPlayer.world_ranking}</span>
                   <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline ml-auto">
                     WCF Profile →
                   </a>
                 </div>
 
-                <div className="flex gap-3 mb-3">
-                  <button
-                    onClick={() => setShowDgrade(!showDgrade)}
-                    className={`flex items-center gap-2 text-xs px-3 py-1 rounded-full border transition ${
-                      showDgrade ? 'bg-green-50 border-green-400 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-400'
-                    }`}
-                  >
-                    <span className="w-3 h-1 bg-green-500 inline-block rounded" /> dGrade
-                  </button>
-                  <button
-                    onClick={() => setShowRanking(!showRanking)}
-                    className={`flex items-center gap-2 text-xs px-3 py-1 rounded-full border transition ${
-                      showRanking ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-gray-50 border-gray-300 text-gray-400'
-                    }`}
-                  >
-                    <span className="w-3 h-1 bg-blue-500 inline-block rounded" /> World Ranking
-                  </button>
+                <div className="flex items-center gap-3 mb-3 flex-wrap">
+                  <div className="flex gap-2">
+                    {[{ key: '1y', label: '1 Year' }, { key: '5y', label: '5 Years' }, { key: 'all', label: 'All Time' }, { key: 'custom', label: 'Custom' }].map(r => (
+                      <button
+                        key={r.key}
+                        onClick={() => setHistoryRange(r.key)}
+                        className={`px-3 py-1 rounded-full text-xs border transition ${
+                          historyRange === r.key ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  {historyRange === 'custom' && (
+                    <div className="flex items-center gap-2">
+                      <input type="date" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs" />
+                      <span className="text-gray-400 text-xs">to</span>
+                      <input type="date" value={historyTo} onChange={(e) => setHistoryTo(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs" />
+                    </div>
+                  )}
+                  <div className="flex gap-2 ml-auto">
+                    <button
+                      onClick={() => setShowDgrade(!showDgrade)}
+                      className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${
+                        showDgrade ? 'bg-green-50 border-green-400 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-400'
+                      }`}
+                    >
+                      <span className="w-4 h-1 bg-green-500 inline-block rounded" /> dGrade
+                    </button>
+                    <button
+                      onClick={() => setShowRanking(!showRanking)}
+                      className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${
+                        showRanking ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-gray-50 border-gray-300 text-gray-400'
+                      }`}
+                    >
+                      <span className="w-4 h-1 bg-blue-500 inline-block rounded" /> World Ranking
+                    </button>
+                  </div>
                 </div>
 
                 <p className="text-xs text-gray-400 mb-3">
-                  History recorded since GCLab first synced. {playerHistory.length} data point{playerHistory.length !== 1 ? 's' : ''}.
+                  History recorded since GCLab first synced on 2 Mar 2026. {playerHistory.length} data point{playerHistory.length !== 1 ? 's' : ''}. Monthly snapshots taken on the 1st of each month.
                 </p>
 
                 <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
