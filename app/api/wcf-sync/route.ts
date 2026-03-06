@@ -76,6 +76,7 @@ async function runSync(logId: string) {
 
     let updated = 0
     let created = 0
+    const now = new Date().toISOString()
 
     const BATCH_SIZE = 50
     for (let i = 0; i < players.length; i += BATCH_SIZE) {
@@ -83,7 +84,7 @@ async function runSync(logId: string) {
       await Promise.all(batch.map(async (player) => {
         const { data: existing } = await supabase
           .from('wcf_players')
-          .select('id, dgrade')
+          .select('id, dgrade, linked_user_id')
           .eq('wcf_first_name', player.wcf_first_name)
           .eq('wcf_last_name', player.wcf_last_name)
           .single()
@@ -95,16 +96,30 @@ async function runSync(logId: string) {
               dgrade_value: player.dgrade,
               world_ranking: player.world_ranking,
             })
+            if (existing.linked_user_id) {
+              await supabase.from('profiles').update({
+                dgrade: player.dgrade,
+                dgrade_last_synced_at: now,
+              }).eq('id', existing.linked_user_id)
+              await supabase.from('dgrade_history').insert({
+                user_id: existing.linked_user_id,
+                dgrade_value: player.dgrade,
+              })
+            }
+          } else if (existing.linked_user_id) {
+            await supabase.from('profiles').update({
+              dgrade_last_synced_at: now,
+            }).eq('id', existing.linked_user_id)
           }
           await supabase
             .from('wcf_players')
-            .update({ ...player, last_synced_at: new Date().toISOString() })
+            .update({ ...player, last_synced_at: now })
             .eq('id', existing.id)
           updated++
         } else {
           const { data: newPlayer } = await supabase
             .from('wcf_players')
-            .insert({ ...player, last_synced_at: new Date().toISOString() })
+            .insert({ ...player, last_synced_at: now })
             .select('id')
             .single()
           if (newPlayer) {
@@ -124,7 +139,7 @@ async function runSync(logId: string) {
       total: players.length,
       created,
       updated,
-      completed_at: new Date().toISOString(),
+      completed_at: now,
     }).eq('id', logId)
 
   } catch (error) {

@@ -45,6 +45,12 @@ export default function DashboardPage() {
     setProfile(data)
   }
 
+  const formatSyncDate = (dateStr: string) => {
+    if (!dateStr) return null
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
 
   return (
@@ -66,12 +72,22 @@ export default function DashboardPage() {
         </div>
       </nav>
       <main className="max-w-4xl mx-auto px-6 py-10">
-        <h2 className="text-2xl font-bold mb-2">
+        <h2 className="text-2xl font-bold mb-1">
           Welcome, {profile?.first_name || user.email}
         </h2>
-        <p className="text-gray-600 mb-6">
-          {profile?.dgrade ? `dGrade: ${profile.dgrade}` : 'Set your dGrade in your profile'}
-        </p>
+
+        {profile?.dgrade ? (
+          <div className="flex items-baseline gap-2 mb-6">
+            <p className="text-gray-600">dGrade: <span className="font-semibold text-gray-800">{profile.dgrade}</span></p>
+            {profile.dgrade_last_synced_at ? (
+              <p className="text-xs text-gray-400">WCF synced {formatSyncDate(profile.dgrade_last_synced_at)}</p>
+            ) : profile.wcf_player_id ? (
+              <p className="text-xs text-gray-400">Updates automatically each Tuesday</p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-gray-500 mb-6">Set your dGrade in your profile</p>
+        )}
 
         {profile && !profile.wcf_player_id && profile.first_name && profile.last_name && (
           <WcfMatchBanner
