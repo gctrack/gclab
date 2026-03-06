@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import WcfMatchBanner from '@/components/WcfMatchBanner'
 
 const GC_COUNTRIES = [
   { code: 'AU', name: 'Australia' },
@@ -214,7 +215,7 @@ function getFlag(code: string) {
     .join('')
 }
 
-function Toggle({ enabled, onChange, label }: { enabled: boolean, onChange: (v: boolean) => void, label: string }) {
+function Toggle({ enabled, onChange }: { enabled: boolean, onChange: (v: boolean) => void }) {
   return (
     <button
       onClick={() => onChange(!enabled)}
@@ -225,7 +226,7 @@ function Toggle({ enabled, onChange, label }: { enabled: boolean, onChange: (v: 
       }`}
     >
       <span className={`w-3 h-3 rounded-full ${enabled ? 'bg-green-500' : 'bg-gray-300'}`} />
-      {enabled ? `Visible to members` : `Private`}
+      {enabled ? 'Visible to members' : 'Private'}
     </button>
   )
 }
@@ -234,6 +235,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [userId, setUserId] = useState('')
   const [profile, setProfile] = useState({
     first_name: '',
     last_name: '',
@@ -247,6 +249,7 @@ export default function ProfilePage() {
     grip_notes: '',
     dgrade: '',
     wcf_profile_url: '',
+    wcf_player_id: '',
     show_city: false,
     show_phone: false,
     show_whatsapp: false,
@@ -263,6 +266,7 @@ export default function ProfilePage() {
         router.push('/login')
         return
       }
+      setUserId(user.id)
       const { data } = await supabase
         .from('profiles')
         .select('*')
@@ -282,6 +286,7 @@ export default function ProfilePage() {
           grip_notes: data.grip_notes || '',
           dgrade: data.dgrade || '',
           wcf_profile_url: data.wcf_profile_url || '',
+          wcf_player_id: data.wcf_player_id || '',
           show_city: data.show_city || false,
           show_phone: data.show_phone || false,
           show_whatsapp: data.show_whatsapp || false,
@@ -300,6 +305,24 @@ export default function ProfilePage() {
     )
   }
 
+  const handleWcfLinked = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+    if (data) {
+      setProfile(p => ({
+        ...p,
+        wcf_player_id: data.wcf_player_id || '',
+        dgrade: data.dgrade || '',
+        wcf_profile_url: data.wcf_profile_url || '',
+      }))
+    }
+  }
+
   const selectedFlag = profile.country ? getFlag(profile.country) : null
 
   const handleSave = async () => {
@@ -314,7 +337,7 @@ export default function ProfilePage() {
       .eq('id', user.id)
       .single()
 
-    const newDgrade = profile.dgrade ? parseInt(profile.dgrade) : null
+    const newDgrade = profile.dgrade ? parseInt(profile.dgrade as string) : null
 
     if (newDgrade && existing?.dgrade !== newDgrade) {
       await supabase.from('dgrade_history').insert({
@@ -370,13 +393,32 @@ export default function ProfilePage() {
       </nav>
       <main className="max-w-2xl mx-auto px-6 py-10">
         <h2 className="text-2xl font-bold mb-6">Your Profile</h2>
+
+        {!profile.wcf_player_id && profile.first_name && profile.last_name && (
+          <WcfMatchBanner
+            userId={userId}
+            firstName={profile.first_name}
+            lastName={profile.last_name}
+            onLinked={handleWcfLinked}
+          />
+        )}
+
         {message && (
           <p className={`text-sm mb-4 ${message.includes('Error') ? 'text-red-500' : 'text-green-600'}`}>
             {message}
           </p>
         )}
-        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
 
+        {profile.wcf_player_id && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-700">
+            ✓ Linked to WCF record —
+            <a href={profile.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="underline ml-1">
+              view WCF profile
+            </a>
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -425,7 +467,7 @@ export default function ProfilePage() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-gray-700">City</label>
-              <Toggle enabled={profile.show_city} onChange={(v) => setProfile(p => ({ ...p, show_city: v }))} label="city" />
+              <Toggle enabled={profile.show_city} onChange={(v) => setProfile(p => ({ ...p, show_city: v }))} />
             </div>
             <input
               type="text"
@@ -513,14 +555,13 @@ export default function ProfilePage() {
           </div>
 
           <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Contact Details</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">Contact Details</h3>
             <p className="text-sm text-gray-500 mb-4">Control what other signed-in members can see.</p>
-
             <div className="space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-gray-700">Phone</label>
-                  <Toggle enabled={profile.show_phone} onChange={(v) => setProfile(p => ({ ...p, show_phone: v }))} label="phone" />
+                  <Toggle enabled={profile.show_phone} onChange={(v) => setProfile(p => ({ ...p, show_phone: v }))} />
                 </div>
                 <input
                   type="text"
@@ -529,11 +570,10 @@ export default function ProfilePage() {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
-
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-gray-700">WhatsApp</label>
-                  <Toggle enabled={profile.show_whatsapp} onChange={(v) => setProfile(p => ({ ...p, show_whatsapp: v }))} label="whatsapp" />
+                  <Toggle enabled={profile.show_whatsapp} onChange={(v) => setProfile(p => ({ ...p, show_whatsapp: v }))} />
                 </div>
                 <input
                   type="text"
@@ -542,11 +582,10 @@ export default function ProfilePage() {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
-
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-gray-700">Contact Email</label>
-                  <Toggle enabled={profile.show_contact_email} onChange={(v) => setProfile(p => ({ ...p, show_contact_email: v }))} label="email" />
+                  <Toggle enabled={profile.show_contact_email} onChange={(v) => setProfile(p => ({ ...p, show_contact_email: v }))} />
                 </div>
                 <input
                   type="email"
@@ -565,7 +604,6 @@ export default function ProfilePage() {
           >
             {saving ? 'Saving...' : 'Save Profile'}
           </button>
-
         </div>
       </main>
     </div>
