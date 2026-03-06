@@ -137,11 +137,10 @@ async function runSync(logId: string) {
 }
 
 export async function GET(request: Request) {
-    const authHeader = request.headers.get('authorization')
-    const cronHeader = request.headers.get('x-vercel-cron')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && cronHeader !== '1') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const authHeader = request.headers.get('authorization')
+  const cronHeader = request.headers.get('x-vercel-cron')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && cronHeader !== '1') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { data: log } = await supabase
