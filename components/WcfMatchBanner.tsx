@@ -29,6 +29,7 @@ export default function WcfMatchBanner({ userId, firstName, lastName, onLinked }
   const [searchResults, setSearchResults] = useState<WcfPlayer[]>([])
   const [searching, setSearching] = useState(false)
   const [linked, setLinked] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -47,12 +48,13 @@ export default function WcfMatchBanner({ userId, firstName, lastName, onLinked }
       .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, wcf_profile_url')
       .ilike('wcf_last_name', last)
       .order('world_ranking', { ascending: true })
-    
+
     if (data) {
-      const filtered = data.filter(p => 
+      const filtered = data.filter(p =>
         p.wcf_first_name.charAt(0).toLowerCase() === firstLetter
       )
       setMatches(filtered)
+      if (filtered.length === 0) setShowSearch(true)
     }
     setLoading(false)
   }
@@ -60,17 +62,16 @@ export default function WcfMatchBanner({ userId, firstName, lastName, onLinked }
   const handleSearch = async () => {
     if (!searchLast) return
     setSearching(true)
-    const firstLetter = searchFirst.charAt(0).toLowerCase()
     const { data } = await supabase
       .from('wcf_players')
       .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, wcf_profile_url')
       .ilike('wcf_last_name', `%${searchLast}%`)
       .order('world_ranking', { ascending: true })
       .limit(20)
-    
+
     if (data) {
-      const filtered = searchFirst 
-        ? data.filter(p => p.wcf_first_name.charAt(0).toLowerCase() === firstLetter)
+      const filtered = searchFirst
+        ? data.filter(p => p.wcf_first_name.charAt(0).toLowerCase() === searchFirst.charAt(0).toLowerCase())
         : data
       setSearchResults(filtered)
     }
@@ -86,6 +87,12 @@ export default function WcfMatchBanner({ userId, firstName, lastName, onLinked }
         wcf_profile_url: player.wcf_profile_url,
       })
       .eq('id', userId)
+
+    await supabase
+      .from('wcf_players')
+      .update({ linked_user_id: userId })
+      .eq('id', player.id)
+
     setLinked(true)
     onLinked()
   }
@@ -93,6 +100,7 @@ export default function WcfMatchBanner({ userId, firstName, lastName, onLinked }
   const handleNotMe = () => {
     setMatches([])
     setSearchResults([])
+    setShowSearch(true)
   }
 
   if (loading || dismissed || linked) return null
@@ -105,7 +113,7 @@ export default function WcfMatchBanner({ userId, firstName, lastName, onLinked }
       <div className="flex justify-between items-start mb-3">
         <div>
           <h3 className="font-semibold text-blue-800">Are you on the WCF rankings?</h3>
-          <p className="text-sm text-blue-600">Link your account to your WCF record to auto-fill your dGrade.</p>
+          <p className="text-sm text-blue-600">Link your account to your WCF record to auto-update your dGrade.</p>
         </div>
         <button
           onClick={() => setDismissed(true)}
@@ -115,22 +123,20 @@ export default function WcfMatchBanner({ userId, firstName, lastName, onLinked }
         </button>
       </div>
 
-      {playersToShow.length > 0 && (
-        <div className="space-y-2 mb-4">
+      {!showSearch && playersToShow.length > 0 && (
+        <div className="space-y-2 mb-3">
           {playersToShow.map(player => (
             <div key={player.id} className="bg-white rounded-md p-3 flex items-center justify-between border border-blue-100">
               <div>
                 <p className="font-medium text-gray-800">{player.wcf_first_name} {player.wcf_last_name}</p>
                 <p className="text-sm text-gray-500">{player.country} · dGrade {player.dgrade} · World #{player.world_ranking}</p>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleLink(player)}
-                  className="bg-blue-600 text-white text-sm px-3 py-1 rounded-md hover:bg-blue-700 transition"
-                >
-                  That's me
-                </button>
-              </div>
+              <button
+                onClick={() => handleLink(player)}
+                className="bg-blue-600 text-white text-sm px-3 py-1 rounded-md hover:bg-blue-700 transition"
+              >
+                That's me
+              </button>
             </div>
           ))}
           <button
@@ -142,12 +148,10 @@ export default function WcfMatchBanner({ userId, firstName, lastName, onLinked }
         </div>
       )}
 
-      {playersToShow.length === 0 && (
+      {(showSearch || playersToShow.length === 0) && (
         <div className="space-y-2">
-          <p className="text-sm text-blue-700 mb-2">
-            {matches.length === 0 && !searching ? "No automatic match found. Search for your name:" : "Search for your name:"}
-          </p>
-          <div className="flex gap-2">
+          <p className="text-sm text-blue-700 mb-2">Search for your name on the WCF rankings:</p>
+          <div className="flex gap-2 flex-wrap">
             <input
               type="text"
               placeholder="First name"
@@ -160,6 +164,7 @@ export default function WcfMatchBanner({ userId, firstName, lastName, onLinked }
               placeholder="Last name"
               value={searchLast}
               onChange={(e) => setSearchLast(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="border border-gray-300 rounded-md px-3 py-1 text-sm text-gray-900 w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button
@@ -167,9 +172,30 @@ export default function WcfMatchBanner({ userId, firstName, lastName, onLinked }
               disabled={searching}
               className="bg-blue-600 text-white text-sm px-3 py-1 rounded-md hover:bg-blue-700 transition disabled:opacity-50"
             >
-              Search
+              {searching ? 'Searching...' : 'Search'}
             </button>
           </div>
+          {searchResults.length > 0 && (
+            <div className="space-y-2 mt-3">
+              {searchResults.map(player => (
+                <div key={player.id} className="bg-white rounded-md p-3 flex items-center justify-between border border-blue-100">
+                  <div>
+                    <p className="font-medium text-gray-800">{player.wcf_first_name} {player.wcf_last_name}</p>
+                    <p className="text-sm text-gray-500">{player.country} · dGrade {player.dgrade} · World #{player.world_ranking}</p>
+                  </div>
+                  <button
+                    onClick={() => handleLink(player)}
+                    className="bg-blue-600 text-white text-sm px-3 py-1 rounded-md hover:bg-blue-700 transition"
+                  >
+                    That's me
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {searchResults.length === 0 && searching === false && searchLast && (
+            <p className="text-sm text-gray-500 mt-2">No players found — check the spelling or try a partial last name.</p>
+          )}
         </div>
       )}
     </div>
