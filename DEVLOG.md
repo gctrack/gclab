@@ -107,3 +107,10 @@ NEXT_PUBLIC_CRON_SECRET=gclab_wcf_sync_secret_2026
 - Hoop importance analysis (hoop 9 significance)
 - Performance scoring formula weighting shot difficulty
 ```
+## Deployment
+- Platform: Vercel
+- Production URL: https://gclab-een9.vercel.app
+- Auto-deploys from GitHub main branch on every push
+- Do NOT use vercel --prod from terminal, just use git push
+- Environment variables must be set in Vercel dashboard
+- Vercel project: gctracks-projects/gclab
