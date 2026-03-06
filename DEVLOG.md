@@ -131,3 +131,42 @@ NEXT_PUBLIC_CRON_SECRET=gclab_wcf_sync_secret_2026
 - Terminal commands always in their own separate code block
 - Deployment: just use git push - Vercel auto-deploys from GitHub
 - Do NOT run vercel --prod from terminal
+
+## Rankings Page - Completed 6 Mar 2026
+
+### What Was Built
+- app/rankings/page.tsx — 5 tab rankings page
+  - Tab 1: Rankings — sortable by dGrade, Games, Win%. Active/All Time toggle. Pagination 50/100/200. Active Rank + All Time Rank columns. Country flags + full names.
+  - Tab 2: Movers — gains and losses. Filtered by games > 0 to exclude inactive players. Shows change, dGrade, games, win%.
+  - Tab 3: New Players — shows players first seen after Mar 3 2026. Country filter + date range.
+  - Tab 4: Country Stats — sortable by clicking column headers. Row numbers. Compare mode (ready for Apr 2026 first snapshot). Full country names + flags.
+  - Tab 5: Historical Rankings — search any player. Line chart with dGrade (green) and World Ranking (blue). Toggle each line. Date range: 1yr/5yr/all/custom. Grid lines and dual Y-axis.
+
+### Database
+- country_stats_snapshots table: snapshot_date, country, total_players, active_players, avg_top6_dgrade
+- get_movers() function: compares first vs last history record, filters games > 0
+- get_country_stats() function: fixed ambiguous column reference
+- wcf_dgrade_history: baseline reset 6 Mar 2026 — all 11,680 players have clean baseline at current dGrade
+
+### Known Issues / Revisit Later
+- Movers data sparse until daily syncs accumulate real changes — check back in a few weeks
+- Country Stats compare mode needs first snapshot (1 Apr 2026) before it becomes useful
+- Historical chart only has 1-2 data points per player now — will improve over months
+- New Players tab currently empty — will populate as new WCF players appear after Mar 3
+
+### Data Rules
+- Movers baseline: 6 Mar 2026 (all bad March 2 import data was deleted and replaced with current dGrade)
+- New Players cutoff: 2026-03-03T00:00:00Z (hardcoded as NEW_PLAYERS_SINCE constant)
+- Monthly snapshots: written on 1st of month for all players + country stats
+- FIRST_SYNC_DATE constant: '2026-03-02'
+
+### Manual Data Fixes Applied
+These players had corrupted March 2 baseline records manually corrected:
+Ed Paravicini 1499, David Fardon 1459, Josh Head 1631, Gary Hudson 1413,
+Joe Zowry 1583, Adam Peck 1998, Margaret Hudson 1486, Bruce Hindin 1908, Rich Rose 1722
+
+### Remaining Roadmap
+- Game logging UI
+- Clubs page  
+- iPhone app
+- Apple Watch app
