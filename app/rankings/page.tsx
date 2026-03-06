@@ -223,7 +223,7 @@ export default function RankingsPage() {
     setLoading(true)
     const since = new Date()
     since.setDate(since.getDate() - newPlayerDays)
-    const sinceDate = since < new Date(FIRST_SYNC_DATE) ? FIRST_SYNC_DATE : since.toISOString()
+    const sinceDate = '2026-03-03T00:00:00Z'
     let query = supabase
       .from('wcf_players')
       .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, wcf_profile_url, created_at')
@@ -338,17 +338,17 @@ export default function RankingsPage() {
   const renderChart = () => {
     if (playerHistory.length === 0) return <p className="text-sm text-gray-400 py-4">No history recorded yet.</p>
     if (playerHistory.length === 1) return (
-  <svg viewBox="0 0 800 240" className="w-full" style={{ minWidth: 400 }}>
-    {showDgrade && <circle cx="400" cy="100" r="5" fill="#16a34a"><title>{formatDate(playerHistory[0].recorded_at)}: dGrade {playerHistory[0].dgrade_value}</title></circle>}
-    {showDgrade && <text x="412" y="104" fontSize="11" fill="#16a34a">dGrade: {playerHistory[0].dgrade_value}</text>}
-    {showRanking && <circle cx="400" cy="140" r="5" fill="#2563eb"><title>{formatDate(playerHistory[0].recorded_at)}: Rank #{playerHistory[0].world_ranking}</title></circle>}
-    {showRanking && <text x="412" y="144" fontSize="11" fill="#2563eb">World Rank: #{playerHistory[0].world_ranking}</text>}
-    <text x="400" y="200" fontSize="10" fill="#9ca3af" textAnchor="middle">More data points will appear as daily syncs accumulate</text>
-  </svg>
-)
+      <svg viewBox="0 0 800 240" className="w-full" style={{ minWidth: 400 }}>
+        {showDgrade && <circle cx="400" cy="100" r="5" fill="#16a34a"><title>{formatDate(playerHistory[0].recorded_at)}: dGrade {playerHistory[0].dgrade_value}</title></circle>}
+        {showDgrade && <text x="412" y="104" fontSize="11" fill="#16a34a">dGrade: {playerHistory[0].dgrade_value}</text>}
+        {showRanking && <circle cx="400" cy="140" r="5" fill="#2563eb"><title>{formatDate(playerHistory[0].recorded_at)}: Rank #{playerHistory[0].world_ranking}</title></circle>}
+        {showRanking && <text x="412" y="144" fontSize="11" fill="#2563eb">World Rank: #{playerHistory[0].world_ranking}</text>}
+        <text x="400" y="200" fontSize="10" fill="#9ca3af" textAnchor="middle">More data points will appear as daily syncs accumulate</text>
+      </svg>
+    )
 
-    const W = 800, H = 240
-    const padL = 55, padR = 55, padT = 20, padB = 30
+    const W = 800, H = 260
+    const padL = 60, padR = 60, padT = 20, padB = 40
     const chartW = W - padL - padR
     const chartH = H - padT - padB
 
@@ -366,31 +366,55 @@ export default function RankingsPage() {
 
     const gridLines = 5
 
+    // X axis date labels — show up to 6 evenly spaced
+    const xLabelCount = Math.min(6, playerHistory.length)
+    const xLabelIndices = Array.from({ length: xLabelCount }, (_, i) =>
+      Math.round(i * (playerHistory.length - 1) / Math.max(xLabelCount - 1, 1))
+    )
+
     return (
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 400 }}>
+        {/* Grid lines */}
         {Array.from({ length: gridLines + 1 }).map((_, i) => {
           const y = padT + (i / gridLines) * chartH
           return <line key={i} x1={padL} y1={y} x2={W - padR} y2={y} stroke="#e5e7eb" strokeWidth="1" />
         })}
 
+        {/* Left Y axis — dGrade */}
         {showDgrade && Array.from({ length: gridLines + 1 }).map((_, i) => {
           const val = Math.round(dgradeMax - i * ((dgradeMax - dgradeMin) / gridLines))
           const y = padT + (i / gridLines) * chartH
-          return <text key={i} x={padL - 6} y={y + 4} fontSize="9" fill="#6b7280" textAnchor="end">{val}</text>
+          return <text key={i} x={padL - 8} y={y + 4} fontSize="10" fill="#16a34a" textAnchor="end">{val}</text>
         })}
 
+        {/* Right Y axis — World Ranking */}
         {showRanking && Array.from({ length: gridLines + 1 }).map((_, i) => {
           const val = Math.round(rankMin + i * ((rankMax - rankMin) / gridLines))
           const y = padT + chartH - (i / gridLines) * chartH
-          return <text key={i} x={W - padR + 6} y={y + 4} fontSize="9" fill="#2563eb" textAnchor="start">#{val}</text>
+          return <text key={i} x={W - padR + 8} y={y + 4} fontSize="10" fill="#2563eb" textAnchor="start">#{val}</text>
         })}
 
+        {/* X axis date labels */}
+        {xLabelIndices.map((idx) => {
+          const x = xScale(idx)
+          const label = new Date(playerHistory[idx].recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+          return <text key={idx} x={x} y={H - 5} fontSize="9" fill="#9ca3af" textAnchor="middle">{label}</text>
+        })}
+
+        {/* Axis border lines */}
+        <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
+        <line x1={W - padR} y1={padT} x2={W - padR} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
+        <line x1={padL} y1={padT + chartH} x2={W - padR} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
+
+        {/* dGrade line */}
         {showDgrade && (
           <polyline
             points={playerHistory.map((h, i) => `${xScale(i)},${yDgrade(h.dgrade_value)}`).join(' ')}
             fill="none" stroke="#16a34a" strokeWidth="2"
           />
         )}
+
+        {/* Ranking line */}
         {showRanking && (
           <polyline
             points={playerHistory.map((h, i) => `${xScale(i)},${yRank(h.world_ranking)}`).join(' ')}
@@ -398,15 +422,25 @@ export default function RankingsPage() {
           />
         )}
 
+        {/* Dots */}
         {playerHistory.map((h, i) => (
           <g key={i}>
-            {showDgrade && <circle cx={xScale(i)} cy={yDgrade(h.dgrade_value)} r="3" fill="#16a34a"><title>{formatDate(h.recorded_at)}: dGrade {h.dgrade_value}</title></circle>}
-            {showRanking && <circle cx={xScale(i)} cy={yRank(h.world_ranking)} r="3" fill="#2563eb"><title>{formatDate(h.recorded_at)}: Rank #{h.world_ranking}</title></circle>}
+            {showDgrade && (
+              <circle cx={xScale(i)} cy={yDgrade(h.dgrade_value)} r="3" fill="#16a34a">
+                <title>{formatDate(h.recorded_at)}: dGrade {h.dgrade_value}</title>
+              </circle>
+            )}
+            {showRanking && (
+              <circle cx={xScale(i)} cy={yRank(h.world_ranking)} r="3" fill="#2563eb">
+                <title>{formatDate(h.recorded_at)}: Rank #{h.world_ranking}</title>
+              </circle>
+            )}
           </g>
         ))}
 
-        {showDgrade && <text x={padL} y={H - 5} fontSize="9" fill="#16a34a">dGrade</text>}
-        {showRanking && <text x={W - padR} y={H - 5} fontSize="9" fill="#2563eb" textAnchor="end">World Rank</text>}
+        {/* Axis labels */}
+        {showDgrade && <text x={padL} y={padT - 6} fontSize="10" fill="#16a34a">dGrade</text>}
+        {showRanking && <text x={W - padR} y={padT - 6} fontSize="10" fill="#2563eb" textAnchor="end">World Rank</text>}
       </svg>
     )
   }
@@ -627,7 +661,7 @@ export default function RankingsPage() {
             {compareMode && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm">
                 {availableSnapshots.length === 0 ? (
-                  <p className="text-blue-700">No historical snapshots available yet. Monthly snapshots are stored on the 1st of each month starting April 2026. Check back in the future to compare periods.</p>
+                  <p className="text-blue-700">No historical snapshots available yet. Monthly snapshots are stored on the 1st of each month. The first snapshot will be taken 1 Apr 2026. Check back in the future to compare periods.</p>
                 ) : (
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-blue-700">Compare current stats to:</span>
