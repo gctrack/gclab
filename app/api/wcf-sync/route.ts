@@ -63,14 +63,27 @@ function isFirstOfMonth(date: Date): boolean {
   return date.getDate() === 1
 }
 
-async function writeMonthlySnapshots(players: any[], now: string) {
-  const BATCH_SIZE = 100
-  const allPlayers = await supabase
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeout)
+    return response
+  } catch (err) {
+    clearTimeout(timeout)
+    throw err
+  }
+}
+
+async function writeMonthlySnapshots(now: string) {
+  const { data: allPlayers } = await supabase
     .from('wcf_players')
     .select('id, dgrade, world_ranking')
-  if (!allPlayers.data) return
-  for (let i = 0; i < allPlayers.data.length; i += BATCH_SIZE) {
-    const batch = allPlayers.data.slice(i, i + BATCH_SIZE)
+  if (!allPlayers) return
+  const BATCH_SIZE = 100
+  for (let i = 0; i < allPlayers.length; i += BATCH_SIZE) {
+    const batch = allPlayers.slice(i, i + BATCH_SIZE)
     await Promise.all(batch.map(async (player) => {
       await supabase.from('wcf_dgrade_history').insert({
         wcf_player_id: player.id,
@@ -108,14 +121,29 @@ async function runSync(logId: string) {
     const activeYear = now.getFullYear() - 1
     const snapshotDate = now.toISOString().split('T')[0]
 
-    const response = await fetch(WCF_URL)
-    const html = await response.text()
+    // Fetch WCF data with 30 second timeout
+    let html: string
+    try {
+      const response = await fetchWithTimeout(WCF_URL, 30000)
+      if (!response.ok) {
+        throw new Error(`WCF returned HTTP ${response.status}`)
+      }
+      html = await response.text()
+    } catch (fetchErr) {
+      await supabase.from('sync_log').update({
+        status: 'error',
+        error: `WCF fetch failed: ${String(fetchErr)}`,
+        completed_at: nowISO,
+      }).eq('id', logId)
+      return
+    }
+
     const players = parsePlayers(html)
 
     if (players.length === 0) {
       await supabase.from('sync_log').update({
         status: 'error',
-        error: 'No players parsed',
+        error: 'No players parsed from WCF response',
         completed_at: nowISO,
       }).eq('id', logId)
       return
@@ -183,7 +211,7 @@ async function runSync(logId: string) {
     }
 
     if (isMonthly) {
-      await writeMonthlySnapshots(players, nowISO)
+      await writeMonthlySnapshots(nowISO)
       await writeCountrySnapshot(activeYear, snapshotDate)
     }
 
