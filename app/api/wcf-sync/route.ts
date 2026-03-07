@@ -7,7 +7,7 @@ const supabase = createClient(
 )
 
 const DGRADE_URL = 'https://rank.worldcroquet.org/gcrankdg/rank_list.php?year=current&games=0&grade=1200&country=World&rank_order=dg&prefer_name=true&women_only=false&show_state=no_state&show_c2_only=false&show_wc=show_wc_no&age_related=all'
-const EGRADE_URL = 'https://rank.worldcroquet.org/gcrankdg/rank_list.php?year=current&games=10&grade=1200&country=World&rank_order=egrade&prefer_name=true&women_only=false&show_state=no_state&show_c2_only=false&show_wc=show_wc_no&age_related=all'
+const EGRADE_URL = 'https://rank.worldcroquet.org/gcrankdg/rank_list.php?year=current&games=0&grade=1200&country=World&rank_order=egrade&prefer_name=true&women_only=false&show_state=no_state&show_c2_only=false&show_wc=show_wc_no&age_related=all'
 
 function parseCountryCode(country: string): string {
   const map: Record<string, string> = {
