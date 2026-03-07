@@ -82,7 +82,7 @@ const PAGE_SIZES = [50, 100, 200]
 const FIRST_SYNC_DATE = '2026-03-02'
 const NEW_PLAYERS_SINCE = '2026-03-03T00:00:00Z'
 
-type SortKey = 'dgrade' | 'world_ranking' | 'games' | 'win_percentage' | 'wcf_last_name'
+type SortKey = 'dgrade' | 'egrade' | 'world_ranking' | 'games' | 'win_percentage' | 'wcf_last_name'
 type SortDir = 'asc' | 'desc'
 
 export default function RankingsPage() {
@@ -120,6 +120,7 @@ export default function RankingsPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null)
   const [playerHistory, setPlayerHistory] = useState<any[]>([])
   const [showDgrade, setShowDgrade] = useState(true)
+  const [showEgrade, setShowEgrade] = useState(true)
   const [showRanking, setShowRanking] = useState(true)
   const [historyRange, setHistoryRange] = useState('5y')
   const [historyFrom, setHistoryFrom] = useState('')
@@ -180,7 +181,7 @@ export default function RankingsPage() {
     setLoading(true)
     let query = supabase
       .from('wcf_players')
-      .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, games, win_percentage, last_active_year, wcf_profile_url')
+      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, games, win_percentage, last_active_year, wcf_profile_url')
       .order(sortKey, { ascending: sortDir === 'asc' })
       .range(rankingsPage * pageSize, (rankingsPage + 1) * pageSize - 1)
     if (activeOnly) query = query.gte('last_active_year', activeYear)
@@ -190,7 +191,7 @@ export default function RankingsPage() {
   }
 
   const downloadCSV = () => {
-    const headers = ['Active Rank', 'All Time Rank', 'First Name', 'Last Name', 'Country', 'dGrade', 'Games (12mo)', 'Win% (12mo)', 'Last Active', 'WCF Profile']
+    const headers = ['Active Rank', 'All Time Rank', 'First Name', 'Last Name', 'Country', 'dGrade', 'eGrade', 'Games (12mo)', 'Win% (12mo)', 'Last Active', 'WCF Profile']
     const rows = rankings.map((player, i) => [
       activeOnly ? rankingsPage * pageSize + i + 1 : '—',
       player.world_ranking,
@@ -198,6 +199,7 @@ export default function RankingsPage() {
       player.wcf_last_name,
       getCountryName(player.country),
       player.dgrade,
+      player.egrade || '',
       player.games || '',
       player.win_percentage ? `${player.win_percentage}%` : '',
       player.last_active_year || '',
@@ -232,7 +234,7 @@ export default function RankingsPage() {
     const sinceDate = since < new Date(NEW_PLAYERS_SINCE) ? NEW_PLAYERS_SINCE : since.toISOString()
     let query = supabase
       .from('wcf_players')
-      .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, wcf_profile_url, created_at')
+      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url, created_at')
       .gte('created_at', sinceDate)
       .order('world_ranking', { ascending: true })
     if (newPlayerCountry) query = query.eq('country', newPlayerCountry)
@@ -273,7 +275,7 @@ export default function RankingsPage() {
   const loadPlayerHistory = async (wcfPlayerId: string) => {
     const { data: player } = await supabase
       .from('wcf_players')
-      .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, wcf_profile_url')
+      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url')
       .eq('id', wcfPlayerId)
       .single()
     if (player) { setSelectedPlayer(player); await fetchHistory(player.id) }
@@ -282,7 +284,7 @@ export default function RankingsPage() {
   const fetchHistory = async (playerId: string) => {
     let query = supabase
       .from('wcf_dgrade_history')
-      .select('dgrade_value, world_ranking, recorded_at')
+      .select('dgrade_value, egrade_value, world_ranking, recorded_at')
       .eq('wcf_player_id', playerId)
       .order('recorded_at', { ascending: true })
     const now = new Date()
@@ -307,7 +309,7 @@ export default function RankingsPage() {
     setPlayerHistory([])
     const { data } = await supabase
       .from('wcf_players')
-      .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, wcf_profile_url')
+      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url')
       .ilike('wcf_last_name', `%${lookupLast}%`)
       .order('world_ranking', { ascending: true })
       .limit(20)
@@ -338,17 +340,19 @@ export default function RankingsPage() {
   const renderChart = () => {
     if (playerHistory.length === 0) return <p className="text-sm text-gray-400 py-4">No history recorded yet.</p>
 
-    const W = 800, H = 260
+    const W = 800, H = 280
     const padL = 60, padR = 60, padT = 24, padB = 40
     const chartW = W - padL - padR
     const chartH = H - padT - padB
 
     const dgrades = playerHistory.map(h => h.dgrade_value)
+    const egrades = playerHistory.filter(h => h.egrade_value && h.egrade_value > 0).map(h => h.egrade_value)
     const wranks = playerHistory.map(h => h.world_ranking)
 
-    const dgradeSpread = Math.max(...dgrades) - Math.min(...dgrades)
-    const dgradeMin = Math.min(...dgrades) - Math.max(50, dgradeSpread * 0.2)
-    const dgradeMax = Math.max(...dgrades) + Math.max(50, dgradeSpread * 0.2)
+    const allGrades = [...dgrades, ...(egrades.length > 0 ? egrades : [])]
+    const gradeSpread = Math.max(...allGrades) - Math.min(...allGrades)
+    const gradeMin = Math.min(...allGrades) - Math.max(50, gradeSpread * 0.2)
+    const gradeMax = Math.max(...allGrades) + Math.max(50, gradeSpread * 0.2)
 
     const rankSpread = Math.max(...wranks) - Math.min(...wranks)
     const rankMin = Math.max(1, Math.min(...wranks) - Math.max(10, rankSpread * 0.2))
@@ -358,9 +362,9 @@ export default function RankingsPage() {
       ? padL + chartW / 2
       : padL + (i / (playerHistory.length - 1)) * chartW
 
-    const yDgrade = (v: number) => {
-      if (dgradeMax === dgradeMin) return padT + chartH / 2
-      return padT + chartH - ((v - dgradeMin) / (dgradeMax - dgradeMin)) * chartH
+    const yGrade = (v: number) => {
+      if (gradeMax === gradeMin) return padT + chartH / 2
+      return padT + chartH - ((v - gradeMin) / (gradeMax - gradeMin)) * chartH
     }
 
     const yRank = (v: number) => {
@@ -385,8 +389,9 @@ export default function RankingsPage() {
         <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
         <line x1={W - padR} y1={padT} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
         <line x1={padL} y1={padT + chartH} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
-        {showDgrade && Array.from({ length: gridLines + 1 }).map((_, i) => {
-          const val = Math.round(dgradeMax - i * ((dgradeMax - dgradeMin) / gridLines))
+
+        {(showDgrade || showEgrade) && Array.from({ length: gridLines + 1 }).map((_, i) => {
+          const val = Math.round(gradeMax - i * ((gradeMax - gradeMin) / gridLines))
           const y = padT + (i / gridLines) * chartH
           return <text key={i} x={padL - 8} y={y + 4} fontSize="10" fill="#16a34a" textAnchor="end">{val}</text>
         })}
@@ -400,12 +405,24 @@ export default function RankingsPage() {
           const label = new Date(playerHistory[idx].recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
           return <text key={idx} x={x} y={H - 6} fontSize="9" fill="#9ca3af" textAnchor="middle">{label}</text>
         })}
+
         {showDgrade && <text x={padL} y={padT - 8} fontSize="10" fill="#16a34a" fontWeight="500">dGrade</text>}
+        {showEgrade && <text x={padL + 52} y={padT - 8} fontSize="10" fill="#d97706" fontWeight="500">eGrade</text>}
         {showRanking && <text x={W - padR} y={padT - 8} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank</text>}
+
         {showDgrade && playerHistory.length > 1 && (
           <polyline
-            points={playerHistory.map((h, i) => `${xScale(i)},${yDgrade(h.dgrade_value)}`).join(' ')}
+            points={playerHistory.map((h, i) => `${xScale(i)},${yGrade(h.dgrade_value)}`).join(' ')}
             fill="none" stroke="#16a34a" strokeWidth="2"
+          />
+        )}
+        {showEgrade && playerHistory.length > 1 && (
+          <polyline
+            points={playerHistory
+              .map((h, i) => h.egrade_value && h.egrade_value > 0 ? `${xScale(i)},${yGrade(h.egrade_value)}` : null)
+              .filter(Boolean)
+              .join(' ')}
+            fill="none" stroke="#d97706" strokeWidth="2" strokeDasharray="4 2"
           />
         )}
         {showRanking && playerHistory.length > 1 && (
@@ -414,11 +431,17 @@ export default function RankingsPage() {
             fill="none" stroke="#2563eb" strokeWidth="2"
           />
         )}
+
         {playerHistory.map((h, i) => (
           <g key={i}>
             {showDgrade && (
-              <circle cx={xScale(i)} cy={yDgrade(h.dgrade_value)} r="4" fill="#16a34a">
+              <circle cx={xScale(i)} cy={yGrade(h.dgrade_value)} r="4" fill="#16a34a">
                 <title>{formatDate(h.recorded_at)}: dGrade {h.dgrade_value}</title>
+              </circle>
+            )}
+            {showEgrade && h.egrade_value && h.egrade_value > 0 && (
+              <circle cx={xScale(i)} cy={yGrade(h.egrade_value)} r="4" fill="#d97706">
+                <title>{formatDate(h.recorded_at)}: eGrade {h.egrade_value}</title>
               </circle>
             )}
             {showRanking && (
@@ -428,9 +451,15 @@ export default function RankingsPage() {
             )}
           </g>
         ))}
+
         {playerHistory.length === 1 && showDgrade && (
-          <text x={xScale(0) + 12} y={yDgrade(playerHistory[0].dgrade_value) - 8} fontSize="11" fill="#16a34a">
+          <text x={xScale(0) + 12} y={yGrade(playerHistory[0].dgrade_value) - 8} fontSize="11" fill="#16a34a">
             dGrade: {playerHistory[0].dgrade_value}
+          </text>
+        )}
+        {playerHistory.length === 1 && showEgrade && playerHistory[0].egrade_value > 0 && (
+          <text x={xScale(0) + 12} y={yGrade(playerHistory[0].egrade_value) + 16} fontSize="11" fill="#d97706">
+            eGrade: {playerHistory[0].egrade_value}
           </text>
         )}
         {playerHistory.length === 1 && showRanking && (
@@ -500,6 +529,7 @@ export default function RankingsPage() {
                     <th className={`text-left ${thClick}`} onClick={() => handleRankingSort('wcf_last_name')}>Player{sortArrow('wcf_last_name')}</th>
                     <th className={`text-left ${thBase}`}>Country</th>
                     <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('dgrade')}>dGrade{sortArrow('dgrade')}</th>
+                    <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('egrade')}>eGrade{sortArrow('egrade')}</th>
                     <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>
                     <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>
                     <th className={`text-right ${thBase}`}>Last Active</th>
@@ -517,6 +547,7 @@ export default function RankingsPage() {
                       </td>
                       <td className="px-4 py-2 text-gray-900"><span className="mr-1">{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
                       <td className="px-4 py-2 text-right font-semibold text-gray-900">{player.dgrade}</td>
+                      <td className="px-4 py-2 text-right font-semibold text-amber-600">{player.egrade || '—'}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{player.games || '—'}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{player.win_percentage ? `${player.win_percentage}%` : '—'}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{player.last_active_year || '—'}</td>
@@ -619,13 +650,14 @@ export default function RankingsPage() {
                     <th className="text-left px-4 py-3 text-gray-700 font-semibold">Player</th>
                     <th className="text-left px-4 py-3 text-gray-700 font-semibold">Country</th>
                     <th className="text-right px-4 py-3 text-gray-700 font-semibold">dGrade</th>
+                    <th className="text-right px-4 py-3 text-gray-700 font-semibold">eGrade</th>
                     <th className="text-right px-4 py-3 text-gray-700 font-semibold">World Rank</th>
                     <th className="text-right px-4 py-3 text-gray-700 font-semibold">First Seen</th>
                   </tr>
                 </thead>
                 <tbody>
                   {newPlayers.length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400 text-sm">No new players found for this period.</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400 text-sm">No new players found for this period.</td></tr>
                   ) : newPlayers.map((player, i) => (
                     <tr key={player.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-4 py-2">
@@ -635,6 +667,7 @@ export default function RankingsPage() {
                       </td>
                       <td className="px-4 py-2 text-gray-900"><span className="mr-1">{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
                       <td className="px-4 py-2 text-right font-semibold text-gray-900">{player.dgrade}</td>
+                      <td className="px-4 py-2 text-right font-semibold text-amber-600">{player.egrade || '—'}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{player.world_ranking}</td>
                       <td className="px-4 py-2 text-right text-gray-500">{formatDate(player.created_at)}</td>
                     </tr>
@@ -743,6 +776,7 @@ export default function RankingsPage() {
                       <th className="text-left px-4 py-3 text-gray-700 font-semibold">Player</th>
                       <th className="text-left px-4 py-3 text-gray-700 font-semibold">Country</th>
                       <th className="text-right px-4 py-3 text-gray-700 font-semibold">dGrade</th>
+                      <th className="text-right px-4 py-3 text-gray-700 font-semibold">eGrade</th>
                       <th className="text-right px-4 py-3 text-gray-700 font-semibold">Rank</th>
                       <th className="px-4 py-3"></th>
                     </tr>
@@ -753,6 +787,7 @@ export default function RankingsPage() {
                         <td className="px-4 py-2 font-medium text-gray-900">{player.wcf_first_name} {player.wcf_last_name}</td>
                         <td className="px-4 py-2 text-gray-900">{getFlag(player.country)} {getCountryName(player.country)}</td>
                         <td className="px-4 py-2 text-right font-semibold text-gray-900">{player.dgrade}</td>
+                        <td className="px-4 py-2 text-right font-semibold text-amber-600">{player.egrade || '—'}</td>
                         <td className="px-4 py-2 text-right text-gray-700">#{player.world_ranking}</td>
                         <td className="px-4 py-2 text-right">
                           <button onClick={() => handleSelectPlayer(player)} className="text-green-600 hover:underline text-xs font-medium">View history →</button>
@@ -770,7 +805,11 @@ export default function RankingsPage() {
                   <button onClick={() => { setSelectedPlayer(null); setPlayerHistory([]) }}
                     className="text-sm text-gray-500 hover:text-green-600">← Back to search</button>
                   <h3 className="font-semibold text-lg text-gray-900">{getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}</h3>
-                  <span className="text-sm text-gray-600">{getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade} · World #{selectedPlayer.world_ranking}</span>
+                  <span className="text-sm text-gray-600">
+                    {getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade}
+                    {selectedPlayer.egrade ? ` · eGrade ${selectedPlayer.egrade}` : ''}
+                    {' '}· World #{selectedPlayer.world_ranking}
+                  </span>
                   <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline ml-auto">WCF Profile →</a>
                 </div>
 
@@ -797,6 +836,10 @@ export default function RankingsPage() {
                       className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${showDgrade ? 'bg-green-50 border-green-400 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
                       <span className="w-4 h-1 bg-green-500 inline-block rounded" /> dGrade
                     </button>
+                    <button onClick={() => setShowEgrade(!showEgrade)}
+                      className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${showEgrade ? 'bg-amber-50 border-amber-400 text-amber-700' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
+                      <span className="w-4 h-1 bg-amber-500 inline-block rounded" /> eGrade
+                    </button>
                     <button onClick={() => setShowRanking(!showRanking)}
                       className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${showRanking ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
                       <span className="w-4 h-1 bg-blue-500 inline-block rounded" /> World Ranking
@@ -819,6 +862,7 @@ export default function RankingsPage() {
                         <tr className="text-gray-500 border-b">
                           <th className="text-left py-1 font-semibold">Date</th>
                           <th className="text-right py-1 font-semibold">dGrade</th>
+                          <th className="text-right py-1 font-semibold">eGrade</th>
                           <th className="text-right py-1 font-semibold">World Rank</th>
                         </tr>
                       </thead>
@@ -827,6 +871,7 @@ export default function RankingsPage() {
                           <tr key={i} className="border-t border-gray-100">
                             <td className="py-1 text-gray-700">{formatDate(h.recorded_at)}</td>
                             <td className="py-1 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
+                            <td className="py-1 text-right font-semibold text-amber-600">{h.egrade_value || '—'}</td>
                             <td className="py-1 text-right text-gray-600">#{h.world_ranking}</td>
                           </tr>
                         ))}

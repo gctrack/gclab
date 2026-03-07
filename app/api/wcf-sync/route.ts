@@ -6,7 +6,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const WCF_URL = 'https://rank.worldcroquet.org/gcrankdg/rank_list.php?year=current&games=0&grade=1200&country=World&rank_order=dg&prefer_name=true&women_only=false&show_state=no_state&show_c2_only=false&show_wc=show_wc_no&age_related=all'
+const DGRADE_URL = 'https://rank.worldcroquet.org/gcrankdg/rank_list.php?year=current&games=0&grade=1200&country=World&rank_order=dg&prefer_name=true&women_only=false&show_state=no_state&show_c2_only=false&show_wc=show_wc_no&age_related=all'
+const EGRADE_URL = 'https://rank.worldcroquet.org/gcrankdg/rank_list.php?year=current&games=10&grade=1200&country=World&rank_order=egrade&prefer_name=true&women_only=false&show_state=no_state&show_c2_only=false&show_wc=show_wc_no&age_related=all'
 
 function parseCountryCode(country: string): string {
   const map: Record<string, string> = {
@@ -59,6 +60,28 @@ function parsePlayers(html: string) {
   return players
 }
 
+function buildEgradeMap(html: string): Record<string, number> {
+  const map: Record<string, number> = {}
+  const rows = html.split('<tr>')
+  for (const row of rows) {
+    if (row.includes('<th>') || !row.includes('player_full.php')) continue
+    const cells = row.split('<td>')
+    if (cells.length < 5) continue
+    try {
+      const nameCell = cells[2]
+      const urlMatch = nameCell.match(/href\s*=\s*"player_full\.php\?pffn=([^&]+)&pfsn=([^"&]+)/)
+      if (!urlMatch) continue
+      const firstName = decodeURIComponent(urlMatch[1].replace(/\+/g, ' ')).trim()
+      const lastName = decodeURIComponent(urlMatch[2].replace(/&nt=1.*/, '').replace(/\+/g, ' ')).trim()
+      const egrade = parseInt(cells[4].replace(/<\/td>.*/, '').trim())
+      if (!isNaN(egrade) && egrade > 0) map[`${firstName}|${lastName}`] = egrade
+    } catch {
+      continue
+    }
+  }
+  return map
+}
+
 function isFirstOfMonth(date: Date): boolean {
   return date.getDate() === 1
 }
@@ -86,7 +109,7 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
 async function writeMonthlySnapshots(now: string) {
   const { data: allPlayers } = await supabase
     .from('wcf_players')
-    .select('id, dgrade, world_ranking')
+    .select('id, dgrade, egrade, world_ranking')
   if (!allPlayers) return
   const BATCH_SIZE = 100
   for (let i = 0; i < allPlayers.length; i += BATCH_SIZE) {
@@ -95,6 +118,7 @@ async function writeMonthlySnapshots(now: string) {
       await supabase.from('wcf_dgrade_history').insert({
         wcf_player_id: player.id,
         dgrade_value: player.dgrade,
+        egrade_value: player.egrade,
         world_ranking: player.world_ranking,
         recorded_at: now,
       })
@@ -128,13 +152,19 @@ async function runSync(logId: string) {
     const activeYear = now.getFullYear() - 1
     const snapshotDate = now.toISOString().split('T')[0]
 
-    let html: string
+    let dgradeHtml: string
+    let egradeHtml: string
     try {
-      const response = await fetchWithTimeout(WCF_URL, 30000)
-      if (!response.ok) {
-        throw new Error(`WCF returned HTTP ${response.status}`)
-      }
-      html = await response.text()
+      const [dgradeResponse, egradeResponse] = await Promise.all([
+        fetchWithTimeout(DGRADE_URL, 30000),
+        fetchWithTimeout(EGRADE_URL, 30000),
+      ])
+      if (!dgradeResponse.ok) throw new Error(`dGrade fetch returned HTTP ${dgradeResponse.status}`)
+      if (!egradeResponse.ok) throw new Error(`eGrade fetch returned HTTP ${egradeResponse.status}`)
+      ;[dgradeHtml, egradeHtml] = await Promise.all([
+        dgradeResponse.text(),
+        egradeResponse.text(),
+      ])
     } catch (fetchErr) {
       await supabase.from('sync_log').update({
         status: 'error',
@@ -144,7 +174,8 @@ async function runSync(logId: string) {
       return
     }
 
-    const players = parsePlayers(html)
+    const players = parsePlayers(dgradeHtml)
+    const egradeMap = buildEgradeMap(egradeHtml)
 
     if (players.length === 0) {
       await supabase.from('sync_log').update({
@@ -162,23 +193,28 @@ async function runSync(logId: string) {
     for (let i = 0; i < players.length; i += BATCH_SIZE) {
       const batch = players.slice(i, i + BATCH_SIZE)
       await Promise.all(batch.map(async (player) => {
-        // Use upsert with the unique constraint on name
+        const egrade = egradeMap[`${player.wcf_first_name}|${player.wcf_last_name}`] || null
+
         const { data: existing } = await supabase
           .from('wcf_players')
-          .select('id, dgrade, linked_user_id')
+          .select('id, dgrade, egrade, linked_user_id')
           .eq('wcf_first_name', player.wcf_first_name)
           .eq('wcf_last_name', player.wcf_last_name)
           .maybeSingle()
 
         if (existing) {
-          if (existing.dgrade !== player.dgrade) {
+          const dgradeChanged = existing.dgrade !== player.dgrade
+          const egradeChanged = egrade !== null && existing.egrade !== egrade
+
+          if (dgradeChanged || egradeChanged) {
             await supabase.from('wcf_dgrade_history').insert({
               wcf_player_id: existing.id,
               dgrade_value: player.dgrade,
+              egrade_value: egrade,
               world_ranking: player.world_ranking,
               recorded_at: nowISO,
             })
-            if (existing.linked_user_id) {
+            if (existing.linked_user_id && dgradeChanged) {
               await supabase.from('profiles').update({
                 dgrade: player.dgrade,
                 dgrade_last_synced_at: nowISO,
@@ -193,20 +229,19 @@ async function runSync(logId: string) {
               dgrade_last_synced_at: nowISO,
             }).eq('id', existing.linked_user_id)
           }
+
           await supabase
             .from('wcf_players')
-            .update({ ...player, last_synced_at: nowISO })
+            .update({ ...player, egrade, last_synced_at: nowISO })
             .eq('id', existing.id)
           updated++
         } else {
-          // Insert with conflict handling — if race condition creates duplicate, ignore
           const { data: newPlayer, error: insertError } = await supabase
             .from('wcf_players')
-            .insert({ ...player, last_synced_at: nowISO })
+            .insert({ ...player, egrade, last_synced_at: nowISO })
             .select('id')
             .maybeSingle()
           if (insertError && insertError.code === '23505') {
-            // Unique constraint violation — duplicate from race condition, fetch and update instead
             const { data: racePlayer } = await supabase
               .from('wcf_players')
               .select('id, dgrade, linked_user_id')
@@ -216,7 +251,7 @@ async function runSync(logId: string) {
             if (racePlayer) {
               await supabase
                 .from('wcf_players')
-                .update({ ...player, last_synced_at: nowISO })
+                .update({ ...player, egrade, last_synced_at: nowISO })
                 .eq('id', racePlayer.id)
               updated++
             }
@@ -224,6 +259,7 @@ async function runSync(logId: string) {
             await supabase.from('wcf_dgrade_history').insert({
               wcf_player_id: newPlayer.id,
               dgrade_value: player.dgrade,
+              egrade_value: egrade,
               world_ranking: player.world_ranking,
               recorded_at: nowISO,
             })
