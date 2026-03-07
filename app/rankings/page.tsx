@@ -166,6 +166,8 @@ export default function RankingsPage() {
   }
 
   const sortArrow = (key: SortKey) => sortKey === key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ' ↕'
+  const thSort = (key: SortKey, align: 'left' | 'right' = 'right') =>
+    `px-4 py-3 font-semibold cursor-pointer select-none text-${align} ${sortKey === key ? 'text-green-600' : 'text-gray-500 hover:text-green-600'}`
 
   const handleCountrySort = (key: string) => {
     const newDir: SortDir = countrySortKey === key && countrySortDir === 'desc' ? 'asc' : 'desc'
@@ -176,6 +178,27 @@ export default function RankingsPage() {
   }
 
   const countryArrow = (key: string) => countrySortKey === key ? (countrySortDir === 'desc' ? ' ↓' : ' ↑') : ' ↕'
+  const thCountrySort = (key: string) =>
+    `px-4 py-3 font-semibold cursor-pointer select-none text-right ${countrySortKey === key ? 'text-green-600' : 'text-gray-500 hover:text-green-600'}`
+
+  const downloadCountryCSV = () => {
+    const headers = ['Rank', 'Country', 'Total Players', 'Active (12mo)', 'Top 6 Avg dGrade']
+    const rows = countryStats.map((row, i) => [
+      i + 1,
+      getCountryName(row.country),
+      row.total_players,
+      row.active_players,
+      row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '',
+    ])
+    const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `gclab-country-stats-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const loadRankings = async () => {
     setLoading(true)
@@ -473,7 +496,6 @@ export default function RankingsPage() {
   }
 
   const thBase = "px-4 py-3 text-gray-700 font-semibold"
-  const thClick = "px-4 py-3 text-gray-700 font-semibold cursor-pointer hover:text-green-600 select-none"
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -527,12 +549,12 @@ export default function RankingsPage() {
                   <tr>
                     <th className={`text-left ${thBase}`}>Active Rank</th>
                     <th className={`text-left ${thBase}`}>All Time</th>
-                    <th className={`text-left ${thClick}`} onClick={() => handleRankingSort('wcf_last_name')}>Player{sortArrow('wcf_last_name')}</th>
+                    <th className={thSort('wcf_last_name', 'left')} onClick={() => handleRankingSort('wcf_last_name')}>Player{sortArrow('wcf_last_name')}</th>
                     <th className={`text-left ${thBase}`}>Country</th>
-                    <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('dgrade')}>dGrade{sortArrow('dgrade')}</th>
-                    <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('egrade')}>eGrade{sortArrow('egrade')}</th>
-                    <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>
-                    <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>
+                    <th className={thSort('dgrade')} onClick={() => handleRankingSort('dgrade')}>dGrade{sortArrow('dgrade')}</th>
+                    <th className={thSort('egrade')} onClick={() => handleRankingSort('egrade')}>eGrade{sortArrow('egrade')}</th>
+                    <th className={thSort('games')} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>
+                    <th className={thSort('win_percentage')} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>
                     <th className={`text-right ${thBase}`}>Last Active</th>
                   </tr>
                 </thead>
@@ -684,10 +706,16 @@ export default function RankingsPage() {
           <div>
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <p className="text-xs text-gray-500">Click column headers to sort. Active = played a ranked game in the last 12 months.</p>
-              <button onClick={() => setCompareMode(!compareMode)}
-                className={`px-4 py-1 rounded-full text-sm border transition ${compareMode ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
-                {compareMode ? 'Hide Compare' : 'Compare to Past'}
-              </button>
+              <div className="flex gap-2">
+                <button onClick={downloadCountryCSV}
+                  className="flex items-center gap-1 text-sm bg-white border border-gray-300 text-gray-600 px-3 py-1 rounded-md hover:border-green-500 hover:text-green-600 transition">
+                  ↓ Download CSV
+                </button>
+                <button onClick={() => setCompareMode(!compareMode)}
+                  className={`px-4 py-1 rounded-full text-sm border transition ${compareMode ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>
+                  {compareMode ? 'Hide Compare' : 'Compare to Past'}
+                </button>
+              </div>
             </div>
             {compareMode && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm">
@@ -710,9 +738,9 @@ export default function RankingsPage() {
                   <tr>
                     <th className="text-left px-4 py-3 text-gray-700 font-semibold w-8">#</th>
                     <th className="text-left px-4 py-3 text-gray-700 font-semibold">Country</th>
-                    <th className={`text-right ${thClick}`} onClick={() => handleCountrySort('total_players')}>Total Players{countryArrow('total_players')}</th>
-                    <th className={`text-right ${thClick}`} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
-                    <th className={`text-right ${thClick}`} onClick={() => handleCountrySort('avg_top6_dgrade')}>Top 6 Avg dGrade{countryArrow('avg_top6_dgrade')}</th>
+                    <th className={`text-right ${thCountrySort('total_players')}`} onClick={() => handleCountrySort('total_players')}>Total Players{countryArrow('total_players')}</th>
+                    <th className={`text-right ${thCountrySort('active_players')}`} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
+                    <th className={`text-right ${thCountrySort('avg_top6_dgrade')}`} onClick={() => handleCountrySort('avg_top6_dgrade')}>Top 6 Avg dGrade{countryArrow('avg_top6_dgrade')}</th>
                   </tr>
                 </thead>
                 <tbody>
