@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -83,7 +82,7 @@ const PAGE_SIZES = [50, 100, 200]
 const FIRST_SYNC_DATE = '2026-03-02'
 const NEW_PLAYERS_SINCE = '2026-03-03T00:00:00Z'
 
-type SortKey = 'dgrade' | 'world_ranking' | 'games' | 'win_percentage'
+type SortKey = 'dgrade' | 'world_ranking' | 'games' | 'win_percentage' | 'wcf_last_name'
 type SortDir = 'asc' | 'desc'
 
 export default function RankingsPage() {
@@ -158,7 +157,10 @@ export default function RankingsPage() {
 
   const handleRankingSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortKey(key); setSortDir('desc') }
+    else {
+      setSortKey(key)
+      setSortDir(key === 'wcf_last_name' ? 'asc' : 'desc')
+    }
     setRankingsPage(0)
   }
 
@@ -185,6 +187,30 @@ export default function RankingsPage() {
     const { data } = await query
     setRankings(data || [])
     setLoading(false)
+  }
+
+  const downloadCSV = () => {
+    const headers = ['Active Rank', 'All Time Rank', 'First Name', 'Last Name', 'Country', 'dGrade', 'Games (12mo)', 'Win% (12mo)', 'Last Active', 'WCF Profile']
+    const rows = rankings.map((player, i) => [
+      activeOnly ? rankingsPage * pageSize + i + 1 : '—',
+      player.world_ranking,
+      player.wcf_first_name,
+      player.wcf_last_name,
+      getCountryName(player.country),
+      player.dgrade,
+      player.games || '',
+      player.win_percentage ? `${player.win_percentage}%` : '',
+      player.last_active_year || '',
+      player.wcf_profile_url,
+    ])
+    const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `gclab-rankings-${activeOnly ? 'active' : 'alltime'}-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const loadMovers = async () => {
@@ -343,7 +369,6 @@ export default function RankingsPage() {
     }
 
     const gridLines = 5
-
     const xLabelCount = Math.min(6, playerHistory.length)
     const xLabelIndices = playerHistory.length === 1
       ? [0]
@@ -353,59 +378,42 @@ export default function RankingsPage() {
 
     return (
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 400 }}>
-        {/* Grid lines */}
         {Array.from({ length: gridLines + 1 }).map((_, i) => {
           const y = padT + (i / gridLines) * chartH
           return <line key={i} x1={padL} y1={y} x2={W - padR} y2={y} stroke="#e5e7eb" strokeWidth="1" />
         })}
-
-        {/* Border lines */}
         <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
         <line x1={W - padR} y1={padT} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
         <line x1={padL} y1={padT + chartH} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
-
-        {/* Left Y axis labels — dGrade */}
         {showDgrade && Array.from({ length: gridLines + 1 }).map((_, i) => {
           const val = Math.round(dgradeMax - i * ((dgradeMax - dgradeMin) / gridLines))
           const y = padT + (i / gridLines) * chartH
           return <text key={i} x={padL - 8} y={y + 4} fontSize="10" fill="#16a34a" textAnchor="end">{val}</text>
         })}
-
-        {/* Right Y axis labels — World Ranking */}
         {showRanking && Array.from({ length: gridLines + 1 }).map((_, i) => {
           const val = Math.round(rankMin + i * ((rankMax - rankMin) / gridLines))
           const y = padT + chartH - (i / gridLines) * chartH
           return <text key={i} x={W - padR + 8} y={y + 4} fontSize="10" fill="#2563eb" textAnchor="start">#{val}</text>
         })}
-
-        {/* X axis date labels */}
         {xLabelIndices.map((idx) => {
           const x = xScale(idx)
           const label = new Date(playerHistory[idx].recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
           return <text key={idx} x={x} y={H - 6} fontSize="9" fill="#9ca3af" textAnchor="middle">{label}</text>
         })}
-
-        {/* Axis titles */}
         {showDgrade && <text x={padL} y={padT - 8} fontSize="10" fill="#16a34a" fontWeight="500">dGrade</text>}
         {showRanking && <text x={W - padR} y={padT - 8} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank</text>}
-
-        {/* dGrade line */}
         {showDgrade && playerHistory.length > 1 && (
           <polyline
             points={playerHistory.map((h, i) => `${xScale(i)},${yDgrade(h.dgrade_value)}`).join(' ')}
             fill="none" stroke="#16a34a" strokeWidth="2"
           />
         )}
-
-        {/* Ranking line */}
         {showRanking && playerHistory.length > 1 && (
           <polyline
             points={playerHistory.map((h, i) => `${xScale(i)},${yRank(h.world_ranking)}`).join(' ')}
             fill="none" stroke="#2563eb" strokeWidth="2"
           />
         )}
-
-        {/* Dots */}
         {playerHistory.map((h, i) => (
           <g key={i}>
             {showDgrade && (
@@ -420,8 +428,6 @@ export default function RankingsPage() {
             )}
           </g>
         ))}
-
-                {/* Single point labels */}
         {playerHistory.length === 1 && showDgrade && (
           <text x={xScale(0) + 12} y={yDgrade(playerHistory[0].dgrade_value) - 8} fontSize="11" fill="#16a34a">
             dGrade: {playerHistory[0].dgrade_value}
@@ -469,6 +475,10 @@ export default function RankingsPage() {
                   className="border border-gray-300 rounded-md px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500">
                   {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
                 </select>
+                <button onClick={downloadCSV}
+                  className="flex items-center gap-1 text-sm bg-white border border-gray-300 text-gray-600 px-3 py-1 rounded-md hover:border-green-500 hover:text-green-600 transition">
+                  ↓ Download CSV
+                </button>
               </div>
               <div className="flex gap-2">
                 <button onClick={() => { setActiveOnly(true); setRankingsPage(0) }}
@@ -487,7 +497,7 @@ export default function RankingsPage() {
                   <tr>
                     <th className={`text-left ${thBase}`}>Active Rank</th>
                     <th className={`text-left ${thBase}`}>All Time</th>
-                    <th className={`text-left ${thBase}`}>Player</th>
+                    <th className={`text-left ${thClick}`} onClick={() => handleRankingSort('wcf_last_name')}>Player{sortArrow('wcf_last_name')}</th>
                     <th className={`text-left ${thBase}`}>Country</th>
                     <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('dgrade')}>dGrade{sortArrow('dgrade')}</th>
                     <th className={`text-right ${thClick}`} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>

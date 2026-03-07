@@ -128,7 +128,6 @@ async function runSync(logId: string) {
     const activeYear = now.getFullYear() - 1
     const snapshotDate = now.toISOString().split('T')[0]
 
-    // Fetch WCF data with 30 second timeout
     let html: string
     try {
       const response = await fetchWithTimeout(WCF_URL, 30000)
@@ -163,12 +162,13 @@ async function runSync(logId: string) {
     for (let i = 0; i < players.length; i += BATCH_SIZE) {
       const batch = players.slice(i, i + BATCH_SIZE)
       await Promise.all(batch.map(async (player) => {
+        // Use upsert with the unique constraint on name
         const { data: existing } = await supabase
           .from('wcf_players')
           .select('id, dgrade, linked_user_id')
           .eq('wcf_first_name', player.wcf_first_name)
           .eq('wcf_last_name', player.wcf_last_name)
-          .single()
+          .maybeSingle()
 
         if (existing) {
           if (existing.dgrade !== player.dgrade) {
@@ -199,20 +199,36 @@ async function runSync(logId: string) {
             .eq('id', existing.id)
           updated++
         } else {
-          const { data: newPlayer } = await supabase
+          // Insert with conflict handling — if race condition creates duplicate, ignore
+          const { data: newPlayer, error: insertError } = await supabase
             .from('wcf_players')
             .insert({ ...player, last_synced_at: nowISO })
             .select('id')
-            .single()
-          if (newPlayer) {
+            .maybeSingle()
+          if (insertError && insertError.code === '23505') {
+            // Unique constraint violation — duplicate from race condition, fetch and update instead
+            const { data: racePlayer } = await supabase
+              .from('wcf_players')
+              .select('id, dgrade, linked_user_id')
+              .eq('wcf_first_name', player.wcf_first_name)
+              .eq('wcf_last_name', player.wcf_last_name)
+              .maybeSingle()
+            if (racePlayer) {
+              await supabase
+                .from('wcf_players')
+                .update({ ...player, last_synced_at: nowISO })
+                .eq('id', racePlayer.id)
+              updated++
+            }
+          } else if (newPlayer) {
             await supabase.from('wcf_dgrade_history').insert({
               wcf_player_id: newPlayer.id,
               dgrade_value: player.dgrade,
               world_ranking: player.world_ranking,
               recorded_at: nowISO,
             })
+            created++
           }
-          created++
         }
       }))
     }
@@ -256,7 +272,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to create sync log' }, { status: 500 })
   }
 
-    await runSync(log.id)
+  await runSync(log.id)
 
   return NextResponse.json({ started: true, logId: log.id })
 }
