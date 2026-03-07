@@ -185,6 +185,7 @@ export default function RankingsPage() {
       .order(sortKey, { ascending: sortDir === 'asc' })
       .range(rankingsPage * pageSize, (rankingsPage + 1) * pageSize - 1)
     if (activeOnly) query = query.gte('last_active_year', activeYear)
+    if (sortKey === 'egrade') query = query.not('egrade', 'is', null)
     const { data } = await query
     setRankings(data || [])
     setLoading(false)
