@@ -256,7 +256,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to create sync log' }, { status: 500 })
   }
 
-  runSync(log.id)
+    await runSync(log.id)
 
   return NextResponse.json({ started: true, logId: log.id })
 }
