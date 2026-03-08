@@ -79,6 +79,7 @@ const MOVER_PERIODS = [
   { label: '30 days', days: 30 },
   { label: '90 days', days: 90 },
   { label: '1 year', days: 365 },
+  { label: 'All Time', days: 0 },
 ]
 const PAGE_SIZES = [50, 100, 200]
 const FIRST_SYNC_DATE = '2026-03-02'
@@ -144,6 +145,7 @@ export default function RankingsPage() {
   const [historyRange, setHistoryRange] = useState('5y')
   const [historyFrom, setHistoryFrom] = useState('')
   const [historyTo, setHistoryTo] = useState('')
+  const [lastSyncDate, setLastSyncDate] = useState<string | null>(null)
 
   const supabase = createClient()
   const activeYear = new Date().getFullYear() - 1
@@ -162,6 +164,15 @@ export default function RankingsPage() {
           setUserRole(data.role || '')
         }
       }
+      // Fetch last successful sync date
+      const { data: syncLog } = await supabase
+        .from('sync_log')
+        .select('completed_at')
+        .eq('status', 'complete')
+        .order('completed_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (syncLog?.completed_at) setLastSyncDate(syncLog.completed_at)
     }
     init()
   }, [])
@@ -264,7 +275,10 @@ export default function RankingsPage() {
 
   const loadMovers = async () => {
     setLoading(true)
-    const { data } = await supabase.rpc('get_movers', { since_date: FIRST_SYNC_DATE, limit_count: 20 })
+    const sinceDate = moverPeriod === 0
+      ? FIRST_SYNC_DATE
+      : new Date(Date.now() - moverPeriod * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const { data } = await supabase.rpc('get_movers', { since_date: sinceDate, limit_count: 20 })
     if (data) {
       setMovers({
         gains: data.filter((p: any) => p.change > 0).sort((a: any, b: any) => b.change - a.change).slice(0, 10),
@@ -771,7 +785,7 @@ export default function RankingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mb-4">GCLab dGrade baseline set 6 Mar 2026. Movers will appear as daily syncs detect changes going forward.</p>
+            <p className="text-xs text-gray-400 mb-4">GCLab baseline set 6 Mar 2026 — changes detected by daily sync. Games and Win% show career totals from WCF.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
                 { title: '📈 Biggest Gains', data: movers.gains, positive: true },
@@ -789,8 +803,8 @@ export default function RankingsPage() {
                             <th className="text-left px-4 py-2 text-gray-700 font-semibold">Player</th>
                             <th className="text-right px-4 py-2 text-gray-700 font-semibold">Change</th>
                             <th className="text-right px-4 py-2 text-gray-700 font-semibold">dGrade</th>
-                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Games</th>
-                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Win%</th>
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Games (career)</th>
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Win% (career)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1120,7 +1134,7 @@ export default function RankingsPage() {
                                 <td className="py-1.5 text-gray-500">
                                   {h.event_url
                                     ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">{h.event_name || '—'}</a>
-                                    : h.event_name || <span className="text-gray-400">Latest sync</span>}
+                                    : h.event_name || <span className="text-gray-400">{lastSyncDate ? `Last synced ${new Date(lastSyncDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Latest sync'}</span>}
                                 </td>
                                 <td className="py-1.5 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
                                 <td className="py-1.5 text-right font-semibold">

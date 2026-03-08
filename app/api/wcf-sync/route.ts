@@ -197,7 +197,7 @@ async function runSync(logId: string) {
 
         const { data: existing } = await supabase
           .from('wcf_players')
-          .select('id, dgrade, egrade, linked_user_id, history_imported')
+          .select('id, dgrade, egrade, world_ranking, linked_user_id, history_imported')
           .eq('wcf_first_name', player.wcf_first_name)
           .eq('wcf_last_name', player.wcf_last_name)
           .maybeSingle()
@@ -329,7 +329,12 @@ async function runSync(logId: string) {
 
           await supabase
             .from('wcf_players')
-            .update({ ...player, egrade, last_synced_at: nowISO })
+            .update({
+              ...player,
+              egrade,
+              last_synced_at: nowISO,
+              ...(dgradeChanged && existing.history_imported ? { history_imported: false } : {}),
+            })
             .eq('id', existing.id)
           updated++
         } else {
