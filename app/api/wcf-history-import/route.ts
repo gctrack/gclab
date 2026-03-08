@@ -138,7 +138,7 @@ function parseYearPage(html: string, year: number): {
 
     // Game row — has game number, result, opponent, score, grades
     const gameMatch = row.match(
-      /<td>\s*(\d+)\s*<\/td><td[^>]*>\s*(<b>)?\s*(beat|lost to)\s*(<\/b>)?\s*<\/td><td[^>]*>.*?pffn=([^&"]+)&pfsn=([^&"]+?)(?:&[^"]*)?">([^<]+)<\/b>?<\/td><td[^>]*>([^<]+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>([^<]*)<\/td>/
+      /<td>\s*(\d+)\s*<\/td><td[^>]*>\s*(<b>)?\s*(beat|lost to)\s*(<\/b>)?\s*<\/td><td[^>]*>.*?pffn=([^&"]+)&pfsn=([^&"]+?)(?:&[^"]*)?">([^<]+?)(?:<\/b>)?<\/td><td[^>]*>([^<]+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>([^<]*)<\/td>/
     )
     if (gameMatch && currentEvent) {
       const gameNumber = parseInt(gameMatch[1])
