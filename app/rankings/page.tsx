@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import GCLabNav from '@/components/GCLabNav'
 
 const COUNTRY_NAMES: Record<string, string> = {
   'AU': 'Australia', 'BE': 'Belgium', 'CA': 'Canada', 'CZ': 'Czech Republic',
@@ -86,9 +88,27 @@ type SortKey = 'dgrade' | 'egrade' | 'world_ranking' | 'games' | 'win_percentage
 type SortDir = 'asc' | 'desc'
 
 export default function RankingsPage() {
-  const [activeTab, setActiveTab] = useState('Rankings')
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      return params.get('tab') || 'Rankings'
+    }
+    return 'Rankings'
+  })
   const [loading, setLoading] = useState(false)
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null)
+  const [userRole, setUserRole] = useState('')
+
+  // Historical search autocomplete
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchSuggestions, setSearchSuggestions] = useState<any[]>([])
+  const searchTimeoutRef = useRef<any>(null)
+
+  // Chart tooltip
+  const [chartTooltip, setChartTooltip] = useState<{ x: number, y: number, label: string } | null>(null)
+
+  // Ranking type for world rank toggle
+  const [rankingType, setRankingType] = useState<'active' | 'alltime'>('active')
 
   const [rankings, setRankings] = useState<any[]>([])
   const [activeOnly, setActiveOnly] = useState(true)
@@ -114,8 +134,6 @@ export default function RankingsPage() {
   const [availableSnapshots, setAvailableSnapshots] = useState<string[]>([])
   const [tooltip, setTooltip] = useState<{ country: string, type: 'active' | 'alltime' } | null>(null)
 
-  const [lookupFirst, setLookupFirst] = useState('')
-  const [lookupLast, setLookupLast] = useState('')
   const [lookupResults, setLookupResults] = useState<any[]>([])
   const [lookupSearched, setLookupSearched] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null)
@@ -136,10 +154,13 @@ export default function RankingsPage() {
       if (user) {
         const { data } = await supabase
           .from('profiles')
-          .select('first_name, last_name, wcf_player_id')
+          .select('first_name, last_name, wcf_player_id, role')
           .eq('id', user.id)
           .single()
-        if (data) setCurrentUserProfile(data)
+        if (data) {
+          setCurrentUserProfile(data)
+          setUserRole(data.role || '')
+        }
       }
     }
     init()
@@ -325,31 +346,86 @@ export default function RankingsPage() {
       if (historyTo) query = query.lte('recorded_at', historyTo)
     }
     const { data } = await query
-    setPlayerHistory(data || [])
-  }
+    if (!data) { setPlayerHistory([]); return }
 
-  const handlePlayerSearch = async () => {
-    if (!lookupLast) return
-    setLookupSearched(true)
-    setSelectedPlayer(null)
-    setPlayerHistory([])
-    const { data } = await supabase
-      .from('wcf_players')
-      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url')
-      .ilike('wcf_last_name', `%${lookupLast}%`)
-      .order('world_ranking', { ascending: true })
-      .limit(20)
-    const filtered = lookupFirst
-      ? (data || []).filter((p: any) => p.wcf_first_name.toLowerCase().startsWith(lookupFirst.charAt(0).toLowerCase()))
-      : data || []
-    setLookupResults(filtered)
+    // Filter: keep all imported/event points, but for daily syncs keep only if dgrade changed
+    // Also deduplicate: if multiple daily syncs on same day, keep only last
+    const MARCH_2026 = new Date('2026-03-01')
+    const filtered: any[] = []
+    let lastDgrade: number | null = null
+    let lastDailyDate: string | null = null
+
+    for (const h of data) {
+      const isEvent = h.is_imported || (h.event_name && h.event_name !== 'Daily sync')
+      const dateStr = h.recorded_at.slice(0, 10)
+
+      if (isEvent) {
+        // Always include event/imported points
+        filtered.push(h)
+        lastDgrade = h.dgrade_value
+        lastDailyDate = null
+      } else {
+        // Daily sync — only include if dgrade changed
+        if (h.dgrade_value !== lastDgrade) {
+          // Remove previous daily sync on same date if exists
+          if (lastDailyDate === dateStr && filtered.length > 0 && !filtered[filtered.length - 1].is_imported) {
+            filtered.pop()
+          }
+          filtered.push(h)
+          lastDgrade = h.dgrade_value
+          lastDailyDate = dateStr
+        }
+      }
+    }
+
+    // Null out world_ranking for points before March 2026
+    const processed = filtered.map(h => ({
+      ...h,
+      world_ranking: new Date(h.recorded_at) >= MARCH_2026 ? h.world_ranking : null,
+    }))
+
+    setPlayerHistory(processed)
   }
 
   const handleSelectPlayer = async (player: any) => {
     setSelectedPlayer(player)
     setLookupResults([])
     setLookupSearched(false)
+    setSearchQuery(`${player.wcf_first_name} ${player.wcf_last_name}`)
+    setSearchSuggestions([])
     await fetchHistory(player.id)
+  }
+
+  const handleSearchQueryChange = (value: string) => {
+    setSearchQuery(value)
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+    if (value.length < 2) { setSearchSuggestions([]); return }
+    searchTimeoutRef.current = setTimeout(async () => {
+      const parts = value.trim().split(' ')
+      let query = supabase
+        .from('wcf_players')
+        .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url')
+        .order('world_ranking', { ascending: true })
+        .limit(8)
+      if (parts.length >= 2 && parts[1]) {
+        query = query
+          .ilike('wcf_first_name', `%${parts[0]}%`)
+          .ilike('wcf_last_name', `%${parts[1]}%`)
+      } else {
+        query = query.or(`wcf_last_name.ilike.%${value}%,wcf_first_name.ilike.%${value}%`)
+      }
+      const { data } = await query
+      setSearchSuggestions(data || [])
+    }, 250)
+  }
+
+  const handleShowMyHistory = () => {
+    if (currentUserProfile?.wcf_player_id) {
+      setSearchQuery('')
+      setSearchSuggestions([])
+      setLookupResults([])
+      loadPlayerHistory(currentUserProfile.wcf_player_id)
+    }
   }
 
   const formatDate = (str: string) => new Date(str).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -366,27 +442,34 @@ export default function RankingsPage() {
   const renderChart = () => {
     if (playerHistory.length === 0) return <p className="text-sm text-gray-400 py-4">No history recorded yet.</p>
 
-    const W = 800, H = 280
-    const padL = 60, padR = 60, padT = 24, padB = 40
+    const W = 800, H = 300
+    const padL = 60, padR = 70, padT = 32, padB = 48
     const chartW = W - padL - padR
     const chartH = H - padT - padB
 
     const dgrades = playerHistory.map(h => h.dgrade_value)
     const egrades = playerHistory.filter(h => h.egrade_value && h.egrade_value > 0).map(h => h.egrade_value)
-    const wranks = playerHistory.map(h => h.world_ranking)
+    const wranks = playerHistory.filter(h => h.world_ranking).map(h => h.world_ranking)
 
-    const allGrades = [...dgrades, ...(egrades.length > 0 ? egrades : [])]
+    const allGrades = [...dgrades, ...(showEgrade && egrades.length > 0 ? egrades : [])]
     const gradeSpread = Math.max(...allGrades) - Math.min(...allGrades)
-    const gradeMin = Math.min(...allGrades) - Math.max(50, gradeSpread * 0.2)
-    const gradeMax = Math.max(...allGrades) + Math.max(50, gradeSpread * 0.2)
+    const gradeMin = Math.min(...allGrades) - Math.max(50, gradeSpread * 0.15)
+    const gradeMax = Math.max(...allGrades) + Math.max(50, gradeSpread * 0.15)
 
-    const rankSpread = Math.max(...wranks) - Math.min(...wranks)
-    const rankMin = Math.max(1, Math.min(...wranks) - Math.max(10, rankSpread * 0.2))
-    const rankMax = Math.max(...wranks) + Math.max(10, rankSpread * 0.2)
+    const hasRank = showRanking && wranks.length > 0
+    const rankMin = hasRank ? Math.max(1, Math.min(...wranks) - Math.max(5, (Math.max(...wranks) - Math.min(...wranks)) * 0.2)) : 1
+    const rankMax = hasRank ? Math.max(...wranks) + Math.max(5, (Math.max(...wranks) - Math.min(...wranks)) * 0.2) : 100
 
-    const xScale = (i: number) => playerHistory.length === 1
-      ? padL + chartW / 2
-      : padL + (i / (playerHistory.length - 1)) * chartW
+    // X scale based on actual dates
+    const dates = playerHistory.map(h => new Date(h.recorded_at).getTime())
+    const dateMin = Math.min(...dates)
+    const dateMax = Math.max(...dates)
+    const dateRange = dateMax - dateMin || 1
+
+    const xScale = (i: number) => {
+      if (playerHistory.length === 1) return padL + chartW / 2
+      return padL + ((dates[i] - dateMin) / dateRange) * chartW
+    }
 
     const yGrade = (v: number) => {
       if (gradeMax === gradeMin) return padT + chartH / 2
@@ -398,121 +481,166 @@ export default function RankingsPage() {
       return padT + chartH - ((rankMax - v) / (rankMax - rankMin)) * chartH
     }
 
+    // Year tick marks on x-axis
+    const startYear = new Date(dateMin).getFullYear()
+    const endYear = new Date(dateMax).getFullYear()
+    const yearTicks: { year: number, x: number }[] = []
+    for (let y = startYear; y <= endYear; y++) {
+      const ts = new Date(`${y}-01-01`).getTime()
+      if (ts >= dateMin && ts <= dateMax) {
+        yearTicks.push({ year: y, x: padL + ((ts - dateMin) / dateRange) * chartW })
+      }
+    }
+    // Always show start and end year
+    const startX = padL
+    const endX = padL + chartW
+
     const gridLines = 5
-    const xLabelCount = Math.min(6, playerHistory.length)
-    const xLabelIndices = playerHistory.length === 1
-      ? [0]
-      : Array.from({ length: xLabelCount }, (_, i) =>
-          Math.round(i * (playerHistory.length - 1) / Math.max(xLabelCount - 1, 1))
-        )
+
+    // Grade change table: compute diffs
+    const historyWithDiff = playerHistory.map((h, i) => ({
+      ...h,
+      gradeDiff: i === 0 ? null : h.dgrade_value - playerHistory[i - 1].dgrade_value,
+    }))
 
     return (
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 400 }}>
-        {Array.from({ length: gridLines + 1 }).map((_, i) => {
-          const y = padT + (i / gridLines) * chartH
-          return <line key={i} x1={padL} y1={y} x2={W - padR} y2={y} stroke="#e5e7eb" strokeWidth="1" />
-        })}
-        <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
-        <line x1={W - padR} y1={padT} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
-        <line x1={padL} y1={padT + chartH} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
+      <div className="relative" onMouseLeave={() => setChartTooltip(null)}>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full"
+          style={{ minWidth: 400 }}
+          onMouseLeave={() => setChartTooltip(null)}
+        >
+          {/* Grid */}
+          {Array.from({ length: gridLines + 1 }).map((_, i) => {
+            const y = padT + (i / gridLines) * chartH
+            return <line key={i} x1={padL} y1={y} x2={W - padR} y2={y} stroke="#e5e7eb" strokeWidth="1" />
+          })}
+          <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
+          <line x1={W - padR} y1={padT} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
+          <line x1={padL} y1={padT + chartH} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
 
-        {(showDgrade || showEgrade) && Array.from({ length: gridLines + 1 }).map((_, i) => {
-          const val = Math.round(gradeMax - i * ((gradeMax - gradeMin) / gridLines))
-          const y = padT + (i / gridLines) * chartH
-          return <text key={i} x={padL - 8} y={y + 4} fontSize="10" fill="#16a34a" textAnchor="end">{val}</text>
-        })}
-        {showRanking && Array.from({ length: gridLines + 1 }).map((_, i) => {
-          const val = Math.round(rankMin + i * ((rankMax - rankMin) / gridLines))
-          const y = padT + chartH - (i / gridLines) * chartH
-          return <text key={i} x={W - padR + 8} y={y + 4} fontSize="10" fill="#2563eb" textAnchor="start">#{val}</text>
-        })}
-        {xLabelIndices.map((idx) => {
-          const x = xScale(idx)
-          const label = new Date(playerHistory[idx].recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-          return <text key={idx} x={x} y={H - 6} fontSize="9" fill="#9ca3af" textAnchor="middle">{label}</text>
-        })}
+          {/* Grade Y axis labels */}
+          {(showDgrade || showEgrade) && Array.from({ length: gridLines + 1 }).map((_, i) => {
+            const val = Math.round(gradeMax - i * ((gradeMax - gradeMin) / gridLines))
+            const y = padT + (i / gridLines) * chartH
+            return <text key={i} x={padL - 8} y={y + 4} fontSize="10" fill="#16a34a" textAnchor="end">{val}</text>
+          })}
 
-        {showDgrade && <text x={padL} y={padT - 8} fontSize="10" fill="#16a34a" fontWeight="500">dGrade</text>}
-        {showEgrade && <text x={padL + 52} y={padT - 8} fontSize="10" fill="#d97706" fontWeight="500">eGrade</text>}
-        {showRanking && <text x={W - padR} y={padT - 8} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank</text>}
+          {/* Rank Y axis labels */}
+          {hasRank && Array.from({ length: gridLines + 1 }).map((_, i) => {
+            const val = Math.round(rankMin + i * ((rankMax - rankMin) / gridLines))
+            const y = padT + chartH - (i / gridLines) * chartH
+            return <text key={i} x={W - padR + 8} y={y + 4} fontSize="10" fill="#2563eb" textAnchor="start">#{val}</text>
+          })}
 
-        {showDgrade && playerHistory.length > 1 && (
-          <polyline
-            points={playerHistory.map((h, i) => `${xScale(i)},${yGrade(h.dgrade_value)}`).join(' ')}
-            fill="none" stroke="#16a34a" strokeWidth="2"
-          />
-        )}
-        {showEgrade && playerHistory.length > 1 && (
-          <polyline
-            points={playerHistory
+          {/* X axis — year ticks */}
+          {yearTicks.map(({ year, x }) => (
+            <g key={year}>
+              <line x1={x} y1={padT + chartH} x2={x} y2={padT + chartH + 4} stroke="#d1d5db" strokeWidth="1" />
+              <text x={x} y={H - 28} fontSize="10" fill="#6b7280" textAnchor="middle">{year}</text>
+            </g>
+          ))}
+          {/* Always label start/end date */}
+          <text x={startX} y={H - 12} fontSize="9" fill="#9ca3af" textAnchor="start">
+            {new Date(dateMin).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+          </text>
+          {dateRange > 0 && (
+            <text x={endX} y={H - 12} fontSize="9" fill="#9ca3af" textAnchor="end">
+              {new Date(dateMax).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+            </text>
+          )}
+
+          {/* Legend */}
+          {showDgrade && <text x={padL} y={padT - 12} fontSize="10" fill="#16a34a" fontWeight="500">dGrade</text>}
+          {showEgrade && <text x={padL + 54} y={padT - 12} fontSize="10" fill="#d97706" fontWeight="500">eGrade</text>}
+          {hasRank && <text x={W - padR} y={padT - 12} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank (from Mar 2026)</text>}
+
+          {/* dGrade line */}
+          {showDgrade && playerHistory.length > 1 && (
+            <polyline
+              points={playerHistory.map((h, i) => `${xScale(i)},${yGrade(h.dgrade_value)}`).join(' ')}
+              fill="none" stroke="#16a34a" strokeWidth="2"
+            />
+          )}
+
+          {/* eGrade line — only connect points that have egrade */}
+          {showEgrade && (() => {
+            const epts = playerHistory
               .map((h, i) => h.egrade_value && h.egrade_value > 0 ? `${xScale(i)},${yGrade(h.egrade_value)}` : null)
               .filter(Boolean)
-              .join(' ')}
-            fill="none" stroke="#d97706" strokeWidth="2" strokeDasharray="4 2"
-          />
-        )}
-        {showRanking && playerHistory.length > 1 && (
-          <polyline
-            points={playerHistory.map((h, i) => `${xScale(i)},${yRank(h.world_ranking)}`).join(' ')}
-            fill="none" stroke="#2563eb" strokeWidth="2"
-          />
-        )}
+            return epts.length > 1 ? (
+              <polyline points={epts.join(' ')} fill="none" stroke="#d97706" strokeWidth="2" strokeDasharray="4 2" />
+            ) : null
+          })()}
 
-        {playerHistory.map((h, i) => (
-          <g key={i}>
-            {showDgrade && (
-              <circle cx={xScale(i)} cy={yGrade(h.dgrade_value)} r={h.is_imported ? 3 : 4}
-                fill={h.is_imported ? '#15803d' : '#16a34a'}
-                opacity={h.is_imported ? 0.7 : 1}>
-                <title>{formatDate(h.recorded_at)}{h.event_name ? ` · ${h.event_name}` : ''}: dGrade {h.dgrade_value}</title>
-              </circle>
-            )}
-            {showEgrade && h.egrade_value && h.egrade_value > 0 && (
-              <circle cx={xScale(i)} cy={yGrade(h.egrade_value)} r={h.is_imported ? 3 : 4}
-                fill={h.is_imported ? '#b45309' : '#d97706'}
-                opacity={h.is_imported ? 0.7 : 1}>
-                <title>{formatDate(h.recorded_at)}{h.event_name ? ` · ${h.event_name}` : ''}: eGrade {h.egrade_value}</title>
-              </circle>
-            )}
-            {showRanking && h.world_ranking && (
-              <circle cx={xScale(i)} cy={yRank(h.world_ranking)} r={h.is_imported ? 3 : 4}
-                fill={h.is_imported ? '#1d4ed8' : '#2563eb'}
-                opacity={h.is_imported ? 0.7 : 1}>
-                <title>{formatDate(h.recorded_at)}{h.event_name ? ` · ${h.event_name}` : ''}: Rank #{h.world_ranking}</title>
-              </circle>
-            )}
-          </g>
-        ))}
+          {/* World Rank line — only connect points that have rank */}
+          {hasRank && (() => {
+            const rpts = playerHistory
+              .map((h, i) => h.world_ranking ? `${xScale(i)},${yRank(h.world_ranking)}` : null)
+              .filter(Boolean)
+            return rpts.length > 1 ? (
+              <polyline points={rpts.join(' ')} fill="none" stroke="#2563eb" strokeWidth="2" />
+            ) : null
+          })()}
 
-        {playerHistory.length === 1 && showDgrade && (
-          <text x={xScale(0) + 12} y={yGrade(playerHistory[0].dgrade_value) - 8} fontSize="11" fill="#16a34a">
-            dGrade: {playerHistory[0].dgrade_value}
-          </text>
+          {/* Dots with hover — large invisible hit area */}
+          {playerHistory.map((h, i) => {
+            const cx = xScale(i)
+            const label = `${new Date(h.recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}${h.event_name && h.event_name !== 'Daily sync' ? ` · ${h.event_name}` : ''}`
+            return (
+              <g key={i}
+                onMouseEnter={(e) => {
+                  const svg = (e.currentTarget as SVGElement).closest('svg')!
+                  const rect = svg.getBoundingClientRect()
+                  const lines = [label]
+                  if (showDgrade) lines.push(`dGrade: ${h.dgrade_value}`)
+                  if (showEgrade && h.egrade_value && h.egrade_value > 0) lines.push(`eGrade: ${h.egrade_value}`)
+                  if (h.world_ranking) lines.push(`World Rank: #${h.world_ranking}`)
+                  setChartTooltip({ x: cx / W * 100, y: yGrade(h.dgrade_value) / H * 100, label: lines.join('\n') })
+                }}
+                onMouseLeave={() => setChartTooltip(null)}
+                style={{ cursor: 'pointer' }}
+              >
+                {showDgrade && (
+                  <circle cx={cx} cy={yGrade(h.dgrade_value)} r={h.is_imported ? 3 : 4}
+                    fill={h.is_imported ? '#15803d' : '#16a34a'} opacity={h.is_imported ? 0.7 : 1} />
+                )}
+                {showEgrade && h.egrade_value && h.egrade_value > 0 && (
+                  <circle cx={cx} cy={yGrade(h.egrade_value)} r={h.is_imported ? 3 : 4}
+                    fill={h.is_imported ? '#b45309' : '#d97706'} opacity={h.is_imported ? 0.7 : 1} />
+                )}
+                {h.world_ranking && (
+                  <circle cx={cx} cy={yRank(h.world_ranking)} r={4}
+                    fill="#2563eb" opacity={0.9} />
+                )}
+                {/* Large invisible hit area */}
+                <circle cx={cx} cy={yGrade(h.dgrade_value)} r={12} fill="transparent" />
+              </g>
+            )
+          })}
+        </svg>
+
+        {/* Floating tooltip */}
+        {chartTooltip && (
+          <div
+            className="absolute z-10 bg-gray-900 text-white text-xs rounded-md px-2 py-1.5 pointer-events-none shadow-lg whitespace-pre"
+            style={{ left: `${Math.min(chartTooltip.x, 80)}%`, top: `${Math.max(chartTooltip.y - 10, 2)}%`, transform: 'translate(-50%, -100%)' }}
+          >
+            {chartTooltip.label}
+          </div>
         )}
-        {playerHistory.length === 1 && showEgrade && playerHistory[0].egrade_value > 0 && (
-          <text x={xScale(0) + 12} y={yGrade(playerHistory[0].egrade_value) + 16} fontSize="11" fill="#d97706">
-            eGrade: {playerHistory[0].egrade_value}
-          </text>
-        )}
-        {playerHistory.length === 1 && showRanking && (
-          <text x={xScale(0) + 12} y={yRank(playerHistory[0].world_ranking) + 16} fontSize="11" fill="#2563eb">
-            Rank: #{playerHistory[0].world_ranking}
-          </text>
-        )}
-      </svg>
+      </div>
     )
   }
 
   const thBase = "px-4 py-3 text-gray-700 font-semibold"
 
   return (
-    <div className="min-h-screen bg-gray-50" onClick={(e) => {
+    <div className="min-h-screen bg-gray-50 relative" onClick={(e) => {
       if (!(e.target as HTMLElement).closest('.relative')) setTooltip(null)
     }}>
-      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <a href="/dashboard" className="text-xl font-bold text-green-600">GCLab</a>
-        <a href="/dashboard" className="text-sm text-gray-600 hover:text-green-600">← Dashboard</a>
-      </nav>
+      <GCLabNav role={userRole} />
       <main className="max-w-5xl mx-auto px-6 py-10">
         <h2 className="text-2xl font-bold mb-6 text-gray-900">WCF Rankings & Stats</h2>
 
@@ -828,61 +956,44 @@ export default function RankingsPage() {
           <div>
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
               <h3 className="font-semibold text-gray-900 mb-3">Search any player</h3>
-              <div className="flex gap-2 flex-wrap">
-                <input type="text" placeholder="First name" value={lookupFirst}
-                  onChange={(e) => setLookupFirst(e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 w-36 focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <input type="text" placeholder="Last name" value={lookupLast}
-                  onChange={(e) => setLookupLast(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handlePlayerSearch()}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 w-36 focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <button onClick={handlePlayerSearch}
-                  className="bg-green-600 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 transition">
-                  Search
-                </button>
+              <div className="flex gap-2 flex-wrap items-start">
+                <div className="relative flex-1 min-w-48">
+                  <input
+                    type="text"
+                    placeholder="Type a name..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearchQueryChange(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  {searchSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-10 bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                      {searchSuggestions.map((player) => (
+                        <button
+                          key={player.id}
+                          onClick={() => handleSelectPlayer(player)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex justify-between items-center"
+                        >
+                          <span className="text-gray-900">{player.wcf_first_name} {player.wcf_last_name}</span>
+                          <span className="text-gray-400 text-xs">{getFlag(player.country)} #{player.world_ranking} · {player.dgrade}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {currentUserProfile?.wcf_player_id && (
+                  <button
+                    onClick={handleShowMyHistory}
+                    className="px-4 py-2 rounded-md text-sm font-medium bg-green-50 border border-green-300 text-green-700 hover:bg-green-100 transition whitespace-nowrap"
+                  >
+                    Show My History
+                  </button>
+                )}
               </div>
             </div>
-
-            {lookupSearched && lookupResults.length === 0 && !selectedPlayer && (
-              <p className="text-sm text-gray-500 mb-4">No players found.</p>
-            )}
-
-            {!selectedPlayer && lookupResults.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="text-left px-4 py-3 text-gray-700 font-semibold">Player</th>
-                      <th className="text-left px-4 py-3 text-gray-700 font-semibold">Country</th>
-                      <th className="text-right px-4 py-3 text-gray-700 font-semibold">dGrade</th>
-                      <th className="text-right px-4 py-3 text-gray-700 font-semibold">eGrade</th>
-                      <th className="text-right px-4 py-3 text-gray-700 font-semibold">Rank</th>
-                      <th className="px-4 py-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lookupResults.map((player, i) => (
-                      <tr key={player.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-4 py-2 font-medium text-gray-900">{player.wcf_first_name} {player.wcf_last_name}</td>
-                        <td className="px-4 py-2 text-gray-900">{getFlag(player.country)} {getCountryName(player.country)}</td>
-                        <td className="px-4 py-2 text-right font-semibold text-gray-900">{player.dgrade}</td>
-                        <td className="px-4 py-2 text-right font-semibold text-amber-600">{player.egrade || '—'}</td>
-                        <td className="px-4 py-2 text-right text-gray-700">#{player.world_ranking}</td>
-                        <td className="px-4 py-2 text-right">
-                          <button onClick={() => handleSelectPlayer(player)} className="text-green-600 hover:underline text-xs font-medium">View history →</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
 
             {selectedPlayer && (
               <div>
                 <div className="flex items-center gap-3 mb-4 flex-wrap">
-                  <button onClick={() => { setSelectedPlayer(null); setPlayerHistory([]) }}
-                    className="text-sm text-gray-500 hover:text-green-600">← Back to search</button>
                   <h3 className="font-semibold text-lg text-gray-900">{getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}</h3>
                   <span className="text-sm text-gray-600">
                     {getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade}
@@ -910,7 +1021,7 @@ export default function RankingsPage() {
                         className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-800" />
                     </div>
                   )}
-                  <div className="flex gap-2 ml-auto">
+                  <div className="flex gap-2 ml-auto flex-wrap">
                     <button onClick={() => setShowDgrade(!showDgrade)}
                       className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${showDgrade ? 'bg-green-50 border-green-400 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
                       <span className="w-4 h-1 bg-green-500 inline-block rounded" /> dGrade
@@ -928,42 +1039,69 @@ export default function RankingsPage() {
 
                 <p className="text-xs text-gray-400 mb-3">
                   {playerHistory.length <= 1
-                    ? 'No history recorded yet. If this player has imported their WCF history, it will appear here.'
+                    ? 'No history recorded yet.'
                     : `${playerHistory.filter((h: any) => h.is_imported).length} imported events + ${playerHistory.filter((h: any) => !h.is_imported).length} GCLab tracked points`}
+                  {showRanking && <span className="ml-2 text-blue-400">· World rank shown from Mar 2026</span>}
                 </p>
 
                 <div className="bg-white rounded-lg shadow-sm p-4 mb-4">{renderChart()}</div>
 
-                {playerHistory.length > 0 && (
-                  <div className="bg-white rounded-lg shadow-sm p-4">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-gray-500 border-b">
-                          <th className="text-left py-1 font-semibold">Date</th>
-                          <th className="text-left py-1 font-semibold">Event</th>
-                          <th className="text-right py-1 font-semibold">dGrade</th>
-                          <th className="text-right py-1 font-semibold">eGrade</th>
-                          <th className="text-right py-1 font-semibold">World Rank</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...playerHistory].reverse().map((h, i) => (
-                          <tr key={i} className="border-t border-gray-100">
-                            <td className="py-1 text-gray-700">{formatDate(h.recorded_at)}</td>
-                            <td className="py-1 text-gray-500">
-                              {h.event_url
-                                ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">{h.event_name || '—'}</a>
-                                : h.event_name || <span className="text-gray-400">Daily sync</span>}
-                            </td>
-                            <td className="py-1 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
-                            <td className="py-1 text-right font-semibold text-amber-600">{h.egrade_value || '—'}</td>
-                            <td className="py-1 text-right text-gray-600">{h.world_ranking ? `#${h.world_ranking}` : '—'}</td>
+                {playerHistory.length > 0 && (() => {
+                  // Only show events + most recent sync (last non-imported point)
+                  const eventPoints = playerHistory.filter((h: any) => h.is_imported || (h.event_name && h.event_name !== 'Daily sync'))
+                  const syncPoints = playerHistory.filter((h: any) => !h.is_imported && (!h.event_name || h.event_name === 'Daily sync'))
+                  const lastSync = syncPoints.length > 0 ? syncPoints[syncPoints.length - 1] : null
+                  const tableRows = [...eventPoints, ...(lastSync ? [lastSync] : [])].sort(
+                    (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
+                  )
+                  // Compute grade diffs vs previous entry in original chronological order
+                  const chronological = [...playerHistory]
+                  const getDiff = (h: any) => {
+                    const idx = chronological.findIndex(x => x.recorded_at === h.recorded_at)
+                    if (idx <= 0) return null
+                    return h.dgrade_value - chronological[idx - 1].dgrade_value
+                  }
+                  return (
+                    <div className="bg-white rounded-lg shadow-sm p-4">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-gray-500 border-b">
+                            <th className="text-left py-1 font-semibold">Date</th>
+                            <th className="text-left py-1 font-semibold">Event</th>
+                            <th className="text-right py-1 font-semibold">dGrade</th>
+                            <th className="text-right py-1 font-semibold">Change</th>
+                            <th className="text-right py-1 font-semibold">eGrade</th>
+                            <th className="text-right py-1 font-semibold">World Rank</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody>
+                          {tableRows.map((h, i) => {
+                            const diff = getDiff(h)
+                            return (
+                              <tr key={i} className="border-t border-gray-100">
+                                <td className="py-1.5 text-gray-700">{formatDate(h.recorded_at)}</td>
+                                <td className="py-1.5 text-gray-500">
+                                  {h.event_url
+                                    ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">{h.event_name || '—'}</a>
+                                    : h.event_name || <span className="text-gray-400">Latest sync</span>}
+                                </td>
+                                <td className="py-1.5 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
+                                <td className="py-1.5 text-right font-semibold">
+                                  {diff === null ? <span className="text-gray-400">—</span> :
+                                   diff > 0 ? <span className="text-green-600">↑ +{diff}</span> :
+                                   diff < 0 ? <span className="text-red-500">↓ {diff}</span> :
+                                   <span className="text-gray-400">—</span>}
+                                </td>
+                                <td className="py-1.5 text-right font-semibold text-amber-600">{h.egrade_value || '—'}</td>
+                                <td className="py-1.5 text-right text-gray-600">{h.world_ranking ? `#${h.world_ranking}` : '—'}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                })()}
               </div>
             )}
           </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import WcfMatchBanner from '@/components/WcfMatchBanner'
+import GCLabNav from '@/components/GCLabNav'
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
@@ -15,10 +16,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
+      if (!user) { router.push('/login'); return }
       setUser(user)
       const { data } = await supabase
         .from('profiles')
@@ -31,11 +29,6 @@ export default function DashboardPage() {
     getUser()
   }, [])
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
-
   const handleWcfLinked = async () => {
     const { data } = await supabase
       .from('profiles')
@@ -47,30 +40,14 @@ export default function DashboardPage() {
 
   const formatSyncDate = (dateStr: string) => {
     if (!dateStr) return null
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-green-600">GCLab</h1>
-        <div className="flex items-center gap-4">
-          {profile && ['admin', 'super_admin'].includes(profile.role) && (
-            <a href="/admin" className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-medium hover:bg-purple-200 transition">
-              Admin
-            </a>
-          )}
-          <button
-            onClick={handleSignOut}
-            className="text-sm text-gray-600 hover:text-red-500"
-          >
-            Sign Out
-          </button>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gray-50 relative">
+      <GCLabNav role={profile?.role} />
       <main className="max-w-4xl mx-auto px-6 py-10">
         <h2 className="text-2xl font-bold mb-1">
           Welcome, {profile?.first_name || user.email}
