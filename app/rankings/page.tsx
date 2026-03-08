@@ -1172,13 +1172,18 @@ export default function RankingsPage() {
 
                 {playerHistory.length > 0 && (() => {
                   // Only show events + most recent sync (last non-imported point)
+                  // Event rows: imported events + daily sync points where grade changed
                   const eventPoints = playerHistory.filter((h: any) => h.is_imported || (h.event_name && h.event_name !== 'Daily sync'))
-                  const syncPoints = playerHistory.filter((h: any) => !h.is_imported && (!h.event_name || h.event_name === 'Daily sync'))
-                  const lastSync = syncPoints.length > 0 ? syncPoints[syncPoints.length - 1] : null
-                  const tableRows = [...eventPoints, ...(lastSync ? [lastSync] : [])].sort(
+                  const gradeChangeSync = playerHistory.filter((h: any) => {
+                    if (h.is_imported) return false
+                    const idx = playerHistory.indexOf(h)
+                    if (idx === 0) return false
+                    return h.dgrade_value !== playerHistory[idx - 1].dgrade_value
+                  })
+                  const tableRows = [...eventPoints, ...gradeChangeSync].sort(
                     (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
                   )
-                  // Compute grade diffs vs previous entry in original chronological order
+                  // Compute grade diffs vs previous entry in chronological order
                   const chronological = [...playerHistory]
                   const getDiff = (h: any) => {
                     const idx = chronological.findIndex(x => x.recorded_at === h.recorded_at)
@@ -1199,6 +1204,17 @@ export default function RankingsPage() {
                           </tr>
                         </thead>
                         <tbody>
+                          {/* Last synced row always at top */}
+                          {lastSyncDate && (
+                            <tr className="border-t border-gray-100 bg-gray-50">
+                              <td className="py-1.5 text-gray-500">{formatDate(lastSyncDate)}</td>
+                              <td className="py-1.5 text-gray-400 italic">Last synced</td>
+                              <td className="py-1.5 text-right font-semibold text-gray-900">{tableRows[0]?.dgrade_value || '—'}</td>
+                              <td className="py-1.5 text-right"><span className="text-gray-400">—</span></td>
+                              <td className="py-1.5 text-right font-semibold text-amber-600">{tableRows[0]?.egrade_value || '—'}</td>
+                              <td className="py-1.5 text-right text-gray-600">{tableRows[0]?.world_ranking ? `#${tableRows[0].world_ranking}` : '—'}</td>
+                            </tr>
+                          )}
                           {tableRows.map((h, i) => {
                             const diff = getDiff(h)
                             return (
@@ -1207,7 +1223,7 @@ export default function RankingsPage() {
                                 <td className="py-1.5 text-gray-500">
                                   {h.event_url
                                     ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">{h.event_name || '—'}</a>
-                                    : h.event_name || <span className="text-gray-400">{lastSyncDate ? `Last synced ${new Date(lastSyncDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Latest sync'}</span>}
+                                    : h.event_name || <span className="text-gray-400">Grade change</span>}
                                 </td>
                                 <td className="py-1.5 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
                                 <td className="py-1.5 text-right font-semibold">
