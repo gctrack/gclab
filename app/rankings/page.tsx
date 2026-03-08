@@ -759,7 +759,14 @@ export default function RankingsPage() {
           <div>
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className="flex items-center gap-3">
-                <p className="text-sm text-gray-500">{rankings.length} players shown</p>
+                <div>
+                  <p className="text-sm text-gray-500">{rankings.length} players shown</p>
+                  {lastSyncDate && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Last updated {new Date(lastSyncDate).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
+                    </p>
+                  )}
+                </div>
                 <select value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setRankingsPage(0) }}
                   className="border border-gray-300 rounded-md px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500">
                   {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
