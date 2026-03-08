@@ -56,15 +56,14 @@ const GRADE_BANDS = [
   { label: '2400+', min: 2400, max: 99999 },
 ]
 
-const FLAG_MAP: Record<string, string> = {
-  'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'Australia': '🇦🇺', 'New Zealand': '🇳🇿', 'USA': '🇺🇸',
-  'Canada': '🇨🇦', 'Ireland': '🇮🇪', 'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'Wales': '🏴󠁧󠁢󠁷󠁬󠁳󠁿',
-  'South Africa': '🇿🇦', 'France': '🇫🇷', 'Japan': '🇯🇵', 'Switzerland': '🇨🇭',
-  'Sweden': '🇸🇪', 'Czech Republic': '🇨🇿', 'Portugal': '🇵🇹', 'Mexico': '🇲🇽',
-  'Spain': '🇪🇸', 'Germany': '🇩🇪', 'Italy': '🇮🇹', 'Netherlands': '🇳🇱',
+function getFlag(code: string): string {
+  if (!code) return ''
+  if (code === 'GB-ENG') return '🏴󠁧󠁢󠁥󠁮󠁧󠁿'
+  if (code === 'GB-SCT') return '🏴󠁧󠁢󠁳󠁣󠁴󠁿'
+  if (code === 'GB-WLS') return '🏴󠁧󠁢󠁷󠁬󠁳󠁿'
+  if (code.length !== 2) return ''
+  return code.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('')
 }
-
-const getFlag = (country: string) => FLAG_MAP[country] || '🌐'
 
 const pct = (wins: number, total: number) =>
   total === 0 ? '—' : `${Math.round((wins / total) * 100)}%`
@@ -214,9 +213,9 @@ function PlayerSearch({ label, color, onSelect, selected, exclude }: {
                 <span className="text-xs text-gray-400 ml-2">{getFlag(p.country)} {p.country}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs text-gray-500">#{p.world_ranking}</span>
-                <span className={`text-xs px-1.5 py-0.5 rounded text-white ${badge}`}>{p.dgrade}</span>
-                {p.history_imported && <span className="text-xs text-green-500">●</span>}
+                {p.history_imported && <span className="text-xs text-green-500" title="History imported">●</span>}
+                <span className="text-xs text-gray-400">#{p.world_ranking}</span>
+                <span className="text-xs font-semibold text-gray-700">{p.dgrade}</span>
               </div>
             </button>
           ))}
@@ -262,6 +261,8 @@ export default function ComparePage() {
   const [gamesB, setGamesB] = useState<Game[]>([])
   const [historyA, setHistoryA] = useState<HistoryPoint[]>([])
   const [historyB, setHistoryB] = useState<HistoryPoint[]>([])
+  const [countryStatsA, setCountryStatsA] = useState<any[]>([])
+  const [countryStatsB, setCountryStatsB] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(false)
   const [showAllH2H, setShowAllH2H] = useState(false)
   const router = useRouter()
@@ -278,7 +279,7 @@ export default function ComparePage() {
     init()
   }, [])
 
-  const fetchPlayerData = useCallback(async (player: Player, setter: (g: Game[]) => void, historySetter: (h: HistoryPoint[]) => void) => {
+  const fetchPlayerData = useCallback(async (player: Player, setter: (g: Game[]) => void, historySetter: (h: HistoryPoint[]) => void, countryStatsSetter: (c: any[]) => void) => {
     if (!player.history_imported) return
     const { data: games } = await supabase
       .from('wcf_player_games')
@@ -294,16 +295,23 @@ export default function ComparePage() {
       .eq('wcf_player_id', player.id)
       .order('recorded_at', { ascending: true })
     historySetter(history || [])
+
+    const { data: countryStats } = await supabase
+      .from('wcf_player_country_stats')
+      .select('country, games, wins, losses, win_percentage')
+      .eq('wcf_player_id', player.id)
+      .order('games', { ascending: false })
+    if (countryStats) countryStatsSetter(countryStats)
   }, [])
 
   useEffect(() => {
     if (!playerA && !playerB) return
     setLoadingData(true)
     const promises = []
-    if (playerA) promises.push(fetchPlayerData(playerA, setGamesA, setHistoryA))
-    else { setGamesA([]); setHistoryA([]) }
-    if (playerB) promises.push(fetchPlayerData(playerB, setGamesB, setHistoryB))
-    else { setGamesB([]); setHistoryB([]) }
+    if (playerA) promises.push(fetchPlayerData(playerA, setGamesA, setHistoryA, setCountryStatsA))
+    else { setGamesA([]); setHistoryA([]); setCountryStatsA([]) }
+    if (playerB) promises.push(fetchPlayerData(playerB, setGamesB, setHistoryB, setCountryStatsB))
+    else { setGamesB([]); setHistoryB([]); setCountryStatsB([]) }
     Promise.all(promises).then(() => setLoadingData(false))
   }, [playerA, playerB])
 
@@ -399,7 +407,7 @@ export default function ComparePage() {
     return Object.keys(oppMapA)
       .filter(k => oppMapB[k])
       .map(k => ({ name: k, a: oppMapA[k], b: oppMapB[k] }))
-      .sort((x, y) => (y.a.t + y.b.t) - (x.a.t + x.b.t))
+      .sort((x, y) => Math.min(y.a.t, y.b.t) - Math.min(x.a.t, x.b.t))
       .slice(0, 10)
   }
   const commonOpps = commonOpponents()
@@ -489,7 +497,6 @@ export default function ComparePage() {
                 <StatCard label="Win % (career)" a={playerA ? `${playerA.win_percentage}%` : '—'} b={playerB ? `${playerB.win_percentage}%` : '—'} />
                 <StatCard label="Total Games" a={playerA?.games ?? '—'} b={playerB?.games ?? '—'} />
                 <StatCard label="Peak dGrade" a={peakGrade(gamesA) ?? (playerA?.dgrade ?? '—')} b={peakGrade(gamesB) ?? (playerB?.dgrade ?? '—')} />
-                <StatCard label="Best Win (opp grade)" a={bestWinA?.opp_dgrade_after ?? '—'} b={bestWinB?.opp_dgrade_after ?? '—'} />
                 <StatCard label="Longest Win Streak" a={streakA.maxWin || '—'} b={streakB.maxWin || '—'} />
               </div>
             </section>
@@ -692,6 +699,61 @@ export default function ComparePage() {
                           <td className="text-right px-4 text-gray-400 text-xs">{opp.b.t}</td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {/* Results by Country */}
+            {(countryStatsA.length > 0 || countryStatsB.length > 0) && (
+              <section>
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Results by Country</h3>
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50">
+                        <th className="text-left text-xs text-gray-400 font-medium py-2.5 px-4">Country</th>
+                        <th className="text-right text-xs text-green-600 font-medium py-2.5 px-3">{nameA.split(' ')[0]}</th>
+                        <th className="text-right text-xs text-gray-400 font-medium py-2.5 px-3">G</th>
+                        <th className="text-right text-xs text-blue-600 font-medium py-2.5 px-3">{nameB.split(' ')[0]}</th>
+                        <th className="text-right text-xs text-gray-400 font-medium py-2.5 px-4">G</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const mapA = Object.fromEntries(countryStatsA.map(r => [r.country, r]))
+                        const mapB = Object.fromEntries(countryStatsB.map(r => [r.country, r]))
+                        const allCountries = Array.from(new Set([
+                          ...countryStatsA.map(r => r.country),
+                          ...countryStatsB.map(r => r.country),
+                        ])).sort((a, b) => {
+                          const totalA = (mapA[a]?.games || 0) + (mapB[a]?.games || 0)
+                          const totalB = (mapA[b]?.games || 0) + (mapB[b]?.games || 0)
+                          return totalB - totalA
+                        })
+                        return allCountries.map(country => {
+                          const a = mapA[country]
+                          const b = mapB[country]
+                          const aPct = a?.win_percentage ?? null
+                          const bPct = b?.win_percentage ?? null
+                          return (
+                            <tr key={country} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                              <td className="py-2.5 px-4 text-gray-700 font-medium">
+                                <span className="mr-1.5">{getFlag(country)}</span>{country}
+                              </td>
+                              <td className={`text-right px-3 font-semibold ${aPct !== null && bPct !== null && aPct > bPct ? 'text-green-600' : 'text-gray-500'}`}>
+                                {aPct !== null ? `${aPct}%` : '—'}
+                              </td>
+                              <td className="text-right px-3 text-gray-400 text-xs">{a?.games ?? '—'}</td>
+                              <td className={`text-right px-3 font-semibold ${aPct !== null && bPct !== null && bPct > aPct ? 'text-blue-600' : 'text-gray-500'}`}>
+                                {bPct !== null ? `${bPct}%` : '—'}
+                              </td>
+                              <td className="text-right px-4 text-gray-400 text-xs">{b?.games ?? '—'}</td>
+                            </tr>
+                          )
+                        })
+                      })()}
                     </tbody>
                   </table>
                 </div>
