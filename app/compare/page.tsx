@@ -444,27 +444,30 @@ export default function ComparePage() {
       <div className="flex-1 flex items-center justify-center px-6 py-20">
         <div className="relative w-full max-w-lg">
           <div className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm" style={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
-            <div className="p-6 border-b border-gray-100">
-              <div className="h-6 w-48 bg-gray-200 rounded mb-2"/>
-              <div className="h-4 w-64 bg-gray-100 rounded"/>
+            <div className="p-5 border-b border-gray-100 bg-gray-50 flex gap-3">
+              <div className="flex-1 h-9 bg-gray-200 rounded-lg"/>
+              <div className="w-8 h-9 bg-green-200 rounded-lg"/>
+              <div className="flex-1 h-9 bg-gray-200 rounded-lg"/>
             </div>
-            <div className="p-6">
-              <svg width="100%" height="180" viewBox="0 0 600 180">
+            <div className="p-5 bg-white">
+              <svg width="100%" height="160" viewBox="0 0 600 160">
                 <defs>
-                  <linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#16a34a" stopOpacity="0.15"/><stop offset="100%" stopColor="#16a34a" stopOpacity="0"/></linearGradient>
-                  <linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity="0.12"/><stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/></linearGradient>
+                  <linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#16a34a" stopOpacity="0.25"/><stop offset="100%" stopColor="#16a34a" stopOpacity="0.02"/></linearGradient>
+                  <linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2"/><stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02"/></linearGradient>
                 </defs>
-                {([30,70,110,150] as number[]).map((y) => <line key={y} x1="0" y1={y} x2="600" y2={y} stroke="#f0f0f0" strokeWidth="1"/>)}
-                <path d="M0,140 C60,120 120,80 180,65 C240,50 300,45 360,55 C420,65 480,90 540,110 C570,120 590,130 600,135 L600,180 L0,180 Z" fill="url(#cg1)"/>
-                <path d="M0,140 C60,120 120,80 180,65 C240,50 300,45 360,55 C420,65 480,90 540,110 C570,120 590,130 600,135" fill="none" stroke="#16a34a" strokeWidth="2"/>
-                <path d="M0,155 C60,145 120,110 180,95 C240,80 300,75 360,85 C420,95 480,115 540,130 C570,138 590,145 600,148 L600,180 L0,180 Z" fill="url(#cg2)"/>
-                <path d="M0,155 C60,145 120,110 180,95 C240,80 300,75 360,85 C420,95 480,115 540,130 C570,138 590,145 600,148" fill="none" stroke="#3b82f6" strokeWidth="2" strokeDasharray="4 3"/>
+                {([30,70,110,150] as number[]).map((y) => <line key={y} x1="0" y1={y} x2="600" y2={y} stroke="#e5e7eb" strokeWidth="1"/>)}
+                <path d="M0,130 C60,110 120,70 180,55 C240,40 300,35 360,45 C420,55 480,80 540,100 C570,110 590,120 600,125 L600,160 L0,160 Z" fill="url(#cg1)"/>
+                <path d="M0,130 C60,110 120,70 180,55 C240,40 300,35 360,45 C420,55 480,80 540,100 C570,110 590,120 600,125" fill="none" stroke="#16a34a" strokeWidth="2.5"/>
+                <path d="M0,145 C60,135 120,100 180,85 C240,70 300,65 360,75 C420,85 480,105 540,120 C570,128 590,135 600,138 L600,160 L0,160 Z" fill="url(#cg2)"/>
+                <path d="M0,145 C60,135 120,100 180,85 C240,70 300,65 360,75 C420,85 480,105 540,120 C570,128 590,135 600,138" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeDasharray="5 3"/>
+                <circle cx="300" cy="35" r="5" fill="#16a34a"/>
+                <circle cx="300" cy="65" r="5" fill="#3b82f6"/>
               </svg>
-              <div className="mt-3 space-y-2">
-                {([80,60,70] as number[]).map((w,i) => (
-                  <div key={i} className="flex gap-3"><div className="h-3 rounded bg-gray-200" style={{width:`${w}%`}}/><div className="h-3 rounded bg-gray-100 w-16"/></div>
-                ))}
-              </div>
+            </div>
+            <div className="p-5 border-t border-gray-100 grid grid-cols-3 gap-3">
+              {[{c:'bg-green-50',w:'w-16'},{c:'bg-blue-50',w:'w-20'},{c:'bg-gray-50',w:'w-14'}].map(({c,w},i) => (
+                <div key={i} className={`${c} rounded-lg p-3`}><div className={`h-6 ${w} bg-white/80 rounded mb-1`}/><div className="h-3 w-12 bg-white/60 rounded"/></div>
+              ))}
             </div>
           </div>
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm rounded-2xl">

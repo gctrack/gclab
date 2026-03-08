@@ -53,16 +53,26 @@ export default function DashboardPage() {
       <div className="flex-1 flex items-center justify-center px-6 py-20">
         <div className="relative w-full max-w-lg">
           <div className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm" style={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
-            <div className="p-6 border-b border-gray-100">
-              <div className="h-6 w-48 bg-gray-200 rounded mb-2"/>
-              <div className="h-4 w-32 bg-gray-100 rounded"/>
+            <div className="p-5 border-b border-gray-100 bg-gray-50">
+              <div className="h-6 w-48 bg-gray-300 rounded mb-2"/>
+              <div className="h-4 w-32 bg-gray-200 rounded"/>
             </div>
-            <div className="p-6 space-y-3">
-              {[85,65,75,55,80,60].map((w,i) => (
-                <div key={i} className="flex gap-3 items-center">
-                  <div className="h-4 rounded bg-gray-200" style={{ width: `${w}%` }}/>
-                  <div className="h-4 rounded bg-gray-100 w-16"/>
+            <div className="p-5 grid grid-cols-2 gap-3">
+              {[
+                {label:'Rankings',color:'bg-green-100'},
+                {label:'Compare',color:'bg-blue-100'},
+                {label:'My Profile',color:'bg-purple-100'},
+                {label:'Grade History',color:'bg-amber-100'},
+              ].map(({label,color},i) => (
+                <div key={i} className={`${color} rounded-xl p-4`}>
+                  <div className="h-5 w-20 bg-white/60 rounded mb-2"/>
+                  <div className="h-3 w-28 bg-white/40 rounded"/>
                 </div>
+              ))}
+            </div>
+            <div className="p-5 border-t border-gray-100 space-y-2">
+              {[90,70,80].map((w,i) => (
+                <div key={i} className="flex gap-3"><div className="h-3 rounded bg-gray-200" style={{width:`${w}%`}}/></div>
               ))}
             </div>
           </div>

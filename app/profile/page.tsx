@@ -548,23 +548,31 @@ export default function ProfilePage() {
       <div className="flex-1 flex items-center justify-center px-6 py-20">
         <div className="relative w-full max-w-lg">
           <div className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm" style={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center gap-4 mb-3">
-                <div className="w-14 h-14 rounded-full bg-gray-200"/>
-                <div><div className="h-5 w-36 bg-gray-200 rounded mb-2"/><div className="h-3 w-24 bg-gray-100 rounded"/></div>
+            <div className="p-5 border-b border-gray-100 bg-gray-50">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-green-200"/>
+                <div>
+                  <div className="h-5 w-36 bg-gray-300 rounded mb-2"/>
+                  <div className="h-3 w-24 bg-gray-200 rounded"/>
+                </div>
               </div>
             </div>
-            <div className="p-6 grid grid-cols-2 gap-4">
-              {[1,2,3,4].map(i => (
-                <div key={i} className="bg-gray-50 rounded-lg p-4">
-                  <div className="h-7 w-16 bg-gray-200 rounded mb-1"/>
-                  <div className="h-3 w-20 bg-gray-100 rounded"/>
+            <div className="p-5 grid grid-cols-2 gap-3">
+              {[
+                {label:'dGrade',val:'1,842',color:'bg-green-50 border-green-100'},
+                {label:'World Rank',val:'#512',color:'bg-blue-50 border-blue-100'},
+                {label:'Win Rate',val:'58%',color:'bg-amber-50 border-amber-100'},
+                {label:'Games',val:'340',color:'bg-purple-50 border-purple-100'},
+              ].map(({color},i) => (
+                <div key={i} className={`${color} border rounded-xl p-4`}>
+                  <div className="h-7 w-14 bg-white/70 rounded mb-1"/>
+                  <div className="h-3 w-20 bg-white/50 rounded"/>
                 </div>
               ))}
             </div>
-            <div className="p-6 border-t border-gray-100 space-y-2">
-              {[90,70,80].map((w,i) => (
-                <div key={i} className="flex gap-3"><div className="h-3 rounded bg-gray-200" style={{width:`${w}%`}}/></div>
+            <div className="p-5 border-t border-gray-100 space-y-2">
+              {[85,65,75].map((w,i) => (
+                <div key={i} className="flex gap-3"><div className="h-3 rounded bg-gray-200" style={{width:`${w}%`}}/><div className="h-3 w-12 rounded bg-gray-100"/></div>
               ))}
             </div>
           </div>

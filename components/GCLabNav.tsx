@@ -17,11 +17,11 @@ const NAV_LINKS = [
 ]
 
 const DESKTOP_TABS = [
-  { href: '/rankings', label: 'Rankings', icon: '🏆', public: true },
+  { href: '/dashboard', label: 'Dashboard', icon: '🎯', public: false },
   { href: '/profile', label: 'My Profile', icon: '👤', public: false },
+  { href: '/rankings', label: 'Rankings', icon: '🏆', public: true },
   { href: '/compare', label: 'Compare', icon: '⚔️', public: false },
   { href: '/rankings?tab=Historical+Rankings', label: 'Historical', icon: '📈', public: true },
-  { href: '/dashboard', label: 'Dashboard', icon: '🎯', public: false },
 ]
 
 export default function GCLabNav({ role, isSignedIn = false, currentPath = '' }: Props & { isSignedIn?: boolean, currentPath?: string }) {
