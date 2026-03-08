@@ -29,9 +29,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const search = searchParams.get('search') || ''
   const page = parseInt(searchParams.get('page') || '0')
-  const pageSize = parseInt(searchParams.get('pageSize') || '50')
+  const pageSize = parseInt(searchParams.get('pageSize') || '20')
 
-  // Get all profiles with optional search
+  // Get profiles
   let query = supabase
     .from('profiles')
     .select('*', { count: 'exact' })
@@ -43,8 +43,26 @@ export async function GET(request: Request) {
   }
 
   const { data: profiles, count, error } = await query
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ profiles, total: count })
+  // Fetch last_sign_in_at from auth.users for each profile
+  const ids = (profiles || []).map((p: any) => p.id)
+  const authData: Record<string, string | null> = {}
+
+  if (ids.length > 0) {
+    // list users — paginate up to 1000 at a time, filter by our IDs
+    const { data: { users: authUsers } } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+    for (const u of authUsers || []) {
+      if (ids.includes(u.id)) {
+        authData[u.id] = u.last_sign_in_at || null
+      }
+    }
+  }
+
+  const enriched = (profiles || []).map((p: any) => ({
+    ...p,
+    last_sign_in_at: authData[p.id] || null,
+  }))
+
+  return NextResponse.json({ profiles: enriched, total: count })
 }

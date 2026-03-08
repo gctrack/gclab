@@ -92,6 +92,12 @@ export default function DashboardPage() {
             <h3 className="font-semibold text-gray-800 mb-1">Rankings</h3>
             <p className="text-sm text-gray-500">WCF rankings, movers and country stats</p>
           </a>
+          {['admin', 'super_admin'].includes(profile?.role) && (
+            <a href="/admin" className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition border border-purple-100">
+              <h3 className="font-semibold text-gray-800 mb-1">⚙️ Admin Panel</h3>
+              <p className="text-sm text-gray-500">Sync, user management and settings</p>
+            </a>
+          )}
         </div>
       </main>
     </div>

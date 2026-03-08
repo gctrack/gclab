@@ -212,10 +212,39 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 relative">
       <GCLabNav role={profile?.role} />
-      <main className="max-w-4xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-6 py-10 flex gap-8">
+
+        {/* Sidebar */}
+        <aside className="hidden lg:block w-48 shrink-0">
+          <div className="sticky top-8 bg-white rounded-lg shadow-sm p-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Admin</p>
+            <nav className="space-y-1">
+              {[
+                { label: 'Overview', href: '#overview' },
+                { label: 'WCF Sync', href: '#wcf-sync' },
+                { label: 'History Import', href: '#history-import', superAdmin: true },
+                { label: 'Users', href: '#users', superAdmin: true },
+                { label: 'Clubs', href: '#clubs' },
+                { label: 'Feature Flags', href: '#flags' },
+              ].filter(item => !item.superAdmin || profile.role === 'super_admin').map(item => (
+                <a key={item.href} href={item.href}
+                  className="block text-sm text-gray-600 hover:text-green-700 hover:bg-green-50 px-2 py-1.5 rounded transition">
+                  {item.label}
+                </a>
+              ))}
+            </nav>
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <a href="/dashboard" className="block text-sm text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded transition">
+                ← Dashboard
+              </a>
+            </div>
+          </div>
+        </aside>
+
+        <main className="flex-1 min-w-0">
         <h2 className="text-2xl font-bold mb-8">Admin Panel</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div id="overview" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-lg shadow-sm p-5">
             <p className="text-sm text-gray-500 mb-1">Signed in as</p>
             <p className="text-sm font-medium text-gray-800 truncate">{user.email}</p>
@@ -233,7 +262,7 @@ export default function AdminPage() {
         <div className="space-y-6">
 
           {/* WCF Sync */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div id="wcf-sync" className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-1">WCF Player Sync</h3>
             <p className="text-sm text-gray-500 mb-4">Fetches the latest rankings from the WCF website and updates all player records and dGrade history.</p>
             <button onClick={handleWcfSync} disabled={syncing} className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition disabled:opacity-50">
@@ -263,7 +292,7 @@ export default function AdminPage() {
 
           {/* Player History Import — Super Admin only */}
           {profile.role === 'super_admin' && (
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div id="history-import" className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-1">Import Player WCF History</h3>
               <p className="text-sm text-gray-500 mb-4">Manually trigger a full WCF history import for any player.</p>
               <div className="relative mb-4">
@@ -316,7 +345,7 @@ export default function AdminPage() {
 
           {/* User Management — Super Admin only */}
           {profile.role === 'super_admin' && (
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div id="users" className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800">User Management</h3>
@@ -338,11 +367,21 @@ export default function AdminPage() {
                           <p className="text-xs text-gray-400 truncate">{u.email}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.role === 'super_admin' ? 'bg-purple-100 text-purple-700' : u.role === 'admin' ? 'bg-blue-100 text-blue-700' : u.role === 'club_manager' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
                           {u.role || 'user'}
                         </span>
-                        {u.wcf_player_id && <span className="text-xs text-green-600">WCF ✓</span>}
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${u.wcf_player_id ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-400'}`}>
+                          WCF {u.wcf_player_id ? '✓' : '—'}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${u.wcf_player_id && u.history_imported ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-400'}`}>
+                          History {u.history_imported ? '✓' : '—'}
+                        </span>
+                        {u.last_sign_in_at && (
+                          <span className="text-xs text-gray-400 hidden sm:block">
+                            {new Date(u.last_sign_in_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                          </span>
+                        )}
                         <span className="text-gray-400 text-xs">{expandedUser === u.id ? '▲' : '▼'}</span>
                       </div>
                     </button>
@@ -390,6 +429,10 @@ export default function AdminPage() {
                             <label className="text-xs text-gray-500 block mb-1">Joined</label>
                             <p className="text-sm text-gray-600 py-1.5">{u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</p>
                           </div>
+                          <div>
+                            <label className="text-xs text-gray-500 block mb-1">Last Login</label>
+                            <p className="text-sm text-gray-600 py-1.5">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Never'}</p>
+                          </div>
                         </div>
                         {userActionMsg?.id === u.id && userActionMsg && (
                           <p className={`text-xs mb-3 ${userActionMsg.ok ? 'text-green-600' : 'text-red-500'}`}>{userActionMsg.msg}</p>
@@ -399,7 +442,7 @@ export default function AdminPage() {
                             className="px-4 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 transition">
                             {savingUser ? 'Saving...' : 'Save Changes'}
                           </button>
-                          <a href={`/profile?user=${u.id}`} target="_blank" rel="noopener noreferrer"
+                          <a href={`/profile/${u.id}`} target="_blank" rel="noopener noreferrer"
                             className="px-4 py-1.5 bg-white border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 transition">
                             View Profile →
                           </a>
@@ -431,18 +474,19 @@ export default function AdminPage() {
             </div>
           )}
 
-          <div className="bg-white rounded-lg shadow-sm p-6 opacity-50">
+          <div id="clubs" className="bg-white rounded-lg shadow-sm p-6 opacity-50">
             <h3 className="text-lg font-semibold text-gray-800 mb-1">Club Management</h3>
             <p className="text-sm text-gray-500">Coming soon</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6 opacity-50">
+          <div id="flags" className="bg-white rounded-lg shadow-sm p-6 opacity-50">
             <h3 className="text-lg font-semibold text-gray-800 mb-1">Feature Flags</h3>
             <p className="text-sm text-gray-500">Coming soon</p>
           </div>
 
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }
