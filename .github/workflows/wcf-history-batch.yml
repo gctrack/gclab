@@ -1,0 +1,61 @@
+name: WCF History Batch Import
+
+on:
+  schedule:
+    # Every hour at :15 past (offset from top of hour to avoid peak times)
+    - cron: '15 * * * *'
+  workflow_dispatch:
+    # Allow manual trigger from GitHub Actions UI
+    inputs:
+      reason:
+        description: 'Reason for manual trigger'
+        required: false
+        default: 'Manual run'
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Trigger batch import
+        run: |
+          echo "Triggering WCF history batch import..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
+            "https://gclab.app/api/wcf-history-batch" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          HTTP_BODY=$(echo "$RESPONSE" | head -n -1)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $HTTP_BODY"
+
+          # Extract key fields for summary
+          PROCESSED=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('processed', 0))" 2>/dev/null || echo "?")
+          SUCCESSFUL=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('successful', 0))" 2>/dev/null || echo "?")
+          TOTAL_GAMES=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('totalGames', 0))" 2>/dev/null || echo "?")
+          REMAINING=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('remaining', '?'))" 2>/dev/null || echo "?")
+          DAYS_LEFT=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('estimatedDaysLeft', '?'))" 2>/dev/null || echo "?")
+
+          echo ""
+          echo "=== Import Summary ==="
+          echo "Players processed: $PROCESSED"
+          echo "Successful: $SUCCESSFUL"
+          echo "Games imported: $TOTAL_GAMES"
+          echo "Players remaining: $REMAINING"
+          echo "Estimated days to complete: $DAYS_LEFT"
+
+          # Fail the workflow if HTTP error
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: API returned HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+          # Treat "all imported" as success
+          MESSAGE=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message', ''))" 2>/dev/null || echo "")
+          if [ "$MESSAGE" = "All players already imported" ]; then
+            echo "All players already imported — disabling workflow."
+            exit 0
+          fi
