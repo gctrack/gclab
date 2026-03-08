@@ -66,16 +66,24 @@ NEXT_PUBLIC_CRON_SECRET=gclab_wcf_sync_secret_2026
 - WCF player ID: 67d1eadf-1eee-4668-b303-3dc6fb019807
 
 ## Pages Built
+- / (homepage) — Midnight Lawn theme, hero with animated beaker + stat cards, grade history chart preview, features grid, coming soon grid, CTA section
 - /login — email/password login
 - /signup — creates auth user, sends confirmation email
-- /dashboard — welcome screen with nav cards, WCF match banner
-- /profile — full profile editor, WCF history import panel with SSE progress stream
+- /dashboard — welcome screen with nav cards, WCF match banner. Auth gate for signed-out users
+- /profile — full profile editor, WCF history import panel with SSE progress stream. Auth gate for signed-out users
+- /compare — head-to-head player comparison with grade chart. Auth gate for signed-out users
 - /admin — WCF sync trigger + history, super admin player history import tool
 - /rankings — 5-tab rankings page (see below)
+- /profile/[id] — admin view of any user's profile
 
 ## Components
 - WcfMatchBanner — suggests WCF record match on profile/dashboard
-- GCLabNav — hamburger nav used on all pages, animates to X, dropdown with all sections + admin link for admins + sign out
+- GCLabNav — sticky nav with:
+  - Desktop tab bar: Dashboard, My Profile, Rankings, Compare, Historical (locked tabs show padlock + redirect to /login for signed-out users, active tab highlighted)
+  - Hamburger menu (mobile): Dashboard, My Profile, Rankings, Compare, Historical Rankings (My Games + Clubs hidden until built)
+  - Admin Panel link for admins/super_admins
+  - Sign out button
+  - Accepts `role`, `isSignedIn`, `currentPath` props
 
 ## API Routes
 - /api/wcf-sync — daily WCF rankings sync, writes players + dgrade history + egrade, smart game fetch on dgrade change
@@ -84,7 +92,7 @@ NEXT_PUBLIC_CRON_SECRET=gclab_wcf_sync_secret_2026
 
 ## GitHub Actions
 - .github/workflows/wcf-history-batch.yml — runs hourly at :15 past, calls /api/wcf-history-batch
-- .github/workflows/wcf-sync.yml — daily WCF rankings sync (if exists)
+- .github/workflows/wcf-sync.yml — daily WCF rankings sync
 - Secret required: CRON_SECRET = gclab_wcf_sync_secret_2026
 
 ## WCF Sync Details
@@ -105,11 +113,11 @@ NEXT_PUBLIC_CRON_SECRET=gclab_wcf_sync_secret_2026
 
 ## Rankings Page — app/rankings/page.tsx
 ### Tabs
-1. **Rankings** — sortable by dGrade/eGrade/Games/Win%/Name. Active/All Time toggle. Pagination 50/100/200. Active + All Time rank columns. Country flags. CSV download.
+1. **Rankings** — sortable by dGrade/eGrade/Games/Win%/Name. Active/All Time toggle. Pagination 50/100/200. Active + All Time rank columns. Country flags. CSV download. Shows last WCF sync timestamp below player count.
 2. **Movers** — biggest dGrade gains and losses since Mar 6 baseline. Filters players with games > 0.
 3. **New Players** — players first seen after Mar 3 2026. Country filter + date range.
 4. **Country Stats** — sortable table. Top 6 Active Avg + Top 6 All Time Avg columns. Click avg to see tooltip with player list. Compare mode (first snapshot Apr 2026). CSV download.
-5. **Historical Rankings** — autocomplete player search, Show My History button, line chart with year x-axis, hover tooltips, dGrade/eGrade/World Rank toggles, grade diff arrows in table (↑/↓ green/red), events + latest sync only in table.
+5. **Historical Rankings** — auth gate (blurred chart + CTA) for signed-out users. For signed-in: autocomplete player search, Show My History button, line chart with year x-axis, hover tooltips, dGrade/eGrade/World Rank toggles, grade diff arrows in table, events + latest sync in table.
 
 ### Chart Details
 - dGrade: green line
@@ -124,12 +132,44 @@ NEXT_PUBLIC_CRON_SECRET=gclab_wcf_sync_secret_2026
 - get_movers(since_date, limit_count) — compares first vs last history record
 - get_country_stats(active_year) — returns top6 active + alltime per country with player lists
 
+## Homepage Design — Midnight Lawn Theme
+- Background: deep forest green (#0d2818)
+- Text: cream/ivory (#e8e0d0)
+- Accent: lime green (#4ade80)
+- Fonts: Playfair Display (headlines), DM Sans (body), DM Mono (numbers)
+- Subtle grid overlay + radial green glow
+- Hero beaker: conical flask SVG, 3 balls in triangle formation (red bottom-left, blue bottom-right, yellow top-centre), independent float animations (f1/f2/f3 keyframes), tick marks on right wall
+- Nav logo: same flask at small scale
+- Sections: Nav → Hero (beaker + stat cards) → Grade History Chart Preview → Features grid (3×2, free/account split) → Coming Soon (6 cards) → CTA → Footer
+
+## Coming Soon Features Listed on Homepage
+- Performance Grading (shot-by-shot metrics)
+- Apple Watch App
+- Training Guides
+- Deep Game Insights (Huneycutt Gambit effectiveness, hoop 2 analysis, etc.)
+- Club Pages
+- AI Match Insights
+
+## Auth Gate Pattern
+Pages that require login (dashboard, profile, compare, historical tab) show a blurred skeleton preview with a centred overlay instead of hard-redirecting to /login. Pattern:
+- `signedIn` state (boolean | null), initially null
+- On auth check: if no user → setSignedIn(false), setLoading(false), return
+- If user confirmed → setSignedIn(true), continue loading data
+- Render: loading/null → spinner; !signedIn → gate UI; signedIn → normal page
+- Gate UI: blurred skeleton (coloured tints per page) + white/blur overlay + icon + title + description + "Create free account" + "Sign in" buttons
+- Dashboard skeleton: coloured nav cards (green/blue/purple/amber)
+- Profile skeleton: avatar circle + coloured stat cards (grade, rank, win%, games)
+- Compare skeleton: two overlapping grade lines (green solid + blue dashed)
+- Historical skeleton: blurred chart + row skeletons (inline in rankings page)
+
 ## Data Rules
 - Movers baseline: 6 Mar 2026
 - New Players cutoff: 2026-03-03T00:00:00Z (NEW_PLAYERS_SINCE constant)
 - FIRST_SYNC_DATE constant: '2026-03-02'
 - World rank on chart: nulled out for records before 2026-03-01
 - Monthly snapshots: written on 1st of month
+- World Rank label: "World Rank Collected Since March 2026"
+- Historical range default: 'all'
 
 ## Manual Data Fixes Applied
 These players had corrupted March 2 baseline records manually corrected:
@@ -142,6 +182,26 @@ Joe Zowry 1583, Adam Peck 1998, Margaret Hudson 1486, Bruce Hindin 1908, Rich Ro
 - Auto-deploys from GitHub main branch on every push
 - Do NOT use vercel --prod from terminal, just use git push
 - Environment variables set in Vercel dashboard
+- zsh: quote bracket paths — use "app/profile/[id]/page.tsx" not app/profile/[id]/page.tsx
+
+## File → Repo Path Mapping
+| Output file | Repo path |
+|---|---|
+| page.tsx | app/page.tsx |
+| GCLabNav.tsx | components/GCLabNav.tsx |
+| rankings-page.tsx | app/rankings/page.tsx |
+| compare-page.tsx | app/compare/page.tsx |
+| dashboard-page.tsx | app/dashboard/page.tsx |
+| admin-page.tsx | app/admin/page.tsx |
+| profile-page.tsx | app/profile/page.tsx |
+| profile-view-page.tsx | app/profile/[id]/page.tsx |
+| route.ts | app/api/wcf-sync/route.ts |
+| wcf-history-import-route.ts | app/api/wcf-history-import/route.ts |
+| wcf-history-next-route.ts | app/api/wcf-history-next/route.ts |
+| admin-users-route.ts | app/api/admin/users/route.ts |
+| admin-user-id-route.ts | app/api/admin/users/[id]/route.ts |
+| admin-reset-password-route.ts | app/api/admin/users/[id]/reset-password/route.ts |
+| wcf-history-batch.yml | .github/workflows/wcf-history-batch.yml |
 
 ## Important Notes for Next Session
 - Always send one terminal command per code block
@@ -149,14 +209,19 @@ Joe Zowry 1583, Adam Peck 1998, Margaret Hudson 1486, Bruce Hindin 1908, Rich Ro
 - Present download links for files, then git command separately — no cp command needed
 - Deployment: just use git push — Vercel auto-deploys from GitHub
 - Do NOT run vercel --prod from terminal
+- Next.js 15/16: params must be Promise<{id: string}> and awaited in dynamic routes
+- Supabase import: always use '@/lib/supabase' (not '@/utils/supabase/client')
 
 ## Remaining Roadmap
 - ⬜ Profile dashboard — career stats (starting grade, peak, total games, win%, years active)
-- ⬜ Public rankings — remove auth gate
 - ⬜ Success Metrics page — WCF career stats from wcf_player_games
+- ⬜ Public rankings — rankings tab already public, confirm other tabs
 - ⬜ Regrade detection — flag when dgrade changes but game count unchanged
 - ⬜ Batch import progress visible in admin panel
+- ⬜ Apply Midnight Lawn brand to all inner pages (rankings, compare, dashboard, admin, profile)
 - ⬜ Game logging UI
 - ⬜ Clubs page
 - ⬜ iPhone app
 - ⬜ Apple Watch app
+- ⬜ Chart zoom feature
+- ⬜ Re-import previously imported players with fixed loss-row regex
