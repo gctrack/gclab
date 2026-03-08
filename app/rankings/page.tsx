@@ -146,6 +146,10 @@ export default function RankingsPage() {
   const [historyFrom, setHistoryFrom] = useState('')
   const [historyTo, setHistoryTo] = useState('')
   const [lastSyncDate, setLastSyncDate] = useState<string | null>(null)
+  const [importedCount, setImportedCount] = useState<number | null>(null)
+  const [totalPlayers, setTotalPlayers] = useState<number | null>(null)
+  const [manualImportLog, setManualImportLog] = useState<string[]>([])
+  const [manualImporting, setManualImporting] = useState(false)
 
   const supabase = createClient()
   const activeYear = new Date().getFullYear() - 1
@@ -173,6 +177,17 @@ export default function RankingsPage() {
         .limit(1)
         .single()
       if (syncLog?.completed_at) setLastSyncDate(syncLog.completed_at)
+
+      // Fetch import progress counts (super_admin only — fetched for all but only shown to super_admin)
+      const { count: imported } = await supabase
+        .from('wcf_players')
+        .select('id', { count: 'exact', head: true })
+        .eq('history_imported', true)
+      const { count: total } = await supabase
+        .from('wcf_players')
+        .select('id', { count: 'exact', head: true })
+      setImportedCount(imported || 0)
+      setTotalPlayers(total || 0)
     }
     init()
   }, [])
@@ -447,6 +462,43 @@ export default function RankingsPage() {
       setSearchSuggestions([])
       setLookupResults([])
       loadPlayerHistory(currentUserProfile.wcf_player_id)
+    }
+  }
+
+  const handleManualImport = async (player: any) => {
+    if (!player?.id) return
+    setManualImporting(true)
+    setManualImportLog([])
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) return
+      const response = await fetch('/api/wcf-history-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ wcf_player_id: player.id }),
+      })
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      if (!reader) return
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const text = decoder.decode(value)
+        const lines = text.split('\n').filter(l => l.startsWith('data:'))
+        for (const line of lines) {
+          try {
+            const event = JSON.parse(line.replace('data: ', ''))
+            setManualImportLog(prev => [...prev, event.message])
+            if (event.step === 'complete') {
+              setImportedCount(prev => (prev || 0) + 1)
+              await fetchHistory(player.id)
+            }
+          } catch {}
+        }
+      }
+    } finally {
+      setManualImporting(false)
     }
   }
 
@@ -1001,6 +1053,11 @@ export default function RankingsPage() {
         {/* ── HISTORICAL RANKINGS ── */}
         {activeTab === 'Historical Rankings' && (
           <div>
+            {userRole === 'super_admin' && importedCount !== null && totalPlayers !== null && (
+              <div className="text-xs text-gray-400 text-right mb-2">
+                📥 {importedCount.toLocaleString()} of {totalPlayers.toLocaleString()} players history imported
+              </div>
+            )}
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
               <h3 className="font-semibold text-gray-900 mb-3">Search any player</h3>
               <div className="flex gap-2 flex-wrap items-start">
@@ -1047,7 +1104,23 @@ export default function RankingsPage() {
                     {selectedPlayer.egrade ? ` · eGrade ${selectedPlayer.egrade}` : ''}
                     {' '}· World #{selectedPlayer.world_ranking}
                   </span>
-                  <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline ml-auto">WCF Profile →</a>
+                  <div className="flex items-center gap-3 ml-auto">
+                    {userRole === 'super_admin' && (
+                      <button
+                        onClick={() => handleManualImport(selectedPlayer)}
+                        disabled={manualImporting}
+                        className="text-xs px-3 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50 disabled:opacity-50 transition"
+                      >
+                        {manualImporting ? 'Importing...' : '↻ Re-import History'}
+                      </button>
+                    )}
+                    <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline">WCF Profile →</a>
+                  </div>
+                  {userRole === 'super_admin' && manualImportLog.length > 0 && (
+                    <div className="w-full mt-2 bg-gray-50 rounded p-2 text-xs text-gray-500 max-h-32 overflow-y-auto">
+                      {manualImportLog.map((log, i) => <div key={i}>{log}</div>)}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3 mb-3 flex-wrap">
