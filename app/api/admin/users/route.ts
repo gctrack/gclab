@@ -59,9 +59,24 @@ export async function GET(request: Request) {
     }
   }
 
+  // Fetch history_imported from wcf_players for linked profiles
+  const wcfIds = (profiles || []).map((p: any) => p.wcf_player_id).filter(Boolean)
+  const wcfData: Record<string, boolean> = {}
+
+  if (wcfIds.length > 0) {
+    const { data: wcfPlayers } = await supabase
+      .from('wcf_players')
+      .select('id, history_imported')
+      .in('id', wcfIds)
+    for (const wp of wcfPlayers || []) {
+      wcfData[wp.id] = wp.history_imported || false
+    }
+  }
+
   const enriched = (profiles || []).map((p: any) => ({
     ...p,
     last_sign_in_at: authData[p.id] || null,
+    history_imported: p.wcf_player_id ? (wcfData[p.wcf_player_id] ?? false) : false,
   }))
 
   return NextResponse.json({ profiles: enriched, total: count })
