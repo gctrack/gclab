@@ -353,6 +353,7 @@ export default function RankingsPage() {
     const MARCH_2026 = new Date('2026-03-01')
     const filtered: any[] = []
     let lastDgrade: number | null = null
+    let lastRank: number | null = null
     let lastDailyDate: string | null = null
 
     for (const h of data) {
@@ -360,19 +361,18 @@ export default function RankingsPage() {
       const dateStr = h.recorded_at.slice(0, 10)
 
       if (isEvent) {
-        // Always include event/imported points
         filtered.push(h)
         lastDgrade = h.dgrade_value
+        lastRank = h.world_ranking
         lastDailyDate = null
       } else {
-        // Daily sync — only include if dgrade changed
-        if (h.dgrade_value !== lastDgrade) {
-          // Remove previous daily sync on same date if exists
+        if (h.dgrade_value !== lastDgrade || h.world_ranking !== lastRank) {
           if (lastDailyDate === dateStr && filtered.length > 0 && !filtered[filtered.length - 1].is_imported) {
             filtered.pop()
           }
           filtered.push(h)
           lastDgrade = h.dgrade_value
+          lastRank = h.world_ranking
           lastDailyDate = dateStr
         }
       }
@@ -554,7 +554,13 @@ export default function RankingsPage() {
           {/* Legend */}
           {showDgrade && <text x={padL} y={padT - 12} fontSize="10" fill="#16a34a" fontWeight="500">dGrade</text>}
           {showEgrade && <text x={padL + 54} y={padT - 12} fontSize="10" fill="#d97706" fontWeight="500">eGrade</text>}
-          {hasRank && <text x={W - padR} y={padT - 12} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank (from Mar 2026)</text>}
+          {hasRank && (() => {
+            const firstRankPoint = playerHistory.find(h => h.world_ranking)
+            const firstRankLabel = firstRankPoint
+              ? new Date(firstRankPoint.recorded_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+              : 'Mar 2026'
+            return <text x={W - padR} y={padT - 12} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank (from {firstRankLabel})</text>
+          })()}
 
           {/* dGrade line */}
           {showDgrade && playerHistory.length > 1 && (
@@ -1041,7 +1047,11 @@ export default function RankingsPage() {
                   {playerHistory.length <= 1
                     ? 'No history recorded yet.'
                     : `${playerHistory.filter((h: any) => h.is_imported).length} imported events + ${playerHistory.filter((h: any) => !h.is_imported).length} GCLab tracked points`}
-                  {showRanking && <span className="ml-2 text-blue-400">· World rank shown from Mar 2026</span>}
+                  {showRanking && playerHistory.some(h => h.world_ranking) && (() => {
+                    const firstRank = playerHistory.find(h => h.world_ranking)
+                    const label = firstRank ? new Date(firstRank.recorded_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'Mar 2026'
+                    return <span className="ml-2 text-blue-400">· World rank shown from {label}</span>
+                  })()}
                 </p>
 
                 <div className="bg-white rounded-lg shadow-sm p-4 mb-4">{renderChart()}</div>
