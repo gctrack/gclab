@@ -139,7 +139,7 @@ export default function RankingsPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null)
   const [playerHistory, setPlayerHistory] = useState<any[]>([])
   const [showDgrade, setShowDgrade] = useState(true)
-  const [showEgrade, setShowEgrade] = useState(true)
+  const [showEgrade, setShowEgrade] = useState(false)
   const [showRanking, setShowRanking] = useState(true)
   const [historyRange, setHistoryRange] = useState('5y')
   const [historyFrom, setHistoryFrom] = useState('')
@@ -462,8 +462,10 @@ export default function RankingsPage() {
     const gradeMax = Math.max(...allGrades) + Math.max(50, gradeSpread * 0.15)
 
     const hasRank = showRanking && wranks.length > 0
-    const rankMin = hasRank ? Math.max(1, Math.min(...wranks) - Math.max(5, (Math.max(...wranks) - Math.min(...wranks)) * 0.2)) : 1
-    const rankMax = hasRank ? Math.max(...wranks) + Math.max(5, (Math.max(...wranks) - Math.min(...wranks)) * 0.2) : 100
+    // rankBest = lowest number (e.g. #1), rankWorst = highest number (e.g. #100)
+    // On chart: #1 at TOP, higher numbers lower down
+    const rankBest = hasRank ? Math.max(1, Math.min(...wranks) - Math.max(2, (Math.max(...wranks) - Math.min(...wranks)) * 0.2)) : 1
+    const rankWorst = hasRank ? Math.max(...wranks) + Math.max(2, (Math.max(...wranks) - Math.min(...wranks)) * 0.2) : 100
 
     // X scale based on actual dates
     const dates = playerHistory.map(h => new Date(h.recorded_at).getTime())
@@ -481,9 +483,10 @@ export default function RankingsPage() {
       return padT + chartH - ((v - gradeMin) / (gradeMax - gradeMin)) * chartH
     }
 
+    // Lower rank number = better = higher on chart
     const yRank = (v: number) => {
-      if (rankMax === rankMin) return padT + chartH / 2
-      return padT + chartH - ((rankMax - v) / (rankMax - rankMin)) * chartH
+      if (rankWorst === rankBest) return padT + chartH / 2
+      return padT + ((v - rankBest) / (rankWorst - rankBest)) * chartH
     }
 
     // Year tick marks on x-axis
@@ -532,15 +535,31 @@ export default function RankingsPage() {
             return <text key={i} x={padL - 8} y={y + 4} fontSize="10" fill="#16a34a" textAnchor="end">{val}</text>
           })}
 
-          {/* Rank Y axis labels */}
+          {/* Rank Y axis labels — #1 at top, higher numbers lower */}
           {hasRank && Array.from({ length: gridLines + 1 }).map((_, i) => {
-            const val = Math.round(rankMin + i * ((rankMax - rankMin) / gridLines))
-            const y = padT + chartH - (i / gridLines) * chartH
+            const val = Math.round(rankBest + i * ((rankWorst - rankBest) / gridLines))
+            const y = padT + (i / gridLines) * chartH
             return <text key={i} x={W - padR + 8} y={y + 4} fontSize="10" fill="#2563eb" textAnchor="start">#{val}</text>
           })}
 
-          {/* X axis — year ticks */}
-          {yearTicks.map(({ year, x }) => (
+          {/* X axis — year ticks or monthly ticks for 1y view */}
+          {historyRange === '1y' ? (() => {
+            const months: { label: string, x: number }[] = []
+            const d = new Date(dateMin)
+            d.setDate(1)
+            d.setMonth(d.getMonth() + 1)
+            while (d.getTime() <= dateMax) {
+              const x = padL + ((d.getTime() - dateMin) / dateRange) * chartW
+              months.push({ label: d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }), x })
+              d.setMonth(d.getMonth() + 1)
+            }
+            return months.map(({ label, x }) => (
+              <g key={label}>
+                <line x1={x} y1={padT + chartH} x2={x} y2={padT + chartH + 4} stroke="#d1d5db" strokeWidth="1" />
+                <text x={x} y={H - 28} fontSize="9" fill="#6b7280" textAnchor="middle">{label}</text>
+              </g>
+            ))
+          })() : yearTicks.map(({ year, x }) => (
             <g key={year}>
               <line x1={x} y1={padT + chartH} x2={x} y2={padT + chartH + 4} stroke="#d1d5db" strokeWidth="1" />
               <text x={x} y={H - 28} fontSize="10" fill="#6b7280" textAnchor="middle">{year}</text>
