@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { createClient } from '@/utils/supabase/client'
+import { createClient } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 
 const styles = `
