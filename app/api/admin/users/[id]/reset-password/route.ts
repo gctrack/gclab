@@ -21,18 +21,17 @@ async function isAuthorized(request: Request) {
   return profile?.role === 'super_admin'
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Get user email
-  const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(params.id)
+  const { id } = await params
+  const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(id)
   if (userError || !user?.email) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
-  // Send password reset email
   const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
     redirectTo: 'https://gclab.app/login',
   })

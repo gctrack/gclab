@@ -21,11 +21,12 @@ async function isAuthorized(request: Request) {
   return profile?.role === 'super_admin'
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { id } = await params
   const body = await request.json()
   const allowedFields = [
     'first_name', 'last_name', 'email', 'country', 'city',
@@ -41,7 +42,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const { data, error } = await supabase
     .from('profiles')
     .update(updates)
-    .eq('id', params.id)
+    .eq('id', id)
     .select()
     .single()
 
@@ -49,13 +50,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ profile: data })
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Delete auth user (cascades to profile via trigger)
-  const { error } = await supabase.auth.admin.deleteUser(params.id)
+  const { id } = await params
+  const { error } = await supabase.auth.admin.deleteUser(id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ success: true })
