@@ -356,6 +356,9 @@ export default function RankingsPage() {
     let lastRank: number | null = null
     let lastDailyDate: string | null = null
 
+    // Find the most recent non-imported record to always include it
+    const lastSyncRecord = [...data].reverse().find(h => !h.is_imported)
+
     for (const h of data) {
       const isEvent = h.is_imported || (h.event_name && h.event_name !== 'Daily sync')
       const dateStr = h.recorded_at.slice(0, 10)
@@ -366,7 +369,9 @@ export default function RankingsPage() {
         lastRank = h.world_ranking
         lastDailyDate = null
       } else {
-        if (h.dgrade_value !== lastDgrade || h.world_ranking !== lastRank) {
+        // Always include the most recent sync point even if nothing changed
+        const isLastSync = lastSyncRecord && h.recorded_at === lastSyncRecord.recorded_at
+        if (isLastSync || h.dgrade_value !== lastDgrade || h.world_ranking !== lastRank) {
           if (lastDailyDate === dateStr && filtered.length > 0 && !filtered[filtered.length - 1].is_imported) {
             filtered.pop()
           }
