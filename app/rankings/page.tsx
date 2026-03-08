@@ -112,6 +112,7 @@ export default function RankingsPage() {
   const [compareDate, setCompareDate] = useState('')
   const [compareStats, setCompareStats] = useState<any[]>([])
   const [availableSnapshots, setAvailableSnapshots] = useState<string[]>([])
+  const [tooltip, setTooltip] = useState<{ country: string, type: 'active' | 'alltime' } | null>(null)
 
   const [lookupFirst, setLookupFirst] = useState('')
   const [lookupLast, setLookupLast] = useState('')
@@ -182,13 +183,14 @@ export default function RankingsPage() {
     `px-4 py-3 font-semibold cursor-pointer select-none text-right ${countrySortKey === key ? 'text-green-600' : 'text-gray-500 hover:text-green-600'}`
 
   const downloadCountryCSV = () => {
-    const headers = ['Rank', 'Country', 'Total Players', 'Active (12mo)', 'Top 6 Avg dGrade']
+    const headers = ['Rank', 'Country', 'Total Players', 'Active (12mo)', 'Top 6 Active Avg dGrade', 'Top 6 All Time Avg dGrade']
     const rows = countryStats.map((row, i) => [
       i + 1,
       getCountryName(row.country),
       row.total_players,
       row.active_players,
       row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '',
+      row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '',
     ])
     const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -498,7 +500,9 @@ export default function RankingsPage() {
   const thBase = "px-4 py-3 text-gray-700 font-semibold"
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" onClick={(e) => {
+      if (!(e.target as HTMLElement).closest('.relative')) setTooltip(null)
+    }}>
       <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
         <a href="/dashboard" className="text-xl font-bold text-green-600">GCLab</a>
         <a href="/dashboard" className="text-sm text-gray-600 hover:text-green-600">← Dashboard</a>
@@ -740,14 +744,17 @@ export default function RankingsPage() {
                     <th className="text-left px-4 py-3 text-gray-700 font-semibold">Country</th>
                     <th className={`text-right ${thCountrySort('total_players')}`} onClick={() => handleCountrySort('total_players')}>Total Players{countryArrow('total_players')}</th>
                     <th className={`text-right ${thCountrySort('active_players')}`} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
-                    <th className={`text-right ${thCountrySort('avg_top6_dgrade')}`} onClick={() => handleCountrySort('avg_top6_dgrade')}>Top 6 Avg dGrade{countryArrow('avg_top6_dgrade')}</th>
+                    <th className={`text-right ${thCountrySort('avg_top6_dgrade')}`} onClick={() => handleCountrySort('avg_top6_dgrade')}>Top 6 Active Avg{countryArrow('avg_top6_dgrade')}</th>
+                    <th className={`text-right ${thCountrySort('avg_top6_alltime_dgrade')}`} onClick={() => handleCountrySort('avg_top6_alltime_dgrade')}>Top 6 All Time Avg{countryArrow('avg_top6_alltime_dgrade')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {countryStats.length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400 text-sm">No data available.</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400 text-sm">No data available.</td></tr>
                   ) : countryStats.map((row, i) => {
                     const comp = compareMode ? getCompareRow(row.country) : null
+                    const activeKey = `${row.country}-active`
+                    const alltimeKey = `${row.country}-alltime`
                     return (
                       <tr key={row.country} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-4 py-2 text-gray-500 text-xs">{i + 1}</td>
@@ -760,9 +767,46 @@ export default function RankingsPage() {
                         <td className="px-4 py-2 text-right text-gray-700">
                           {row.active_players}{comp && renderDiff(row.active_players, comp.active_players)}
                         </td>
-                        <td className="px-4 py-2 text-right font-semibold text-gray-900">
-                          {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
-                          {comp && comp.avg_top6_dgrade && renderDiff(Math.round(row.avg_top6_dgrade), Math.round(comp.avg_top6_dgrade))}
+                        <td className="px-4 py-2 text-right font-semibold text-gray-900 relative">
+                          <button
+                            onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'active' ? null : { country: row.country, type: 'active' })}
+                            className="hover:text-green-600 transition"
+                          >
+                            {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
+                            {comp && comp.avg_top6_dgrade && renderDiff(Math.round(row.avg_top6_dgrade), Math.round(comp.avg_top6_dgrade))}
+                            {row.top6_active && <span className="ml-1 text-gray-400 text-xs">▾</span>}
+                          </button>
+                          {tooltip?.country === row.country && tooltip?.type === 'active' && row.top6_active && (
+                            <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-56 text-left">
+                              <p className="text-xs font-semibold text-gray-500 mb-2">Top 6 Active — {getCountryName(row.country)}</p>
+                              {row.top6_active.map((p: any, idx: number) => (
+                                <div key={idx} className="flex justify-between text-xs py-0.5">
+                                  <span className="text-gray-800">{idx + 1}. {p.first_name} {p.last_name}</span>
+                                  <span className="font-semibold text-gray-900 ml-2">{p.dgrade}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-right font-semibold text-gray-700 relative">
+                          <button
+                            onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'alltime' ? null : { country: row.country, type: 'alltime' })}
+                            className="hover:text-green-600 transition"
+                          >
+                            {row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '—'}
+                            {row.top6_alltime && <span className="ml-1 text-gray-400 text-xs">▾</span>}
+                          </button>
+                          {tooltip?.country === row.country && tooltip?.type === 'alltime' && row.top6_alltime && (
+                            <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-56 text-left">
+                              <p className="text-xs font-semibold text-gray-500 mb-2">Top 6 All Time — {getCountryName(row.country)}</p>
+                              {row.top6_alltime.map((p: any, idx: number) => (
+                                <div key={idx} className="flex justify-between text-xs py-0.5">
+                                  <span className="text-gray-800">{idx + 1}. {p.first_name} {p.last_name}</span>
+                                  <span className="font-semibold text-gray-900 ml-2">{p.dgrade}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )
