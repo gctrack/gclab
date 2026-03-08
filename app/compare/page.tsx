@@ -255,6 +255,7 @@ function ChartTooltip({ active, payload, label, nameA, nameB }: any) {
 export default function ComparePage() {
   const [userProfile, setUserProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
   const [playerA, setPlayerA] = useState<Player | null>(null)
   const [playerB, setPlayerB] = useState<Player | null>(null)
   const [gamesA, setGamesA] = useState<Game[]>([])
@@ -271,7 +272,8 @@ export default function ComparePage() {
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { setSignedIn(false); setLoading(false); return }
+      setSignedIn(true)
       const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setUserProfile(data)
       setLoading(false)
@@ -434,7 +436,53 @@ export default function ComparePage() {
   const nameA = playerA ? `${playerA.wcf_first_name} ${playerA.wcf_last_name}` : 'Player A'
   const nameB = playerB ? `${playerB.wcf_first_name} ${playerB.wcf_last_name}` : 'Player B'
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  if (loading || signedIn === null) return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading...</div>
+
+  if (!signedIn) return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <GCLabNav role="" isSignedIn={false} currentPath="/compare" />
+      <div className="flex-1 flex items-center justify-center px-6 py-20">
+        <div className="relative w-full max-w-lg">
+          <div className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm" style={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
+            <div className="p-6 border-b border-gray-100">
+              <div className="h-6 w-48 bg-gray-200 rounded mb-2"/>
+              <div className="h-4 w-64 bg-gray-100 rounded"/>
+            </div>
+            <div className="p-6">
+              <svg width="100%" height="180" viewBox="0 0 600 180">
+                <defs>
+                  <linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#16a34a" stopOpacity="0.15"/><stop offset="100%" stopColor="#16a34a" stopOpacity="0"/></linearGradient>
+                  <linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity="0.12"/><stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/></linearGradient>
+                </defs>
+                {([30,70,110,150] as number[]).map((y) => <line key={y} x1="0" y1={y} x2="600" y2={y} stroke="#f0f0f0" strokeWidth="1"/>)}
+                <path d="M0,140 C60,120 120,80 180,65 C240,50 300,45 360,55 C420,65 480,90 540,110 C570,120 590,130 600,135 L600,180 L0,180 Z" fill="url(#cg1)"/>
+                <path d="M0,140 C60,120 120,80 180,65 C240,50 300,45 360,55 C420,65 480,90 540,110 C570,120 590,130 600,135" fill="none" stroke="#16a34a" strokeWidth="2"/>
+                <path d="M0,155 C60,145 120,110 180,95 C240,80 300,75 360,85 C420,95 480,115 540,130 C570,138 590,145 600,148 L600,180 L0,180 Z" fill="url(#cg2)"/>
+                <path d="M0,155 C60,145 120,110 180,95 C240,80 300,75 360,85 C420,95 480,115 540,130 C570,138 590,145 600,148" fill="none" stroke="#3b82f6" strokeWidth="2" strokeDasharray="4 3"/>
+              </svg>
+              <div className="mt-3 space-y-2">
+                {([80,60,70] as number[]).map((w,i) => (
+                  <div key={i} className="flex gap-3"><div className="h-3 rounded bg-gray-200" style={{width:`${w}%`}}/><div className="h-3 rounded bg-gray-100 w-16"/></div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm rounded-2xl">
+            <div className="text-center px-8 py-10 max-w-sm">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5 text-2xl">⚔️</div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Compare any two players</h2>
+              <p className="text-sm text-gray-500 mb-6 leading-relaxed">Head-to-head grade history, win rates, performance trends. Pick any two players and see how they stack up over time.</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <a href="/login?mode=signup" className="bg-green-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 transition text-center">Create free account</a>
+                <a href="/login" className="border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg text-sm font-medium hover:border-green-500 hover:text-green-700 transition text-center">Sign in</a>
+              </div>
+              <p className="text-xs text-gray-400 mt-4">Free · No credit card · 30 seconds</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -10,13 +10,15 @@ export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { setSignedIn(false); setLoading(false); return }
+      setSignedIn(true)
       setUser(user)
       const { data } = await supabase
         .from('profiles')
@@ -43,7 +45,43 @@ export default function DashboardPage() {
     return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  if (loading || signedIn === null) return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading...</div>
+
+  if (!signedIn) return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <GCLabNav role="" isSignedIn={false} currentPath="/dashboard" />
+      <div className="flex-1 flex items-center justify-center px-6 py-20">
+        <div className="relative w-full max-w-lg">
+          <div className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm" style={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
+            <div className="p-6 border-b border-gray-100">
+              <div className="h-6 w-48 bg-gray-200 rounded mb-2"/>
+              <div className="h-4 w-32 bg-gray-100 rounded"/>
+            </div>
+            <div className="p-6 space-y-3">
+              {[85,65,75,55,80,60].map((w,i) => (
+                <div key={i} className="flex gap-3 items-center">
+                  <div className="h-4 rounded bg-gray-200" style={{ width: `${w}%` }}/>
+                  <div className="h-4 rounded bg-gray-100 w-16"/>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm rounded-2xl">
+            <div className="text-center px-8 py-10 max-w-sm">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5 text-2xl">🎯</div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Your personal dashboard</h2>
+              <p className="text-sm text-gray-500 mb-6 leading-relaxed">Track your grade, link your WCF profile, and see your career stats at a glance. Free to set up in 30 seconds.</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <a href="/login?mode=signup" className="bg-green-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 transition text-center">Create free account</a>
+                <a href="/login" className="border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg text-sm font-medium hover:border-green-500 hover:text-green-700 transition text-center">Sign in</a>
+              </div>
+              <p className="text-xs text-gray-400 mt-4">Free · No credit card · 30 seconds</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
