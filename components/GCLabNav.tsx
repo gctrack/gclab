@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/profile', label: 'My Profile' },
   { href: '/rankings', label: 'Rankings' },
+  { href: '/compare', label: 'Compare' },
   { href: '/rankings?tab=Historical+Rankings', label: 'Historical Rankings' },
   { href: '/games', label: 'My Games' },
   { href: '/clubs', label: 'Clubs' },
