@@ -1,11 +1,10 @@
+# SAVE TO: .github/workflows/wcf-history-batch.yml
 name: WCF History Batch Import
 
 on:
   schedule:
-    # Every hour at :15 past (offset from top of hour to avoid peak times)
     - cron: '15 * * * *'
   workflow_dispatch:
-    # Allow manual trigger from GitHub Actions UI
     inputs:
       reason:
         description: 'Reason for manual trigger'
@@ -15,47 +14,68 @@ on:
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
-      - name: Trigger batch import
+      - name: Import 8 players
         run: |
-          echo "Triggering WCF history batch import..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
-            "https://gclab.app/api/wcf-history-batch" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json")
+          BATCH=8
+          SUCCESS=0
+          TOTAL_GAMES=0
 
-          HTTP_BODY=$(echo "$RESPONSE" | head -n -1)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          for i in $(seq 1 $BATCH); do
+            echo ""
+            echo "=== Player $i of $BATCH ==="
 
-          echo "HTTP Status: $HTTP_CODE"
-          echo "Response: $HTTP_BODY"
+            # Get next player to import
+            NEXT=$(curl -s -X GET \
+              "https://gclab.app/api/wcf-history-next" \
+              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
 
-          # Extract key fields for summary
-          PROCESSED=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('processed', 0))" 2>/dev/null || echo "?")
-          SUCCESSFUL=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('successful', 0))" 2>/dev/null || echo "?")
-          TOTAL_GAMES=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('totalGames', 0))" 2>/dev/null || echo "?")
-          REMAINING=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('remaining', '?'))" 2>/dev/null || echo "?")
-          DAYS_LEFT=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('estimatedDaysLeft', '?'))" 2>/dev/null || echo "?")
+            echo "Next response: $NEXT"
+
+            DONE=$(echo "$NEXT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('done', False))" 2>/dev/null || echo "False")
+
+            if [ "$DONE" = "True" ]; then
+              echo "All players imported — stopping."
+              break
+            fi
+
+            PLAYER_ID=$(echo "$NEXT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['player']['id'])" 2>/dev/null || echo "")
+            PLAYER_NAME=$(echo "$NEXT" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d['player']; print(p['wcf_first_name']+' '+p['wcf_last_name'])" 2>/dev/null || echo "Unknown")
+            REMAINING=$(echo "$NEXT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('remaining', '?'))" 2>/dev/null || echo "?")
+
+            echo "Importing: $PLAYER_NAME (remaining: $REMAINING)"
+
+            if [ -z "$PLAYER_ID" ]; then
+              echo "Could not get player ID — skipping"
+              continue
+            fi
+
+            # Import this player — read SSE stream until complete
+            IMPORT_RESULT=$(curl -s -N -X POST \
+              "https://gclab.app/api/wcf-history-import" \
+              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"wcf_player_id\": \"$PLAYER_ID\"}" \
+              --max-time 300 | grep "data:" | tail -1)
+
+            echo "Import result: $IMPORT_RESULT"
+
+            GAMES=$(echo "$IMPORT_RESULT" | python3 -c "import sys,json; line=sys.stdin.read().strip().replace('data: ',''); d=json.loads(line); print(d.get('totalGames',0))" 2>/dev/null || echo "0")
+            TOTAL_GAMES=$((TOTAL_GAMES + GAMES))
+            SUCCESS=$((SUCCESS + 1))
+
+            echo "Games imported: $GAMES"
+
+            # Wait 45 seconds between players (skip after last)
+            if [ $i -lt $BATCH ]; then
+              echo "Waiting 45s before next player..."
+              sleep 45
+            fi
+          done
 
           echo ""
-          echo "=== Import Summary ==="
-          echo "Players processed: $PROCESSED"
-          echo "Successful: $SUCCESSFUL"
-          echo "Games imported: $TOTAL_GAMES"
-          echo "Players remaining: $REMAINING"
-          echo "Estimated days to complete: $DAYS_LEFT"
-
-          # Fail the workflow if HTTP error
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "ERROR: API returned HTTP $HTTP_CODE"
-            exit 1
-          fi
-
-          # Treat "all imported" as success
-          MESSAGE=$(echo "$HTTP_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message', ''))" 2>/dev/null || echo "")
-          if [ "$MESSAGE" = "All players already imported" ]; then
-            echo "All players already imported — disabling workflow."
-            exit 0
-          fi
+          echo "=== Batch Summary ==="
+          echo "Players processed: $SUCCESS"
+          echo "Total games imported: $TOTAL_GAMES"
