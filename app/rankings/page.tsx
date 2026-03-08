@@ -310,7 +310,7 @@ export default function RankingsPage() {
   const fetchHistory = async (playerId: string) => {
     let query = supabase
       .from('wcf_dgrade_history')
-      .select('dgrade_value, egrade_value, world_ranking, recorded_at')
+      .select('dgrade_value, egrade_value, world_ranking, recorded_at, event_name, event_url, is_imported')
       .eq('wcf_player_id', playerId)
       .order('recorded_at', { ascending: true })
     const now = new Date()
@@ -461,18 +461,24 @@ export default function RankingsPage() {
         {playerHistory.map((h, i) => (
           <g key={i}>
             {showDgrade && (
-              <circle cx={xScale(i)} cy={yGrade(h.dgrade_value)} r="4" fill="#16a34a">
-                <title>{formatDate(h.recorded_at)}: dGrade {h.dgrade_value}</title>
+              <circle cx={xScale(i)} cy={yGrade(h.dgrade_value)} r={h.is_imported ? 3 : 4}
+                fill={h.is_imported ? '#15803d' : '#16a34a'}
+                opacity={h.is_imported ? 0.7 : 1}>
+                <title>{formatDate(h.recorded_at)}{h.event_name ? ` · ${h.event_name}` : ''}: dGrade {h.dgrade_value}</title>
               </circle>
             )}
             {showEgrade && h.egrade_value && h.egrade_value > 0 && (
-              <circle cx={xScale(i)} cy={yGrade(h.egrade_value)} r="4" fill="#d97706">
-                <title>{formatDate(h.recorded_at)}: eGrade {h.egrade_value}</title>
+              <circle cx={xScale(i)} cy={yGrade(h.egrade_value)} r={h.is_imported ? 3 : 4}
+                fill={h.is_imported ? '#b45309' : '#d97706'}
+                opacity={h.is_imported ? 0.7 : 1}>
+                <title>{formatDate(h.recorded_at)}{h.event_name ? ` · ${h.event_name}` : ''}: eGrade {h.egrade_value}</title>
               </circle>
             )}
-            {showRanking && (
-              <circle cx={xScale(i)} cy={yRank(h.world_ranking)} r="4" fill="#2563eb">
-                <title>{formatDate(h.recorded_at)}: Rank #{h.world_ranking}</title>
+            {showRanking && h.world_ranking && (
+              <circle cx={xScale(i)} cy={yRank(h.world_ranking)} r={h.is_imported ? 3 : 4}
+                fill={h.is_imported ? '#1d4ed8' : '#2563eb'}
+                opacity={h.is_imported ? 0.7 : 1}>
+                <title>{formatDate(h.recorded_at)}{h.event_name ? ` · ${h.event_name}` : ''}: Rank #{h.world_ranking}</title>
               </circle>
             )}
           </g>
@@ -922,8 +928,8 @@ export default function RankingsPage() {
 
                 <p className="text-xs text-gray-400 mb-3">
                   {playerHistory.length <= 1
-                    ? 'GCLab has been tracking dGrade history since 2 Mar 2026. As daily syncs and monthly snapshots accumulate, this chart will show your full ranking journey over time.'
-                    : `Tracking since 2 Mar 2026 · ${playerHistory.length} data points recorded`}
+                    ? 'No history recorded yet. If this player has imported their WCF history, it will appear here.'
+                    : `${playerHistory.filter((h: any) => h.is_imported).length} imported events + ${playerHistory.filter((h: any) => !h.is_imported).length} GCLab tracked points`}
                 </p>
 
                 <div className="bg-white rounded-lg shadow-sm p-4 mb-4">{renderChart()}</div>
@@ -934,6 +940,7 @@ export default function RankingsPage() {
                       <thead>
                         <tr className="text-gray-500 border-b">
                           <th className="text-left py-1 font-semibold">Date</th>
+                          <th className="text-left py-1 font-semibold">Event</th>
                           <th className="text-right py-1 font-semibold">dGrade</th>
                           <th className="text-right py-1 font-semibold">eGrade</th>
                           <th className="text-right py-1 font-semibold">World Rank</th>
@@ -943,9 +950,14 @@ export default function RankingsPage() {
                         {[...playerHistory].reverse().map((h, i) => (
                           <tr key={i} className="border-t border-gray-100">
                             <td className="py-1 text-gray-700">{formatDate(h.recorded_at)}</td>
+                            <td className="py-1 text-gray-500">
+                              {h.event_url
+                                ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">{h.event_name || '—'}</a>
+                                : h.event_name || <span className="text-gray-400">Daily sync</span>}
+                            </td>
                             <td className="py-1 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
                             <td className="py-1 text-right font-semibold text-amber-600">{h.egrade_value || '—'}</td>
-                            <td className="py-1 text-right text-gray-600">#{h.world_ranking}</td>
+                            <td className="py-1 text-right text-gray-600">{h.world_ranking ? `#${h.world_ranking}` : '—'}</td>
                           </tr>
                         ))}
                       </tbody>

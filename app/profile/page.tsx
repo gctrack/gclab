@@ -231,6 +231,20 @@ function Toggle({ enabled, onChange }: { enabled: boolean, onChange: (v: boolean
   )
 }
 
+type ImportStep = {
+  type: 'info' | 'year' | 'year_done' | 'year_error' | 'error' | 'complete'
+  message: string
+  year?: number
+  games?: number
+  events?: number
+}
+
+type ImportResult = {
+  totalGames: number
+  years: number
+  startingGrade: number | null
+}
+
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -238,6 +252,15 @@ export default function ProfilePage() {
   const [message, setMessage] = useState('')
   const [userId, setUserId] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [historyImported, setHistoryImported] = useState(false)
+
+  // Import state
+  const [importing, setImporting] = useState(false)
+  const [importSteps, setImportSteps] = useState<ImportStep[]>([])
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [showImportLog, setShowImportLog] = useState(false)
+  const importLogRef = useRef<HTMLDivElement>(null)
+
   const [profile, setProfile] = useState({
     first_name: '',
     last_name: '',
@@ -297,11 +320,98 @@ export default function ProfilePage() {
         })
         setSelectedGrips(data.grips || [])
         if (data.avatar_url) setAvatarUrl(data.avatar_url)
+
+        // Check if history already imported
+        if (data.wcf_player_id) {
+          const { data: wcfPlayer } = await supabase
+            .from('wcf_players')
+            .select('history_imported')
+            .eq('id', data.wcf_player_id)
+            .single()
+          if (wcfPlayer) setHistoryImported(wcfPlayer.history_imported || false)
+        }
       }
       setLoading(false)
     }
     getProfile()
   }, [])
+
+  // Auto-scroll import log
+  useEffect(() => {
+    if (importLogRef.current) {
+      importLogRef.current.scrollTop = importLogRef.current.scrollHeight
+    }
+  }, [importSteps])
+
+  const handleImportHistory = async () => {
+    if (!profile.wcf_player_id) return
+
+    if (historyImported) {
+      const confirmed = window.confirm(
+        'Your WCF history has already been imported.\n\nRe-importing will refresh all data — useful if your starting grade was revised or you want to pick up any missed events.\n\nContinue?'
+      )
+      if (!confirmed) return
+    }
+
+    setImporting(true)
+    setImportSteps([])
+    setImportResult(null)
+    setShowImportLog(true)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setImporting(false)
+        return
+      }
+
+      const response = await fetch('/api/wcf-history-import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ wcf_player_id: profile.wcf_player_id }),
+      })
+
+      if (!response.ok || !response.body) {
+        setImportSteps(prev => [...prev, { type: 'error', message: 'Import request failed' }])
+        setImporting(false)
+        return
+      }
+
+      // Read SSE stream
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const data = JSON.parse(line.slice(6))
+            setImportSteps(prev => [...prev, { type: data.step, message: data.message, year: data.year, games: data.games, events: data.events }])
+            if (data.step === 'complete') {
+              setImportResult({ totalGames: data.totalGames, years: data.years, startingGrade: data.startingGrade })
+              setHistoryImported(true)
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+      }
+    } catch (err) {
+      setImportSteps(prev => [...prev, { type: 'error', message: `Error: ${String(err)}` }])
+    }
+
+    setImporting(false)
+  }
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -321,7 +431,7 @@ export default function ProfilePage() {
       .from('avatars')
       .getPublicUrl(filePath)
     await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId)
-    setAvatarUrl(publicUrl)
+    setAvatarUrl(`${publicUrl}?t=${Date.now()}`)
     setUploadingAvatar(false)
     setMessage('Photo updated successfully')
   }
@@ -347,6 +457,14 @@ export default function ProfilePage() {
         dgrade: data.dgrade || '',
         wcf_profile_url: data.wcf_profile_url || '',
       }))
+      if (data.wcf_player_id) {
+        const { data: wcfPlayer } = await supabase
+          .from('wcf_players')
+          .select('history_imported')
+          .eq('id', data.wcf_player_id)
+          .single()
+        if (wcfPlayer) setHistoryImported(wcfPlayer.history_imported || false)
+      }
     }
   }
 
@@ -410,6 +528,14 @@ export default function ProfilePage() {
     setSaving(false)
   }
 
+  const stepIcon = (type: ImportStep['type']) => {
+    if (type === 'complete') return '✅'
+    if (type === 'error' || type === 'year_error') return '❌'
+    if (type === 'year_done') return '✓'
+    if (type === 'year') return '⟳'
+    return '•'
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
 
   return (
@@ -442,6 +568,93 @@ export default function ProfilePage() {
             <a href={profile.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="underline ml-1">
               view WCF profile
             </a>
+          </div>
+        )}
+
+        {/* ── WCF HISTORY IMPORT ── */}
+        {profile.wcf_player_id && (
+          <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-1">
+                  {historyImported ? '✅ WCF History Imported' : '📥 Import Your WCF History'}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {historyImported
+                    ? 'Your full career history is in GCLab. Every game, opponent, score and dGrade change is recorded and visible on your ranking chart.'
+                    : 'Import your complete WCF career — every game, opponent, score and dGrade change going back to when you started. Takes 10–30 seconds depending on how many years you have played.'}
+                </p>
+                {historyImported && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Re-import if your starting grade was revised or you want to refresh your data.
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={handleImportHistory}
+                disabled={importing}
+                className={`shrink-0 px-4 py-2 rounded-md text-sm font-medium transition ${
+                  importing
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : historyImported
+                    ? 'bg-white border border-gray-300 text-gray-600 hover:border-green-500 hover:text-green-600'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+              >
+                {importing ? 'Importing...' : historyImported ? 'Re-import' : 'Import History'}
+              </button>
+            </div>
+
+            {/* Progress log */}
+            {showImportLog && (
+              <div className="mt-4">
+                <div
+                  ref={importLogRef}
+                  className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-48 overflow-y-auto font-mono text-xs space-y-1"
+                >
+                  {importSteps.map((step, i) => (
+                    <div key={i} className={`flex gap-2 ${
+                      step.type === 'complete' ? 'text-green-700 font-semibold' :
+                      step.type === 'error' || step.type === 'year_error' ? 'text-red-600' :
+                      step.type === 'year_done' ? 'text-gray-700' :
+                      'text-gray-400'
+                    }`}>
+                      <span>{stepIcon(step.type)}</span>
+                      <span>{step.message}</span>
+                    </div>
+                  ))}
+                  {importing && (
+                    <div className="text-gray-400 animate-pulse">• Working...</div>
+                  )}
+                </div>
+
+                {/* Completion summary */}
+                {importResult && (
+                  <div className="mt-3 grid grid-cols-3 gap-3">
+                    <div className="bg-green-50 border border-green-100 rounded-md p-3 text-center">
+                      <p className="text-2xl font-bold text-green-700">{importResult.totalGames.toLocaleString()}</p>
+                      <p className="text-xs text-green-600 mt-0.5">Games imported</p>
+                    </div>
+                    <div className="bg-green-50 border border-green-100 rounded-md p-3 text-center">
+                      <p className="text-2xl font-bold text-green-700">{importResult.years}</p>
+                      <p className="text-xs text-green-600 mt-0.5">Years of history</p>
+                    </div>
+                    <div className="bg-green-50 border border-green-100 rounded-md p-3 text-center">
+                      <p className="text-2xl font-bold text-green-700">{importResult.startingGrade ?? '—'}</p>
+                      <p className="text-xs text-green-600 mt-0.5">Starting grade</p>
+                    </div>
+                  </div>
+                )}
+
+                {!importing && importResult && (
+                  <p className="text-xs text-gray-500 mt-3">
+                    Your ranking chart in{' '}
+                    <a href="/rankings" className="text-green-600 hover:underline">Historical Rankings</a>
+                    {' '}now shows your full career.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

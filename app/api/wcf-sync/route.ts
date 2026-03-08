@@ -197,7 +197,7 @@ async function runSync(logId: string) {
 
         const { data: existing } = await supabase
           .from('wcf_players')
-          .select('id, dgrade, egrade, linked_user_id')
+          .select('id, dgrade, egrade, linked_user_id, history_imported')
           .eq('wcf_first_name', player.wcf_first_name)
           .eq('wcf_last_name', player.wcf_last_name)
           .maybeSingle()
@@ -207,12 +207,109 @@ async function runSync(logId: string) {
           const egradeChanged = egrade !== null && existing.egrade !== egrade
 
           if (dgradeChanged || egradeChanged) {
+            // If history imported, try to fetch the new game details from WCF
+            let eventName: string | null = null
+            let eventUrl: string | null = null
+            let eventDate: string | null = null
+
+            if (existing.history_imported && dgradeChanged) {
+              try {
+                const yearUrl = `https://rank.worldcroquet.org/gcrankdg/player.php?year=${now.getFullYear()}&pfn=${encodeURIComponent(player.wcf_first_name)}&psn=${encodeURIComponent(player.wcf_last_name)}&nt=1&pid=`
+                const res = await fetchWithTimeout(yearUrl, 15000)
+                const yearHtml = await res.text()
+
+                // Find most recent event from page
+                const rows = yearHtml.split('<tr>')
+                let lastEvent: { name: string, url: string, date: string | null } | null = null
+                let lastGames: any[] = []
+
+                for (const row of rows) {
+                  const eventMatch = row.match(
+                    /<td>&nbsp\s*<\/td><td><b>(\d+)<\/b><\/td><td><b>\s*<a href\s*=\s*"(event\.php\?[^"]+)">\s*([^<]+?)\s*<\/a><\/b><\/td><td><b>(\d{2}\.\d{2}\.\d{2})<\/b>/
+                  )
+                  if (eventMatch) {
+                    if (lastEvent && lastGames.length > 0) {
+                      const lastGame = lastGames[lastGames.length - 1]
+                      // Write game records
+                      for (const g of lastGames) {
+                        await supabase.from('wcf_player_games').upsert({
+                          ...g,
+                          wcf_player_id: existing.id,
+                        }, { onConflict: 'wcf_player_id,year,game_number' })
+                      }
+                    }
+                    const dateMatch = eventMatch[4].match(/^(\d{2})\.(\d{2})\.(\d{2})$/)
+                    let parsedDate: string | null = null
+                    if (dateMatch) {
+                      const yr = parseInt(dateMatch[3]) >= 80 ? `19${dateMatch[3]}` : `20${dateMatch[3]}`
+                      parsedDate = `${yr}-${dateMatch[2]}-${dateMatch[1]}`
+                    }
+                    lastEvent = {
+                      name: eventMatch[3].trim(),
+                      url: `https://rank.worldcroquet.org/gcrankdg/${eventMatch[2]}`,
+                      date: parsedDate,
+                    }
+                    lastGames = []
+                    continue
+                  }
+
+                  const gameMatch = row.match(
+                    /<td>\s*(\d+)\s*<\/td><td[^>]*>\s*(<b>)?\s*(beat|lost to)\s*(<\/b>)?\s*<\/td><td[^>]*>.*?pffn=([^&"]+)&pfsn=([^&"]+?)(?:&[^"]*)?">([^<]+)<\/b>?<\/td><td[^>]*>([^<]+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>(\d+)<\/td><td[^>]*>([^<]*)<\/td>/
+                  )
+                  if (gameMatch && lastEvent) {
+                    const scoreParts = gameMatch[8].trim().split('-')
+                    const egradeVal = parseInt(gameMatch[11])
+                    const oppEgradeVal = parseInt(gameMatch[12])
+                    lastGames.push({
+                      year: now.getFullYear(),
+                      game_number: parseInt(gameMatch[1]),
+                      event_number: 0,
+                      event_name: lastEvent.name,
+                      event_url: lastEvent.url,
+                      event_date: lastEvent.date,
+                      result: gameMatch[3].trim() === 'beat' ? 'win' : 'loss',
+                      score: gameMatch[8].trim(),
+                      player_score: parseInt(scoreParts[0]) || null,
+                      opponent_score: parseInt(scoreParts[1]) || null,
+                      opponent_first_name: decodeURIComponent(gameMatch[5].replace(/\+/g, ' ')).trim(),
+                      opponent_last_name: decodeURIComponent(gameMatch[6].replace(/\+/g, ' ')).trim(),
+                      opponent_wcf_url: `https://rank.worldcroquet.org/gcrankdg/player_full.php?pffn=${gameMatch[5]}&pfsn=${gameMatch[6]}&nt=1`,
+                      dgrade_after: parseInt(gameMatch[9]),
+                      egrade_after: egradeVal > 0 ? egradeVal : null,
+                      opp_dgrade_after: parseInt(gameMatch[10]),
+                      opp_egrade_after: oppEgradeVal > 0 ? oppEgradeVal : null,
+                      round_detail: gameMatch[13].trim() || null,
+                      is_imported: false,
+                    })
+                  }
+                }
+
+                // Process last event
+                if (lastEvent && lastGames.length > 0) {
+                  for (const g of lastGames) {
+                    await supabase.from('wcf_player_games').upsert({
+                      ...g,
+                      wcf_player_id: existing.id,
+                    }, { onConflict: 'wcf_player_id,year,game_number' })
+                  }
+                  eventName = lastEvent.name
+                  eventUrl = lastEvent.url
+                  eventDate = lastEvent.date
+                }
+              } catch {
+                // Silent fail — still write basic history record
+              }
+            }
+
             await supabase.from('wcf_dgrade_history').insert({
               wcf_player_id: existing.id,
               dgrade_value: player.dgrade,
               egrade_value: egrade,
               world_ranking: player.world_ranking,
               recorded_at: nowISO,
+              event_name: eventName,
+              event_url: eventUrl,
+              event_date: eventDate ? new Date(eventDate).toISOString() : null,
             })
             if (existing.linked_user_id && dgradeChanged) {
               await supabase.from('profiles').update({
