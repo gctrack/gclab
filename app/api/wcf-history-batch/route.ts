@@ -74,7 +74,7 @@ function parseYearPage(html: string): {
 
   for (const row of rows) {
     // Event header row
-    const eventMatch = row.match(/<b>(\d+)<\/b>.*?href="(event\.php[^"]+)"[^>]*>([^<]+)<\/a>.*?<b>(\d{1,2})\.(\d{1,2})\.(\d{2})<\/b>/s)
+    const eventMatch = row.match(/<b>(\d+)<\/b>[\s\S]*?href="(event\.php[^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<b>(\d{1,2})\.(\d{1,2})\.(\d{2})<\/b>/)
     if (eventMatch) {
       const day = eventMatch[4].padStart(2, '0')
       const month = eventMatch[5].padStart(2, '0')
