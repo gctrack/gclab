@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import WcfMatchBanner from '@/components/WcfMatchBanner'
+import GCLabNav from '@/components/GCLabNav'
 
 const GC_COUNTRIES = [
   { code: 'AU', name: 'Australia' },
