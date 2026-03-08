@@ -142,7 +142,7 @@ export default function RankingsPage() {
   const [showDgrade, setShowDgrade] = useState(true)
   const [showEgrade, setShowEgrade] = useState(false)
   const [showRanking, setShowRanking] = useState(true)
-  const [historyRange, setHistoryRange] = useState('5y')
+  const [historyRange, setHistoryRange] = useState('all')
   const [historyFrom, setHistoryFrom] = useState('')
   const [historyTo, setHistoryTo] = useState('')
   const [lastSyncDate, setLastSyncDate] = useState<string | null>(null)
@@ -351,7 +351,7 @@ export default function RankingsPage() {
   const loadPlayerHistory = async (wcfPlayerId: string) => {
     const { data: player } = await supabase
       .from('wcf_players')
-      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url')
+      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url, history_imported')
       .eq('id', wcfPlayerId)
       .single()
     if (player) { setSelectedPlayer(player); await fetchHistory(player.id) }
@@ -441,7 +441,7 @@ export default function RankingsPage() {
       const parts = value.trim().split(' ')
       let query = supabase
         .from('wcf_players')
-        .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url')
+        .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url, history_imported')
         .order('world_ranking', { ascending: true })
         .limit(8)
       if (parts.length >= 2 && parts[1]) {
@@ -652,7 +652,7 @@ export default function RankingsPage() {
             const firstRankLabel = firstRankPoint
               ? new Date(firstRankPoint.recorded_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
               : 'Mar 2026'
-            return <text x={W - padR} y={padT - 12} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank (from {firstRankLabel})</text>
+            return <text x={W - padR} y={padT - 12} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank Collected Since March 2026</text>
           })()}
 
           {/* dGrade line */}
