@@ -14,11 +14,17 @@ const NAV_LINKS = [
   { href: '/rankings', label: 'Rankings' },
   { href: '/compare', label: 'Compare' },
   { href: '/rankings?tab=Historical+Rankings', label: 'Historical Rankings' },
-  { href: '/games', label: 'My Games' },
-  { href: '/clubs', label: 'Clubs' },
 ]
 
-export default function GCLabNav({ role }: Props) {
+const DESKTOP_TABS = [
+  { href: '/rankings', label: 'Rankings', icon: '🏆', public: true },
+  { href: '/profile', label: 'My Profile', icon: '👤', public: false },
+  { href: '/compare', label: 'Compare', icon: '⚔️', public: false },
+  { href: '/rankings?tab=Historical+Rankings', label: 'Historical', icon: '📈', public: true },
+  { href: '/dashboard', label: 'Dashboard', icon: '🎯', public: false },
+]
+
+export default function GCLabNav({ role, isSignedIn = false, currentPath = '' }: Props & { isSignedIn?: boolean, currentPath?: string }) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -32,8 +38,39 @@ export default function GCLabNav({ role }: Props) {
 
   return (
     <>
-      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center relative z-50">
-        <a href="/dashboard" className="text-xl font-bold text-green-600">GCLab</a>
+      <nav className="bg-white shadow-sm px-4 py-3 flex justify-between items-center relative z-50">
+        <a href="/dashboard" className="text-xl font-bold text-green-600 shrink-0">GCLab</a>
+
+        {/* Desktop tab bar */}
+        <div className="hidden md:flex items-center gap-1 bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-100">
+          {DESKTOP_TABS.map(tab => {
+            const isActive = currentPath === tab.href || currentPath.startsWith(tab.href.split('?')[0] + (tab.href.includes('?') ? '?' : '/')) && tab.href !== '/rankings'
+            const isLocked = !tab.public && !isSignedIn
+            return (
+              <a
+                key={tab.href}
+                href={isLocked ? '/login' : tab.href}
+                title={isLocked ? `Sign in to access ${tab.label}` : tab.label}
+                className={[
+                  'relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                  isActive
+                    ? 'bg-white text-green-700 shadow-sm border border-gray-200'
+                    : isLocked
+                    ? 'text-gray-400 hover:text-gray-500 hover:bg-white/60'
+                    : 'text-gray-600 hover:text-green-700 hover:bg-white/80',
+                ].join(' ')}
+              >
+                <span className="text-base leading-none">{tab.icon}</span>
+                <span>{tab.label}</span>
+                {isLocked && (
+                  <svg className="w-3 h-3 ml-0.5 opacity-50" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+                  </svg>
+                )}
+              </a>
+            )
+          })}
+        </div>
         <button
           onClick={() => setOpen(!open)}
           className="flex flex-col justify-center items-center w-8 h-8 gap-1.5 group"

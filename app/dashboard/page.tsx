@@ -47,7 +47,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
-      <GCLabNav role={profile?.role} />
+      <GCLabNav role={profile?.role} isSignedIn={true} currentPath="/dashboard" />
       <main className="max-w-4xl mx-auto px-6 py-10">
         <h2 className="text-2xl font-bold mb-1">
           Welcome, {profile?.first_name || user.email}

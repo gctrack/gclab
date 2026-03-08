@@ -211,7 +211,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
-      <GCLabNav role={profile?.role} />
+      <GCLabNav role={profile?.role} isSignedIn={true} currentPath="/admin" />
       <div className="max-w-6xl mx-auto px-6 py-10 flex gap-8">
 
         {/* Sidebar */}

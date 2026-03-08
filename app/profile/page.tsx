@@ -1,884 +1,134 @@
+// SAVE TO: app/profile/[id]/page.tsx
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import WcfMatchBanner from '@/components/WcfMatchBanner'
+import GCLabNav from '@/components/GCLabNav'
 
-const GC_COUNTRIES = [
-  { code: 'AU', name: 'Australia' },
-  { code: 'BE', name: 'Belgium' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'CZ', name: 'Czech Republic' },
-  { code: 'EG', name: 'Egypt' },
-  { code: 'GB-ENG', name: 'England' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'HK', name: 'Hong Kong' },
-  { code: 'IE', name: 'Ireland' },
-  { code: 'LV', name: 'Latvia' },
-  { code: 'MX', name: 'Mexico' },
-  { code: 'NZ', name: 'New Zealand' },
-  { code: 'NO', name: 'Norway' },
-  { code: 'PT', name: 'Portugal' },
-  { code: 'GB-SCT', name: 'Scotland' },
-  { code: 'ZA', name: 'South Africa' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'SE', name: 'Sweden' },
-  { code: 'CH', name: 'Switzerland' },
-  { code: 'US', name: 'USA' },
-  { code: 'GB-WLS', name: 'Wales' },
-]
-
-const ALL_COUNTRIES = [
-  { code: 'AF', name: 'Afghanistan' },
-  { code: 'AL', name: 'Albania' },
-  { code: 'DZ', name: 'Algeria' },
-  { code: 'AD', name: 'Andorra' },
-  { code: 'AO', name: 'Angola' },
-  { code: 'AG', name: 'Antigua and Barbuda' },
-  { code: 'AR', name: 'Argentina' },
-  { code: 'AM', name: 'Armenia' },
-  { code: 'AT', name: 'Austria' },
-  { code: 'AZ', name: 'Azerbaijan' },
-  { code: 'BS', name: 'Bahamas' },
-  { code: 'BH', name: 'Bahrain' },
-  { code: 'BD', name: 'Bangladesh' },
-  { code: 'BB', name: 'Barbados' },
-  { code: 'BY', name: 'Belarus' },
-  { code: 'BZ', name: 'Belize' },
-  { code: 'BJ', name: 'Benin' },
-  { code: 'BT', name: 'Bhutan' },
-  { code: 'BO', name: 'Bolivia' },
-  { code: 'BA', name: 'Bosnia and Herzegovina' },
-  { code: 'BW', name: 'Botswana' },
-  { code: 'BR', name: 'Brazil' },
-  { code: 'BN', name: 'Brunei' },
-  { code: 'BG', name: 'Bulgaria' },
-  { code: 'BF', name: 'Burkina Faso' },
-  { code: 'BI', name: 'Burundi' },
-  { code: 'CV', name: 'Cabo Verde' },
-  { code: 'KH', name: 'Cambodia' },
-  { code: 'CM', name: 'Cameroon' },
-  { code: 'CF', name: 'Central African Republic' },
-  { code: 'TD', name: 'Chad' },
-  { code: 'CL', name: 'Chile' },
-  { code: 'CN', name: 'China' },
-  { code: 'CO', name: 'Colombia' },
-  { code: 'KM', name: 'Comoros' },
-  { code: 'CG', name: 'Congo' },
-  { code: 'CR', name: 'Costa Rica' },
-  { code: 'HR', name: 'Croatia' },
-  { code: 'CU', name: 'Cuba' },
-  { code: 'CY', name: 'Cyprus' },
-  { code: 'DK', name: 'Denmark' },
-  { code: 'DJ', name: 'Djibouti' },
-  { code: 'DM', name: 'Dominica' },
-  { code: 'DO', name: 'Dominican Republic' },
-  { code: 'EC', name: 'Ecuador' },
-  { code: 'SV', name: 'El Salvador' },
-  { code: 'GQ', name: 'Equatorial Guinea' },
-  { code: 'ER', name: 'Eritrea' },
-  { code: 'EE', name: 'Estonia' },
-  { code: 'SZ', name: 'Eswatini' },
-  { code: 'ET', name: 'Ethiopia' },
-  { code: 'FJ', name: 'Fiji' },
-  { code: 'FI', name: 'Finland' },
-  { code: 'FR', name: 'France' },
-  { code: 'GA', name: 'Gabon' },
-  { code: 'GM', name: 'Gambia' },
-  { code: 'GE', name: 'Georgia' },
-  { code: 'GH', name: 'Ghana' },
-  { code: 'GR', name: 'Greece' },
-  { code: 'GD', name: 'Grenada' },
-  { code: 'GT', name: 'Guatemala' },
-  { code: 'GN', name: 'Guinea' },
-  { code: 'GW', name: 'Guinea-Bissau' },
-  { code: 'GY', name: 'Guyana' },
-  { code: 'HT', name: 'Haiti' },
-  { code: 'HN', name: 'Honduras' },
-  { code: 'HU', name: 'Hungary' },
-  { code: 'IS', name: 'Iceland' },
-  { code: 'IN', name: 'India' },
-  { code: 'ID', name: 'Indonesia' },
-  { code: 'IR', name: 'Iran' },
-  { code: 'IQ', name: 'Iraq' },
-  { code: 'IL', name: 'Israel' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'JM', name: 'Jamaica' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'JO', name: 'Jordan' },
-  { code: 'KZ', name: 'Kazakhstan' },
-  { code: 'KE', name: 'Kenya' },
-  { code: 'KI', name: 'Kiribati' },
-  { code: 'KW', name: 'Kuwait' },
-  { code: 'KG', name: 'Kyrgyzstan' },
-  { code: 'LA', name: 'Laos' },
-  { code: 'LB', name: 'Lebanon' },
-  { code: 'LS', name: 'Lesotho' },
-  { code: 'LR', name: 'Liberia' },
-  { code: 'LY', name: 'Libya' },
-  { code: 'LI', name: 'Liechtenstein' },
-  { code: 'LT', name: 'Lithuania' },
-  { code: 'LU', name: 'Luxembourg' },
-  { code: 'MG', name: 'Madagascar' },
-  { code: 'MW', name: 'Malawi' },
-  { code: 'MY', name: 'Malaysia' },
-  { code: 'MV', name: 'Maldives' },
-  { code: 'ML', name: 'Mali' },
-  { code: 'MT', name: 'Malta' },
-  { code: 'MH', name: 'Marshall Islands' },
-  { code: 'MR', name: 'Mauritania' },
-  { code: 'MU', name: 'Mauritius' },
-  { code: 'FM', name: 'Micronesia' },
-  { code: 'MD', name: 'Moldova' },
-  { code: 'MC', name: 'Monaco' },
-  { code: 'MN', name: 'Mongolia' },
-  { code: 'ME', name: 'Montenegro' },
-  { code: 'MA', name: 'Morocco' },
-  { code: 'MZ', name: 'Mozambique' },
-  { code: 'MM', name: 'Myanmar' },
-  { code: 'NA', name: 'Namibia' },
-  { code: 'NR', name: 'Nauru' },
-  { code: 'NP', name: 'Nepal' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'NI', name: 'Nicaragua' },
-  { code: 'NE', name: 'Niger' },
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'MK', name: 'North Macedonia' },
-  { code: 'PK', name: 'Pakistan' },
-  { code: 'PW', name: 'Palau' },
-  { code: 'PA', name: 'Panama' },
-  { code: 'PG', name: 'Papua New Guinea' },
-  { code: 'PY', name: 'Paraguay' },
-  { code: 'PE', name: 'Peru' },
-  { code: 'PH', name: 'Philippines' },
-  { code: 'PL', name: 'Poland' },
-  { code: 'QA', name: 'Qatar' },
-  { code: 'RO', name: 'Romania' },
-  { code: 'RU', name: 'Russia' },
-  { code: 'RW', name: 'Rwanda' },
-  { code: 'KN', name: 'Saint Kitts and Nevis' },
-  { code: 'LC', name: 'Saint Lucia' },
-  { code: 'VC', name: 'Saint Vincent and the Grenadines' },
-  { code: 'WS', name: 'Samoa' },
-  { code: 'SM', name: 'San Marino' },
-  { code: 'ST', name: 'Sao Tome and Principe' },
-  { code: 'SA', name: 'Saudi Arabia' },
-  { code: 'SN', name: 'Senegal' },
-  { code: 'RS', name: 'Serbia' },
-  { code: 'SL', name: 'Sierra Leone' },
-  { code: 'SG', name: 'Singapore' },
-  { code: 'SK', name: 'Slovakia' },
-  { code: 'SI', name: 'Slovenia' },
-  { code: 'SB', name: 'Solomon Islands' },
-  { code: 'SO', name: 'Somalia' },
-  { code: 'SS', name: 'South Sudan' },
-  { code: 'LK', name: 'Sri Lanka' },
-  { code: 'SD', name: 'Sudan' },
-  { code: 'SR', name: 'Suriname' },
-  { code: 'SY', name: 'Syria' },
-  { code: 'TW', name: 'Taiwan' },
-  { code: 'TJ', name: 'Tajikistan' },
-  { code: 'TZ', name: 'Tanzania' },
-  { code: 'TH', name: 'Thailand' },
-  { code: 'TL', name: 'Timor-Leste' },
-  { code: 'TG', name: 'Togo' },
-  { code: 'TO', name: 'Tonga' },
-  { code: 'TT', name: 'Trinidad and Tobago' },
-  { code: 'TN', name: 'Tunisia' },
-  { code: 'TR', name: 'Turkey' },
-  { code: 'TM', name: 'Turkmenistan' },
-  { code: 'TV', name: 'Tuvalu' },
-  { code: 'UG', name: 'Uganda' },
-  { code: 'UA', name: 'Ukraine' },
-  { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'UY', name: 'Uruguay' },
-  { code: 'UZ', name: 'Uzbekistan' },
-  { code: 'VU', name: 'Vanuatu' },
-  { code: 'VE', name: 'Venezuela' },
-  { code: 'VN', name: 'Vietnam' },
-  { code: 'YE', name: 'Yemen' },
-  { code: 'ZM', name: 'Zambia' },
-  { code: 'ZW', name: 'Zimbabwe' },
-]
-
-const GRIP_OPTIONS = ['Irish', 'Solomon', 'Standard', 'Other']
-
-function getFlag(code: string) {
-  if (code === 'GB-ENG') return '🏴󠁧󠁢󠁥󠁮󠁧󠁿'
-  if (code === 'GB-SCT') return '🏴󠁧󠁢󠁳󠁣󠁴󠁿'
-  if (code === 'GB-WLS') return '🏴󠁧󠁢󠁷󠁬󠁳󠁿'
-  return code
-    .toUpperCase()
-    .split('')
-    .map(c => String.fromCodePoint(c.charCodeAt(0) + 127397))
-    .join('')
-}
-
-function Toggle({ enabled, onChange }: { enabled: boolean, onChange: (v: boolean) => void }) {
-  return (
-    <button
-      onClick={() => onChange(!enabled)}
-      className={`flex items-center gap-2 text-xs px-2 py-1 rounded-full border transition ${
-        enabled
-          ? 'bg-green-50 border-green-400 text-green-700'
-          : 'bg-gray-50 border-gray-300 text-gray-400'
-      }`}
-    >
-      <span className={`w-3 h-3 rounded-full ${enabled ? 'bg-green-500' : 'bg-gray-300'}`} />
-      {enabled ? 'Visible to members' : 'Private'}
-    </button>
-  )
-}
-
-type ImportStep = {
-  type: 'info' | 'year' | 'year_done' | 'year_error' | 'error' | 'complete'
-  message: string
-  year?: number
-  games?: number
-  events?: number
-}
-
-type ImportResult = {
-  totalGames: number
-  years: number
-  startingGrade: number | null
-}
-
-export default function ProfilePage() {
+export default function ProfileViewPage() {
+  const [viewerProfile, setViewerProfile] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [wcfPlayer, setWcfPlayer] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [message, setMessage] = useState('')
-  const [userId, setUserId] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
-  const [historyImported, setHistoryImported] = useState(false)
-
-  // Import state
-  const [importing, setImporting] = useState(false)
-  const [importSteps, setImportSteps] = useState<ImportStep[]>([])
-  const [importResult, setImportResult] = useState<ImportResult | null>(null)
-  const [showImportLog, setShowImportLog] = useState(false)
-  const importLogRef = useRef<HTMLDivElement>(null)
-
-  const [profile, setProfile] = useState({
-    first_name: '',
-    last_name: '',
-    country: '',
-    city: '',
-    phone: '',
-    whatsapp: '',
-    contact_email: '',
-    bio: '',
-    mallet_type: '',
-    grip_notes: '',
-    dgrade: '',
-    wcf_profile_url: '',
-    wcf_player_id: '',
-    show_city: false,
-    show_phone: false,
-    show_whatsapp: false,
-    show_contact_email: false,
-  })
-  const [selectedGrips, setSelectedGrips] = useState<string[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const params = useParams()
+  const targetId = params.id as string
   const supabase = createClient()
 
   useEffect(() => {
-    const getProfile = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      setUserId(user.id)
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-      if (data) {
-        setProfile({
-          first_name: data.first_name || '',
-          last_name: data.last_name || '',
-          country: data.country || '',
-          city: data.city || '',
-          phone: data.phone || '',
-          whatsapp: data.whatsapp || '',
-          contact_email: data.contact_email || '',
-          bio: data.bio || '',
-          mallet_type: data.mallet_type || '',
-          grip_notes: data.grip_notes || '',
-          dgrade: data.dgrade || '',
-          wcf_profile_url: data.wcf_profile_url || '',
-          wcf_player_id: data.wcf_player_id || '',
-          show_city: data.show_city || false,
-          show_phone: data.show_phone || false,
-          show_whatsapp: data.show_whatsapp || false,
-          show_contact_email: data.show_contact_email || false,
-        })
-        setSelectedGrips(data.grips || [])
-        if (data.avatar_url) setAvatarUrl(data.avatar_url)
+      if (!user) { router.push('/login'); return }
 
-        // Check if history already imported
-        if (data.wcf_player_id) {
-          const { data: wcfPlayer } = await supabase
-            .from('wcf_players')
-            .select('history_imported')
-            .eq('id', data.wcf_player_id)
-            .single()
-          if (wcfPlayer) setHistoryImported(wcfPlayer.history_imported || false)
-        }
+      // Check viewer is admin
+      const { data: vp } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      if (!vp || !['admin', 'super_admin'].includes(vp.role)) {
+        router.push('/dashboard'); return
       }
+      setViewerProfile(vp)
+
+      // Load target profile
+      const { data: tp } = await supabase.from('profiles').select('*').eq('id', targetId).single()
+      if (!tp) { router.push('/admin'); return }
+      setProfile(tp)
+
+      // Load WCF player if linked
+      if (tp.wcf_player_id) {
+        const { data: wp } = await supabase
+          .from('wcf_players')
+          .select('wcf_first_name, wcf_last_name, dgrade, egrade, world_ranking, games, win_percentage, history_imported, wcf_profile_url')
+          .eq('id', tp.wcf_player_id)
+          .single()
+        if (wp) setWcfPlayer(wp)
+      }
+
       setLoading(false)
     }
-    getProfile()
-  }, [])
-
-  // Auto-scroll import log
-  useEffect(() => {
-    if (importLogRef.current) {
-      importLogRef.current.scrollTop = importLogRef.current.scrollHeight
-    }
-  }, [importSteps])
-
-  const handleImportHistory = async () => {
-    if (!profile.wcf_player_id) return
-
-    if (historyImported) {
-      const confirmed = window.confirm(
-        'Your WCF history has already been imported.\n\nRe-importing will refresh all data — useful if your starting grade was revised or you want to pick up any missed events.\n\nContinue?'
-      )
-      if (!confirmed) return
-    }
-
-    setImporting(true)
-    setImportSteps([])
-    setImportResult(null)
-    setShowImportLog(true)
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setImporting(false)
-        return
-      }
-
-      const response = await fetch('/api/wcf-history-import', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ wcf_player_id: profile.wcf_player_id }),
-      })
-
-      if (!response.ok || !response.body) {
-        setImportSteps(prev => [...prev, { type: 'error', message: 'Import request failed' }])
-        setImporting(false)
-        return
-      }
-
-      // Read SSE stream
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const data = JSON.parse(line.slice(6))
-            setImportSteps(prev => [...prev, { type: data.step, message: data.message, year: data.year, games: data.games, events: data.events }])
-            if (data.step === 'complete') {
-              setImportResult({ totalGames: data.totalGames, years: data.years, startingGrade: data.startingGrade })
-              setHistoryImported(true)
-            }
-          } catch {
-            // ignore parse errors
-          }
-        }
-      }
-    } catch (err) {
-      setImportSteps(prev => [...prev, { type: 'error', message: `Error: ${String(err)}` }])
-    }
-
-    setImporting(false)
-  }
-
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !userId) return
-    setUploadingAvatar(true)
-    const fileExt = file.name.split('.').pop()
-    const filePath = `${userId}/avatar.${fileExt}`
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, { upsert: true })
-    if (uploadError) {
-      setMessage('Error uploading photo')
-      setUploadingAvatar(false)
-      return
-    }
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath)
-    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId)
-    setAvatarUrl(`${publicUrl}?t=${Date.now()}`)
-    setUploadingAvatar(false)
-    setMessage('Photo updated successfully')
-  }
-
-  const toggleGrip = (grip: string) => {
-    setSelectedGrips(prev =>
-      prev.includes(grip) ? prev.filter(g => g !== grip) : [...prev, grip]
-    )
-  }
-
-  const handleWcfLinked = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-    if (data) {
-      setProfile(p => ({
-        ...p,
-        wcf_player_id: data.wcf_player_id || '',
-        dgrade: data.dgrade || '',
-        wcf_profile_url: data.wcf_profile_url || '',
-      }))
-      if (data.wcf_player_id) {
-        const { data: wcfPlayer } = await supabase
-          .from('wcf_players')
-          .select('history_imported')
-          .eq('id', data.wcf_player_id)
-          .single()
-        if (wcfPlayer) setHistoryImported(wcfPlayer.history_imported || false)
-      }
-    }
-  }
-
-  const selectedFlag = profile.country ? getFlag(profile.country) : null
-
-  const handleSave = async () => {
-    setSaving(true)
-    setMessage('')
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data: existing } = await supabase
-      .from('profiles')
-      .select('dgrade')
-      .eq('id', user.id)
-      .single()
-
-    const newDgrade = profile.dgrade ? parseInt(profile.dgrade as string) : null
-
-    if (newDgrade && existing?.dgrade !== newDgrade) {
-      await supabase.from('dgrade_history').insert({
-        user_id: user.id,
-        dgrade_value: newDgrade,
-      })
-    }
-
-    let wcfUrl = profile.wcf_profile_url
-    if (!wcfUrl && profile.first_name && profile.last_name) {
-      wcfUrl = `https://rank.worldcroquet.org/gcrankdg/player_full.php?pffn=${profile.first_name}&pfsn=${profile.last_name}&nt=1`
-    }
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        country: profile.country,
-        city: profile.city,
-        phone: profile.phone,
-        whatsapp: profile.whatsapp,
-        contact_email: profile.contact_email,
-        bio: profile.bio,
-        mallet_type: profile.mallet_type,
-        grips: selectedGrips,
-        grip_notes: profile.grip_notes,
-        dgrade: newDgrade,
-        wcf_profile_url: wcfUrl,
-        show_city: profile.show_city,
-        show_phone: profile.show_phone,
-        show_whatsapp: profile.show_whatsapp,
-        show_contact_email: profile.show_contact_email,
-      })
-      .eq('id', user.id)
-
-    if (error) {
-      setMessage('Error saving profile')
-    } else {
-      setMessage('Profile saved successfully')
-      if (wcfUrl) setProfile(p => ({ ...p, wcf_profile_url: wcfUrl }))
-    }
-    setSaving(false)
-  }
-
-  const stepIcon = (type: ImportStep['type']) => {
-    if (type === 'complete') return '✅'
-    if (type === 'error' || type === 'year_error') return '❌'
-    if (type === 'year_done') return '✓'
-    if (type === 'year') return '⟳'
-    return '•'
-  }
+    init()
+  }, [targetId])
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  if (!profile) return null
+
+  const Field = ({ label, value }: { label: string; value?: string | number | null }) => (
+    <div>
+      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+      <p className="text-sm text-gray-800">{value || <span className="text-gray-300">—</span>}</p>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <a href="/dashboard" className="text-xl font-bold text-green-600">GCLab</a>
-        <a href="/dashboard" className="text-sm text-gray-600 hover:text-green-600">← Dashboard</a>
-      </nav>
-      <main className="max-w-2xl mx-auto px-6 py-10">
-        <h2 className="text-2xl font-bold mb-6">Your Profile</h2>
+      <GCLabNav role={viewerProfile?.role} isSignedIn={true} currentPath="/profile" />
+      <main className="max-w-3xl mx-auto px-6 py-10">
 
-        {!profile.wcf_player_id && profile.first_name && profile.last_name && (
-          <WcfMatchBanner
-            userId={userId}
-            firstName={profile.first_name}
-            lastName={profile.last_name}
-            onLinked={handleWcfLinked}
-          />
-        )}
+        {/* Back link */}
+        <a href="/admin#users" className="text-sm text-gray-400 hover:text-gray-600 mb-6 inline-block">← Back to Users</a>
 
-        {message && (
-          <p className={`text-sm mb-4 ${message.includes('Error') ? 'text-red-500' : 'text-green-600'}`}>
-            {message}
-          </p>
-        )}
-
-        {profile.wcf_player_id && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-700">
-            ✓ Linked to WCF record —
-            <a href={profile.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="underline ml-1">
-              view WCF profile
-            </a>
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6 flex items-center gap-5">
+          <div className="w-16 h-16 rounded-full bg-green-100 text-green-700 text-2xl font-bold flex items-center justify-center shrink-0">
+            {profile.first_name?.[0]}{profile.last_name?.[0]}
           </div>
-        )}
-
-        {/* ── WCF HISTORY IMPORT ── */}
-        {profile.wcf_player_id && (
-          <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">
-                  {historyImported ? '✅ WCF History Imported' : '📥 Import Your WCF History'}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {historyImported
-                    ? 'Your full career history is in GCLab. Every game, opponent, score and dGrade change is recorded and visible on your ranking chart.'
-                    : 'Import your complete WCF career — every game, opponent, score and dGrade change going back to when you started. Takes 10–30 seconds depending on how many years you have played.'}
-                </p>
-                {historyImported && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Re-import if your starting grade was revised or you want to refresh your data.
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={handleImportHistory}
-                disabled={importing}
-                className={`shrink-0 px-4 py-2 rounded-md text-sm font-medium transition ${
-                  importing
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : historyImported
-                    ? 'bg-white border border-gray-300 text-gray-600 hover:border-green-500 hover:text-green-600'
-                    : 'bg-green-600 text-white hover:bg-green-700'
-                }`}
-              >
-                {importing ? 'Importing...' : historyImported ? 'Re-import' : 'Import History'}
-              </button>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-xl font-bold text-gray-900">{profile.first_name} {profile.last_name}</h2>
+            <p className="text-sm text-gray-500">{profile.email}</p>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                profile.role === 'super_admin' ? 'bg-purple-100 text-purple-700' :
+                profile.role === 'admin' ? 'bg-blue-100 text-blue-700' :
+                'bg-gray-100 text-gray-600'
+              }`}>{profile.role || 'user'}</span>
+              {profile.country && <span className="text-xs text-gray-500">{profile.country}</span>}
+              {profile.city && <span className="text-xs text-gray-400">{profile.city}</span>}
             </div>
+          </div>
+          <a href={`/admin`} onClick={(e) => { e.preventDefault(); router.push(`/admin#users`) }}
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded hover:bg-gray-50 transition shrink-0">
+            Edit in Admin →
+          </a>
+        </div>
 
-            {/* Progress log */}
-            {showImportLog && (
-              <div className="mt-4">
-                <div
-                  ref={importLogRef}
-                  className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-48 overflow-y-auto font-mono text-xs space-y-1"
-                >
-                  {importSteps.map((step, i) => (
-                    <div key={i} className={`flex gap-2 ${
-                      step.type === 'complete' ? 'text-green-700 font-semibold' :
-                      step.type === 'error' || step.type === 'year_error' ? 'text-red-600' :
-                      step.type === 'year_done' ? 'text-gray-700' :
-                      'text-gray-400'
-                    }`}>
-                      <span>{stepIcon(step.type)}</span>
-                      <span>{step.message}</span>
-                    </div>
-                  ))}
-                  {importing && (
-                    <div className="text-gray-400 animate-pulse">• Working...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          {/* Profile details */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Profile Details</h3>
+            <div className="space-y-3">
+              <Field label="dGrade" value={profile.dgrade} />
+              <Field label="Bio" value={profile.bio} />
+              <Field label="Mallet" value={profile.mallet_type} />
+              <Field label="Grip Notes" value={profile.grip_notes} />
+              <Field label="Joined" value={profile.created_at ? new Date(profile.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : null} />
+            </div>
+          </div>
+
+          {/* WCF data */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">WCF Account</h3>
+            {wcfPlayer ? (
+              <div className="space-y-3">
+                <Field label="WCF Name" value={`${wcfPlayer.wcf_first_name} ${wcfPlayer.wcf_last_name}`} />
+                <Field label="World Ranking" value={wcfPlayer.world_ranking ? `#${wcfPlayer.world_ranking}` : null} />
+                <Field label="dGrade" value={wcfPlayer.dgrade} />
+                <Field label="eGrade" value={wcfPlayer.egrade} />
+                <Field label="Games" value={wcfPlayer.games} />
+                <Field label="Win %" value={wcfPlayer.win_percentage != null ? `${wcfPlayer.win_percentage}%` : null} />
+                <div className="flex items-center gap-2 pt-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${wcfPlayer.history_imported ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-400'}`}>
+                    History {wcfPlayer.history_imported ? '✓ imported' : 'not imported'}
+                  </span>
+                  {wcfPlayer.wcf_profile_url && (
+                    <a href={wcfPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-green-600 hover:underline">WCF Profile →</a>
                   )}
                 </div>
-
-                {/* Completion summary */}
-                {importResult && (
-                  <div className="mt-3 grid grid-cols-3 gap-3">
-                    <div className="bg-green-50 border border-green-100 rounded-md p-3 text-center">
-                      <p className="text-2xl font-bold text-green-700">{importResult.totalGames.toLocaleString()}</p>
-                      <p className="text-xs text-green-600 mt-0.5">Games imported</p>
-                    </div>
-                    <div className="bg-green-50 border border-green-100 rounded-md p-3 text-center">
-                      <p className="text-2xl font-bold text-green-700">{importResult.years}</p>
-                      <p className="text-xs text-green-600 mt-0.5">Years of history</p>
-                    </div>
-                    <div className="bg-green-50 border border-green-100 rounded-md p-3 text-center">
-                      <p className="text-2xl font-bold text-green-700">{importResult.startingGrade ?? '—'}</p>
-                      <p className="text-xs text-green-600 mt-0.5">Starting grade</p>
-                    </div>
-                  </div>
-                )}
-
-                {!importing && importResult && (
-                  <p className="text-xs text-gray-500 mt-3">
-                    Your ranking chart in{' '}
-                    <a href="/rankings" className="text-green-600 hover:underline">Historical Rankings</a>
-                    {' '}now shows your full career.
-                  </p>
-                )}
               </div>
+            ) : (
+              <p className="text-sm text-gray-400">No WCF account linked</p>
             )}
           </div>
-        )}
-
-        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt="Profile photo"
-                  className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
-                />
-              ) : (
-                <div className="w-20 h-20 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center text-gray-400 text-2xl">
-                  {profile.first_name ? profile.first_name.charAt(0).toUpperCase() : '?'}
-                </div>
-              )}
-            </div>
-            <div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingAvatar}
-                className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-md hover:bg-gray-200 transition disabled:opacity-50"
-              >
-                {uploadingAvatar ? 'Uploading...' : avatarUrl ? 'Change photo' : 'Upload photo'}
-              </button>
-              <p className="text-xs text-gray-400 mt-1">JPG or PNG, max 2MB</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png"
-                onChange={handleAvatarUpload}
-                className="hidden"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input
-                type="text"
-                value={profile.first_name}
-                onChange={(e) => setProfile(p => ({ ...p, first_name: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input
-                type="text"
-                value={profile.last_name}
-                onChange={(e) => setProfile(p => ({ ...p, last_name: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-            <div className="flex items-center gap-2">
-              {selectedFlag && <span className="text-2xl">{selectedFlag}</span>}
-              <select
-                value={profile.country}
-                onChange={(e) => setProfile(p => ({ ...p, country: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Select your country</option>
-                <optgroup label="── Golf Croquet Countries ──">
-                  {GC_COUNTRIES.map(c => (
-                    <option key={c.code} value={c.code}>{c.name}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="── All Other Countries ──">
-                  {ALL_COUNTRIES.map(c => (
-                    <option key={c.code} value={c.code}>{c.name}</option>
-                  ))}
-                </optgroup>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium text-gray-700">City</label>
-              <Toggle enabled={profile.show_city} onChange={(v) => setProfile(p => ({ ...p, show_city: v }))} />
-            </div>
-            <input
-              type="text"
-              value={profile.city}
-              onChange={(e) => setProfile(p => ({ ...p, city: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">dGrade</label>
-            <input
-              type="number"
-              value={profile.dgrade}
-              onChange={(e) => setProfile(p => ({ ...p, dgrade: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="e.g. 1750"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">WCF Profile URL</label>
-            <input
-              type="text"
-              value={profile.wcf_profile_url}
-              onChange={(e) => setProfile(p => ({ ...p, wcf_profile_url: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Auto-generated from your name"
-            />
-            {profile.wcf_profile_url && (
-              <div className="mt-1">
-                <a href={profile.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-sm text-green-600 hover:underline">
-                  View WCF ranking page →
-                </a>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mallet Type</label>
-            <input
-              type="text"
-              value={profile.mallet_type}
-              onChange={(e) => setProfile(p => ({ ...p, mallet_type: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Grips Used</label>
-            <div className="flex gap-2 flex-wrap mb-3">
-              {GRIP_OPTIONS.map(grip => (
-                <button
-                  key={grip}
-                  onClick={() => toggleGrip(grip)}
-                  className={`px-4 py-2 rounded-full border text-sm font-medium transition ${
-                    selectedGrips.includes(grip)
-                      ? 'bg-green-600 text-white border-green-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
-                  }`}
-                >
-                  {grip}
-                </button>
-              ))}
-            </div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Grip Notes <span className="text-gray-400 font-normal">e.g. which shots do you use each grip for?</span>
-            </label>
-            <textarea
-              value={profile.grip_notes}
-              onChange={(e) => setProfile(p => ({ ...p, grip_notes: e.target.value }))}
-              rows={3}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-            <textarea
-              value={profile.bio}
-              onChange={(e) => setProfile(p => ({ ...p, bio: e.target.value }))}
-              rows={4}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-1">Contact Details</h3>
-            <p className="text-sm text-gray-500 mb-4">Control what other signed-in members can see.</p>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Phone</label>
-                  <Toggle enabled={profile.show_phone} onChange={(v) => setProfile(p => ({ ...p, show_phone: v }))} />
-                </div>
-                <input
-                  type="text"
-                  value={profile.phone}
-                  onChange={(e) => setProfile(p => ({ ...p, phone: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-medium text-gray-700">WhatsApp</label>
-                  <Toggle enabled={profile.show_whatsapp} onChange={(v) => setProfile(p => ({ ...p, show_whatsapp: v }))} />
-                </div>
-                <input
-                  type="text"
-                  value={profile.whatsapp}
-                  onChange={(e) => setProfile(p => ({ ...p, whatsapp: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Contact Email</label>
-                  <Toggle enabled={profile.show_contact_email} onChange={(v) => setProfile(p => ({ ...p, show_contact_email: v }))} />
-                </div>
-                <input
-                  type="email"
-                  value={profile.contact_email}
-                  onChange={(e) => setProfile(p => ({ ...p, contact_email: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full bg-green-600 text-white py-2 rounded-md hover:bg-green-700 transition disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save Profile'}
-          </button>
-
         </div>
       </main>
     </div>

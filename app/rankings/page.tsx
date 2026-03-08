@@ -739,7 +739,7 @@ export default function RankingsPage() {
     <div className="min-h-screen bg-gray-50 relative" onClick={(e) => {
       if (!(e.target as HTMLElement).closest('.relative')) setTooltip(null)
     }}>
-      <GCLabNav role={userRole} />
+      <GCLabNav role={userRole} isSignedIn={!!currentUserProfile} currentPath="/rankings" />
       <main className="max-w-5xl mx-auto px-6 py-10">
         <h2 className="text-2xl font-bold mb-6 text-gray-900">WCF Rankings & Stats</h2>
 
@@ -1053,6 +1053,70 @@ export default function RankingsPage() {
         {/* ── HISTORICAL RANKINGS ── */}
         {activeTab === 'Historical Rankings' && (
           <div>
+            {/* Gate for non-signed-in users */}
+            {!currentUserProfile && (
+              <div className="relative mb-6">
+                {/* Blurred placeholder chart */}
+                <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm" style={{ filter: 'blur(3px)', pointerEvents: 'none', userSelect: 'none' }}>
+                  <div className="p-4 border-b border-gray-100">
+                    <div className="h-5 w-48 bg-gray-200 rounded mb-2"/>
+                    <div className="h-3 w-32 bg-gray-100 rounded"/>
+                  </div>
+                  <div className="p-4">
+                    <svg width="100%" height="200" viewBox="0 0 800 200">
+                      <defs>
+                        <linearGradient id="blurGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#16a34a" stopOpacity="0.2"/>
+                          <stop offset="100%" stopColor="#16a34a" stopOpacity="0"/>
+                        </linearGradient>
+                      </defs>
+                      {[40,80,120,160].map((y: number) => <line key={y} x1="0" y1={y} x2="800" y2={y} stroke="#f0f0f0" strokeWidth="1"/>)}
+                      <path d="M0,160 C60,140 120,100 180,90 C240,80 300,60 360,55 C420,50 480,65 540,80 C600,95 660,110 720,130 C760,145 790,155 800,160 L800,200 L0,200 Z" fill="url(#blurGrad)"/>
+                      <path d="M0,160 C60,140 120,100 180,90 C240,80 300,60 360,55 C420,50 480,65 540,80 C600,95 660,110 720,130 C760,145 790,155 800,160" fill="none" stroke="#16a34a" strokeWidth="2.5"/>
+                      <circle cx="360" cy="55" r="5" fill="#16a34a"/>
+                      {/* Fake data table rows */}
+                      {[0,1,2,3].map(i => (
+                        <g key={i}>
+                          <rect x="0" y={170 - i * 0} width="800" height="0" fill="none"/>
+                        </g>
+                      ))}
+                    </svg>
+                    <div className="mt-3 space-y-2">
+                      {[80, 60, 70, 50].map((w, i) => (
+                        <div key={i} className="flex gap-3 items-center">
+                          <div className="h-3 rounded bg-gray-200" style={{ width: `${w}%` }}/>
+                          <div className="h-3 rounded bg-gray-100 w-16"/>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overlay CTA */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl z-10">
+                  <div className="text-center px-6 py-8 max-w-sm">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Grade History is free</h3>
+                    <p className="text-sm text-gray-500 mb-5">Search any player&apos;s full grade history — every movement, every event, plotted over time. Create a free account to unlock it.</p>
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <a href="/login?mode=signup" className="bg-green-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 transition">
+                        Create free account
+                      </a>
+                      <a href="/login" className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:border-green-500 hover:text-green-700 transition">
+                        Sign in
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentUserProfile && (
+            <>
             {importedCount !== null && totalPlayers !== null && (
               <div className="text-xs text-gray-400 text-right mb-2">
                 📥 {importedCount.toLocaleString()} of {totalPlayers.toLocaleString()} players history imported
@@ -1243,6 +1307,8 @@ export default function RankingsPage() {
                   )
                 })()}
               </div>
+            )}
+            </>
             )}
           </div>
         )}
