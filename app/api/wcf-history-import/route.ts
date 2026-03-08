@@ -62,6 +62,27 @@ function parseProfilePage(html: string): {
   }
 }
 
+// Parse country stats table from player_full.php
+function parseCountryStats(html: string): { country: string, games: number, wins: number, losses: number, win_percentage: number }[] {
+  const stats: { country: string, games: number, wins: number, losses: number, win_percentage: number }[] = []
+  // The country table has headers: Num, Country, Games, Wins, Losses, %wins
+  const tableMatch = html.match(/<th>Num<\/th><th>Country<\/th><th>Games<\/th><th>Wins<\/th><th>Losses<\/th><th>%wins<\/th>([\s\S]*?)<\/table>/)
+  if (!tableMatch) return stats
+  const rows = tableMatch[1].split('<tr>')
+  for (const row of rows) {
+    const cells = row.split('<td>')
+    if (cells.length < 7) continue
+    const country = cells[2].replace(/<\/td>.*/, '').trim()
+    const games = parseInt(cells[3].replace(/<\/td>.*/, '').trim())
+    const wins = parseInt(cells[4].replace(/<\/td>.*/, '').trim())
+    const losses = parseInt(cells[5].replace(/<\/td>.*/, '').trim())
+    const winPct = parseInt(cells[6].replace(/<\/td>.*/, '').trim())
+    if (!country || isNaN(games)) continue
+    stats.push({ country, games, wins, losses, win_percentage: winPct })
+  }
+  return stats
+}
+
 // Parse DD.MM.YY date format
 function parseEventDate(dateStr: string): string | null {
   const m = dateStr.trim().match(/^(\d{2})\.(\d{2})\.(\d{2})$/)
@@ -316,6 +337,27 @@ export async function POST(request: Request) {
 
             // Small delay between years to be polite to WCF server
             await new Promise(r => setTimeout(r, 300))
+          }
+
+          // Parse and write country stats
+          const countryStats = parseCountryStats(profileHtml)
+          if (countryStats.length > 0) {
+            // Delete existing and re-insert
+            await supabase
+              .from('wcf_player_country_stats')
+              .delete()
+              .eq('wcf_player_id', wcf_player_id)
+            const countryRows = countryStats.map(c => ({
+              wcf_player_id,
+              country: c.country,
+              games: c.games,
+              wins: c.wins,
+              losses: c.losses,
+              win_percentage: c.win_percentage,
+              updated_at: new Date().toISOString(),
+            }))
+            await supabase.from('wcf_player_country_stats').insert(countryRows)
+            send({ step: 'countries', message: `Saved stats for ${countryStats.length} countries` })
           }
 
           // Mark player as imported
