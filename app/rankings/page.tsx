@@ -1053,7 +1053,7 @@ export default function RankingsPage() {
         {/* ── HISTORICAL RANKINGS ── */}
         {activeTab === 'Historical Rankings' && (
           <div>
-            {userRole === 'super_admin' && importedCount !== null && totalPlayers !== null && (
+            {importedCount !== null && totalPlayers !== null && (
               <div className="text-xs text-gray-400 text-right mb-2">
                 📥 {importedCount.toLocaleString()} of {totalPlayers.toLocaleString()} players history imported
               </div>
@@ -1111,7 +1111,7 @@ export default function RankingsPage() {
                         disabled={manualImporting}
                         className="text-xs px-3 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50 disabled:opacity-50 transition"
                       >
-                        {manualImporting ? 'Importing...' : '↻ Re-import History'}
+                        {manualImporting ? 'Importing...' : selectedPlayer.history_imported ? '↻ Re-import History' : '↓ Import History'}
                       </button>
                     )}
                     <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline">WCF Profile →</a>
