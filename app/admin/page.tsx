@@ -391,7 +391,7 @@ export default function AdminPage() {
                             <p className="text-sm text-gray-600 py-1.5">{u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</p>
                           </div>
                         </div>
-                        {userActionMsg?.id === u.id && (
+                        {userActionMsg?.id === u.id && userActionMsg && (
                           <p className={`text-xs mb-3 ${userActionMsg.ok ? 'text-green-600' : 'text-red-500'}`}>{userActionMsg.msg}</p>
                         )}
                         <div className="flex flex-wrap gap-2">
