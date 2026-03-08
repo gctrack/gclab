@@ -352,34 +352,37 @@ export default function RankingsPage() {
     // Also deduplicate: if multiple daily syncs on same day, keep only last
     const MARCH_2026 = new Date('2026-03-01')
     const filtered: any[] = []
+    // Ensure data is sorted chronologically
+    const sorted = [...data].sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
+
+    // Find the most recent non-imported record — always show this in chart + table
+    const lastSyncRecord = [...sorted].reverse().find(h => !h.is_imported)
+
     let lastDgrade: number | null = null
     let lastRank: number | null = null
     let lastDailyDate: string | null = null
 
-    // Find the most recent non-imported record to always include it
-    const lastSyncRecord = [...data].reverse().find(h => !h.is_imported)
-
-    for (const h of data) {
+    for (const h of sorted) {
       const isEvent = h.is_imported || (h.event_name && h.event_name !== 'Daily sync')
       const dateStr = h.recorded_at.slice(0, 10)
+      const isLastSync = lastSyncRecord && h.recorded_at === lastSyncRecord.recorded_at
 
       if (isEvent) {
         filtered.push(h)
         lastDgrade = h.dgrade_value
         lastRank = h.world_ranking
         lastDailyDate = null
-      } else {
-        // Always include the most recent sync point even if nothing changed
-        const isLastSync = lastSyncRecord && h.recorded_at === lastSyncRecord.recorded_at
-        if (isLastSync || h.dgrade_value !== lastDgrade || h.world_ranking !== lastRank) {
-          if (lastDailyDate === dateStr && filtered.length > 0 && !filtered[filtered.length - 1].is_imported) {
-            filtered.pop()
-          }
-          filtered.push(h)
-          lastDgrade = h.dgrade_value
-          lastRank = h.world_ranking
-          lastDailyDate = dateStr
+      } else if (isLastSync || h.dgrade_value !== lastDgrade || h.world_ranking !== lastRank) {
+        // Replace same-day duplicate but never remove the lastSync point
+        if (lastDailyDate === dateStr && filtered.length > 0 && !filtered[filtered.length - 1].is_imported) {
+          const last = filtered[filtered.length - 1]
+          const lastIsLastSync = lastSyncRecord && last.recorded_at === lastSyncRecord.recorded_at
+          if (!lastIsLastSync) filtered.pop()
         }
+        filtered.push(h)
+        lastDgrade = h.dgrade_value
+        lastRank = h.world_ranking
+        lastDailyDate = dateStr
       }
     }
 
