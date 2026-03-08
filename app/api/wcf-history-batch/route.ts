@@ -90,7 +90,7 @@ function parseYearPage(html: string): {
     }
 
     // Game row — 9 td columns
-    const cells = [...row.matchAll(/<td[^>]*>(.*?)<\/td>/gs)].map(m =>
+    const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(m =>
       m[1].replace(/<[^>]+>/g, '').trim()
     )
     if (cells.length < 5) continue
