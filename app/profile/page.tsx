@@ -273,6 +273,7 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState({
     first_name: '',
+    role: '',
     last_name: '',
     country: '',
     city: '',
