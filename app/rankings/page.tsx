@@ -1275,7 +1275,12 @@ export default function RankingsPage() {
                     if (idx === 0) return false
                     return h.dgrade_value !== playerHistory[idx - 1].dgrade_value
                   })
-                  const tableRows = [...eventPoints, ...gradeChangeSync].sort(
+                  const seen = new Set<string>()
+                  const tableRows = [...eventPoints, ...gradeChangeSync].filter((h: any) => {
+                    if (seen.has(h.id)) return false
+                    seen.add(h.id)
+                    return true
+                  }).sort(
                     (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
                   )
                   // Compute grade diffs vs previous entry in chronological order
@@ -1299,8 +1304,13 @@ export default function RankingsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {/* Last synced row always at top */}
-                          {lastSyncDate && (
+                          {/* Last synced row — only show if no WCF event already exists for today.
+                               If the most recent tableRow is from the same calendar date as the last
+                               sync, the WCF event row IS today's sync result and is more accurate —
+                               the null-event sync record would be stale/redundant so we hide it. */}
+                          {lastSyncDate && tableRows[0] && (
+                            lastSyncDate.slice(0, 10) !== tableRows[0].recorded_at.slice(0, 10)
+                          ) && (
                             <tr className="border-t border-gray-100 bg-gray-50">
                               <td className="py-1.5 text-gray-500">{formatDate(lastSyncDate)}</td>
                               <td className="py-1.5 text-gray-400 italic">Last synced</td>
