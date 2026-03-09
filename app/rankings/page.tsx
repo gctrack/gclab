@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
@@ -1319,15 +1319,14 @@ export default function RankingsPage() {
                           )}
                           {tableRows.map((h, i) => {
                             const diff = getDiff(h)
-                            // Insert "World Ranking tracking began" milestone row just before
-                            // the first row that falls before March 3 2026
-                            const RANK_START = '2026-03-03'
+                            const RANK_START = new Date('2026-03-03').getTime()
                             const prevRow = tableRows[i + 1]
-                            const showMilestone = h.record_date >= RANK_START &&
-                              (!prevRow || prevRow.record_date < RANK_START)
+                            const thisTime = new Date(h.recorded_at).getTime()
+                            const prevTime = prevRow ? new Date(prevRow.recorded_at).getTime() : 0
+                            const showMilestone = thisTime >= RANK_START && (!prevRow || prevTime < RANK_START)
                             return (
-                              <>
-                                <tr key={i} className="border-t border-gray-100">
+                              <React.Fragment key={i}>
+                                <tr className="border-t border-gray-100">
                                   <td className="py-1.5 text-gray-700">{formatDate(h.recorded_at)}</td>
                                   <td className="py-1.5 text-gray-500">
                                     {h.event_url
@@ -1345,12 +1344,12 @@ export default function RankingsPage() {
                                   <td className="py-1.5 text-right text-gray-600">{h.world_ranking ? `#${h.world_ranking}` : '—'}</td>
                                 </tr>
                                 {showMilestone && (
-                                  <tr key={`milestone-${i}`} className="border-t border-blue-100 bg-blue-50">
-                                    <td className="py-1.5 text-blue-400 text-xs">3 Mar 2026</td>
-                                    <td className="py-1.5 text-blue-400 italic text-xs" colSpan={5}>World Ranking tracking began</td>
+                                  <tr className="border-t-2 border-blue-200 bg-blue-50">
+                                    <td className="py-1.5 text-blue-500 text-xs font-medium">3 Mar 2026</td>
+                                    <td className="py-1.5 text-blue-400 italic text-xs" colSpan={5}>↑ World Ranking tracking began</td>
                                   </tr>
                                 )}
-                              </>
+                              </React.Fragment>
                             )
                           })}
                         </tbody>
