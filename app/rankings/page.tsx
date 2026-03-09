@@ -1319,24 +1319,38 @@ export default function RankingsPage() {
                           )}
                           {tableRows.map((h, i) => {
                             const diff = getDiff(h)
+                            // Insert "World Ranking tracking began" milestone row just before
+                            // the first row that falls before March 3 2026
+                            const RANK_START = '2026-03-03'
+                            const prevRow = tableRows[i + 1]
+                            const showMilestone = h.record_date >= RANK_START &&
+                              (!prevRow || prevRow.record_date < RANK_START)
                             return (
-                              <tr key={i} className="border-t border-gray-100">
-                                <td className="py-1.5 text-gray-700">{formatDate(h.recorded_at)}</td>
-                                <td className="py-1.5 text-gray-500">
-                                  {h.event_url
-                                    ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">{h.event_name || '—'}</a>
-                                    : h.event_name || <span className="text-gray-400">Grade change</span>}
-                                </td>
-                                <td className="py-1.5 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
-                                <td className="py-1.5 text-right font-semibold">
-                                  {diff === null ? <span className="text-gray-400">—</span> :
-                                   diff > 0 ? <span className="text-green-600">↑ +{diff}</span> :
-                                   diff < 0 ? <span className="text-red-500">↓ {diff}</span> :
-                                   <span className="text-gray-400">—</span>}
-                                </td>
-                                <td className="py-1.5 text-right font-semibold text-amber-600">{h.egrade_value || '—'}</td>
-                                <td className="py-1.5 text-right text-gray-600">{h.world_ranking ? `#${h.world_ranking}` : '—'}</td>
-                              </tr>
+                              <>
+                                <tr key={i} className="border-t border-gray-100">
+                                  <td className="py-1.5 text-gray-700">{formatDate(h.recorded_at)}</td>
+                                  <td className="py-1.5 text-gray-500">
+                                    {h.event_url
+                                      ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">{h.event_name || '—'}</a>
+                                      : h.event_name || <span className="text-gray-400">Grade change</span>}
+                                  </td>
+                                  <td className="py-1.5 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
+                                  <td className="py-1.5 text-right font-semibold">
+                                    {diff === null ? <span className="text-gray-400">—</span> :
+                                     diff > 0 ? <span className="text-green-600">↑ +{diff}</span> :
+                                     diff < 0 ? <span className="text-red-500">↓ {diff}</span> :
+                                     <span className="text-gray-400">—</span>}
+                                  </td>
+                                  <td className="py-1.5 text-right font-semibold text-amber-600">{h.egrade_value || '—'}</td>
+                                  <td className="py-1.5 text-right text-gray-600">{h.world_ranking ? `#${h.world_ranking}` : '—'}</td>
+                                </tr>
+                                {showMilestone && (
+                                  <tr key={`milestone-${i}`} className="border-t border-blue-100 bg-blue-50">
+                                    <td className="py-1.5 text-blue-400 text-xs">3 Mar 2026</td>
+                                    <td className="py-1.5 text-blue-400 italic text-xs" colSpan={5}>World Ranking tracking began</td>
+                                  </tr>
+                                )}
+                              </>
                             )
                           })}
                         </tbody>
