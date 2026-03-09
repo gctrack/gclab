@@ -148,6 +148,7 @@ async function runSync(logId: string) {
   try {
     const now = new Date()
     const nowISO = now.toISOString()
+    const todayDate = nowISO.split('T')[0]  // YYYY-MM-DD for record_date column
     const isMonthly = isFirstOfMonth(now)
     const activeYear = now.getFullYear() - 1
     const snapshotDate = now.toISOString().split('T')[0]
@@ -217,31 +218,20 @@ async function runSync(logId: string) {
                 // Write a pre-change snapshot so we preserve the player's state
                 // (dgrade + world rank) as it was BEFORE this event updated their grade.
                 // This becomes the "Last synced" row in the history table.
-                // Only write it if we don't already have a record from today
-                // (prevents duplicates if cron fires twice).
-                const todayMidnight = new Date(now)
-                todayMidnight.setHours(0, 0, 0, 0)
-                const { data: alreadySnappedToday } = await supabase
-                  .from('wcf_dgrade_history')
-                  .select('id')
-                  .eq('wcf_player_id', existing.id)
-                  .gte('recorded_at', todayMidnight.toISOString())
-                  .maybeSingle()
-
-                if (!alreadySnappedToday) {
-                  // Timestamp the pre-change snapshot 1 second before the main record
-                  const preSnapTime = new Date(now.getTime() - 1000).toISOString()
-                  await supabase.from('wcf_dgrade_history').insert({
-                    wcf_player_id: existing.id,
-                    dgrade_value: existing.dgrade,
-                    egrade_value: existing.egrade,
-                    world_ranking: existing.world_ranking,
-                    recorded_at: preSnapTime,
-                    event_name: null,   // null = rendered as "Last synced" in the table
-                    event_url: null,
-                    event_date: null,
-                  })
-                }
+                // Write pre-change snapshot — upsert so concurrent syncs don't
+                // create duplicates. DB unique index handles the race condition.
+                const preSnapTime = new Date(now.getTime() - 1000).toISOString()
+                await supabase.from('wcf_dgrade_history').upsert({
+                  wcf_player_id: existing.id,
+                  dgrade_value: existing.dgrade,
+                  egrade_value: existing.egrade,
+                  world_ranking: existing.world_ranking,
+                  recorded_at: preSnapTime,
+                  record_date: todayDate,
+                  event_name: null,   // null = rendered as "Last synced" in the table
+                  event_url: null,
+                  event_date: null,
+                }, { onConflict: 'wcf_player_id,dgrade_value,record_date', ignoreDuplicates: true })
 
                 const yearUrl = `https://rank.worldcroquet.org/gcrankdg/player.php?year=${now.getFullYear()}&pfn=${encodeURIComponent(player.wcf_first_name)}&psn=${encodeURIComponent(player.wcf_last_name)}&nt=1&pid=`
                 const res = await fetchWithTimeout(yearUrl, 15000)
@@ -330,30 +320,18 @@ async function runSync(logId: string) {
               }
             }
 
-            // Dedup: don't insert if same player already has a record for today
-            // with the same dgrade (guards against Vercel double-firing crons)
-            const todayStart = new Date(now)
-            todayStart.setHours(0, 0, 0, 0)
-            const { data: existingToday } = await supabase
-              .from('wcf_dgrade_history')
-              .select('id')
-              .eq('wcf_player_id', existing.id)
-              .eq('dgrade_value', player.dgrade)
-              .gte('recorded_at', todayStart.toISOString())
-              .maybeSingle()
-
-            if (!existingToday) {
-              await supabase.from('wcf_dgrade_history').insert({
-                wcf_player_id: existing.id,
-                dgrade_value: player.dgrade,
-                egrade_value: egrade,
-                world_ranking: player.world_ranking,
-                recorded_at: nowISO,
-                event_name: eventName,
-                event_url: eventUrl,
-                event_date: eventDate ? new Date(eventDate).toISOString() : null,
-              })
-            }
+            // Upsert — DB unique index prevents duplicates even with concurrent syncs
+            await supabase.from('wcf_dgrade_history').upsert({
+              wcf_player_id: existing.id,
+              dgrade_value: player.dgrade,
+              egrade_value: egrade,
+              world_ranking: player.world_ranking,
+              recorded_at: nowISO,
+              record_date: todayDate,
+              event_name: eventName,
+              event_url: eventUrl,
+              event_date: eventDate ? new Date(eventDate).toISOString() : null,
+            }, { onConflict: 'wcf_player_id,dgrade_value,record_date,event_name', ignoreDuplicates: true })
             if (existing.linked_user_id && dgradeChanged) {
               await supabase.from('profiles').update({
                 dgrade: player.dgrade,
