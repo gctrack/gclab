@@ -314,6 +314,19 @@ async function runSync(logId: string) {
                   eventName = lastEvent.name
                   eventUrl = lastEvent.url
                   eventDate = lastEvent.date
+
+                  // If player already has an imported record for this same event,
+                  // this is a regrade (WCF recalculated grades) — label it as such
+                  if (eventName) {
+                    const { data: priorImport } = await supabase
+                      .from('wcf_dgrade_history')
+                      .select('id')
+                      .eq('wcf_player_id', existing.id)
+                      .eq('event_name', eventName)
+                      .eq('is_imported', true)
+                      .maybeSingle()
+                    if (priorImport) eventName = `${eventName} (regrade)`
+                  }
                 }
               } catch {
                 // Silent fail — still write basic history record
