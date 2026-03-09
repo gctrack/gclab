@@ -1269,18 +1269,15 @@ export default function RankingsPage() {
                   // Only show events + most recent sync (last non-imported point)
                   // Event rows: imported events + daily sync points where grade changed
                   const eventPoints = playerHistory.filter((h: any) => h.is_imported || (h.event_name && h.event_name !== 'Daily sync'))
+                  const eventPointIds = new Set(eventPoints.map((h: any) => h.id))
                   const gradeChangeSync = playerHistory.filter((h: any) => {
                     if (h.is_imported) return false
+                    if (eventPointIds.has(h.id)) return false  // already in eventPoints, skip
                     const idx = playerHistory.indexOf(h)
                     if (idx === 0) return false
                     return h.dgrade_value !== playerHistory[idx - 1].dgrade_value
                   })
-                  const seen = new Set<string>()
-                  const tableRows = [...eventPoints, ...gradeChangeSync].filter((h: any) => {
-                    if (seen.has(h.id)) return false
-                    seen.add(h.id)
-                    return true
-                  }).sort(
+                  const tableRows = [...eventPoints, ...gradeChangeSync].sort(
                     (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
                   )
                   // Compute grade diffs vs previous entry in chronological order
