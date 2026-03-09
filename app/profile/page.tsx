@@ -605,7 +605,7 @@ export default function ProfilePage() {
   return (
     <div style={{ minHeight:"100vh", background:"#f5f2ec" }}>
       <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
-      <GCLabNav role={formData.role || ''} isSignedIn={true} currentPath="/profile" />
+      <GCLabNav role={profile?.role || ''} isSignedIn={true} currentPath="/profile" />
 
       {/* Dark ML header */}
       <div style={{ background:"#0d2818", position:"relative", overflow:"hidden" }}>
@@ -614,9 +614,9 @@ export default function ProfilePage() {
         <div style={{ maxWidth:"48rem", margin:"0 auto", padding:"32px 24px 40px", position:"relative", zIndex:1 }}>
           <div style={{ display:"inline-flex", alignItems:"center", gap:7, background:"rgba(74,222,128,0.09)", border:"1px solid rgba(74,222,128,0.18)", color:"#4ade80", padding:"3px 12px", borderRadius:20, fontSize:11, fontWeight:500, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:14 }} className="gsans">My Profile</div>
           <h2 className="ghl" style={{ fontSize:"clamp(24px,3vw,38px)", color:"#e8e0d0", fontWeight:900, letterSpacing:"-0.5px", marginBottom:6 }}>
-            {formData.first_name ? `${formData.first_name}${formData.last_name ? ' ' + formData.last_name : ''}` : 'Your Profile'}
+            {profile?.first_name ? `${profile.first_name}${profile.last_name ? ' ' + profile.last_name : ''}` : 'Your Profile'}
           </h2>
-          {formData.dgrade && <div className="gsans" style={{ fontSize:14, color:"rgba(232,224,208,0.5)" }}>dGrade <strong style={{ color:"#4ade80" }}>{formData.dgrade}</strong>{formData.country && ` · ${formData.country}`}</div>}
+          {profile?.dgrade && <div className="gsans" style={{ fontSize:14, color:"rgba(232,224,208,0.5)" }}>dGrade <strong style={{ color:"#4ade80" }}>{profile.dgrade}</strong>{profile?.country && ` · ${profile.country}`}</div>}
         </div>
         <div style={{ height:24, background:"linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)" }}/>
       </div>
