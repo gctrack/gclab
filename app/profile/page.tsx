@@ -326,6 +326,7 @@ export default function ProfilePage() {
           dgrade: data.dgrade || '',
           wcf_profile_url: data.wcf_profile_url || '',
           wcf_player_id: data.wcf_player_id || '',
+          role: data.role || '',
           show_city: data.show_city || false,
           show_phone: data.show_phone || false,
           show_whatsapp: data.show_whatsapp || false,
