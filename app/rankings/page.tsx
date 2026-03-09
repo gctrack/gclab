@@ -88,6 +88,14 @@ const NEW_PLAYERS_SINCE = '2026-03-03T00:00:00Z'
 type SortKey = 'dgrade' | 'egrade' | 'world_ranking' | 'games' | 'win_percentage' | 'wcf_last_name'
 type SortDir = 'asc' | 'desc'
 
+
+const ML_STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  .ghl  { font-family: 'Playfair Display', serif; }
+  .gmono{ font-family: 'DM Mono', monospace; }
+  .gsans{ font-family: 'DM Sans', sans-serif; }
+`
+
 export default function RankingsPage() {
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -736,23 +744,39 @@ export default function RankingsPage() {
   const thBase = "px-4 py-3 text-gray-700 font-semibold"
 
   return (
-    <div className="min-h-screen bg-gray-50 relative" onClick={(e) => {
+    <div style={{ minHeight: '100vh', background: '#f5f2ec' }} onClick={(e) => {
       if (!(e.target as HTMLElement).closest('.relative')) setTooltip(null)
     }}>
+      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
       <GCLabNav role={userRole} isSignedIn={!!currentUserProfile} currentPath="/rankings" />
-      <main className="max-w-5xl mx-auto px-6 py-10">
-        <h2 className="text-2xl font-bold mb-6 text-gray-900">WCF Rankings & Stats</h2>
 
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {TABS.map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${activeTab === tab ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:border-green-500'}`}>
-              {tab}
-            </button>
-          ))}
+      {/* Dark ML header */}
+      <div style={{ background: '#0d2818', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 100% 0%, rgba(74,222,128,0.06) 0%, transparent 55%)' }}/>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)', backgroundSize: '44px 44px' }}/>
+        <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '32px 24px 20px', position: 'relative', zIndex: 1 }}>
+          <h2 className="ghl" style={{ fontSize: 'clamp(22px, 3vw, 38px)', color: '#e8e0d0', fontWeight: 900, marginBottom: 20, letterSpacing: '-0.5px' }}>
+            WCF Rankings & Stats
+          </h2>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {TABS.map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab)} className="gsans" style={{
+                padding: '7px 16px', borderRadius: 20, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                background: activeTab === tab ? 'rgba(74,222,128,0.15)' : 'transparent',
+                border: `1px solid ${activeTab === tab ? 'rgba(74,222,128,0.35)' : 'rgba(255,255,255,0.12)'}`,
+                color: activeTab === tab ? '#4ade80' : 'rgba(232,224,208,0.5)',
+                transition: 'all 0.15s',
+              }}>
+                {tab}
+              </button>
+            ))}
+          </div>
         </div>
+        <div style={{ height: 24, background: 'linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)' }}/>
+      </div>
 
-        {loading && <p className="text-gray-400 text-sm">Loading...</p>}
+      <main className="max-w-5xl mx-auto px-6 py-6">
+        {loading && <p className="gsans" style={{ color: '#9ca3af', fontSize: 13 }}>Loading...</p>}
 
         {/* ── RANKINGS ── */}
         {activeTab === 'Rankings' && !loading && (

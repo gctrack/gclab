@@ -10,6 +10,14 @@ type ImportStep = { type: string; message: string }
 
 const ROLES = ['user', 'club_manager', 'admin', 'super_admin']
 
+
+const ML_STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  .ghl  { font-family: 'Playfair Display', serif; }
+  .gmono{ font-family: 'DM Mono', monospace; }
+  .gsans{ font-family: 'DM Sans', sans-serif; }
+`
+
 export default function AdminPage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -210,8 +218,19 @@ export default function AdminPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50 relative">
+    <div style={{ minHeight: "100vh", background: "#f5f2ec" }}>
+      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
       <GCLabNav role={profile?.role} isSignedIn={true} currentPath="/admin" />
+
+      {/* Dark ML header */}
+      <div style={{ background: "#0d2818", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)" }}/>
+        <div style={{ maxWidth: "80rem", margin: "0 auto", padding: "32px 24px 40px", position: "relative", zIndex: 1 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", color: "rgba(192,132,252,0.9)", padding: "3px 12px", borderRadius: 20, fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }} className="gsans">Admin Panel</div>
+          <h2 className="ghl" style={{ fontSize: "clamp(24px,3vw,38px)", color: "#e8e0d0", fontWeight: 900, letterSpacing: "-0.5px" }}>Administration</h2>
+        </div>
+        <div style={{ height: 24, background: "linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)" }}/>
+      </div>
       <div className="max-w-6xl mx-auto px-6 py-10 flex gap-8">
 
         {/* Sidebar */}

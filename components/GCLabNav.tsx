@@ -4,27 +4,54 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
+const G = '#0d2818'
+const LIME = '#4ade80'
+const CREAM = '#e8e0d0'
+
+function Logo() {
+  return (
+    <svg width="30" height="36" viewBox="0 0 44 52" fill="none">
+      <rect x="13" y="2" width="18" height="8" rx="2" fill="rgba(74,222,128,0.1)" stroke={LIME} strokeWidth="1.6"/>
+      <path d="M13 10 L2 44 Q0 50 4 51 L40 51 Q44 50 42 44 L31 10 Z" fill="rgba(74,222,128,0.07)" stroke={LIME} strokeWidth="1.6" strokeLinejoin="round"/>
+      <circle cx="14" cy="40" r="6.5" fill="#ef4444"/>
+      <circle cx="30" cy="40" r="6.5" fill="#3b82f6"/>
+      <circle cx="22" cy="29" r="6.5" fill="#eab308"/>
+    </svg>
+  )
+}
+
 type Props = {
   role?: string
+  isSignedIn?: boolean
+  currentPath?: string
 }
 
 const NAV_LINKS = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/profile', label: 'My Profile' },
-  { href: '/rankings', label: 'Rankings' },
-  { href: '/compare', label: 'Compare' },
-  { href: '/rankings?tab=Historical+Rankings', label: 'Historical Rankings' },
+  { href: '/dashboard',                           label: 'Dashboard',           icon: '🎯' },
+  { href: '/profile',                             label: 'My Profile',          icon: '👤' },
+  { href: '/rankings',                            label: 'Rankings',            icon: '🏆' },
+  { href: '/compare',                             label: 'Compare',             icon: '⚔️'  },
+  { href: '/rankings?tab=Historical+Rankings',    label: 'Historical Rankings', icon: '📈' },
 ]
 
 const DESKTOP_TABS = [
-  { href: '/dashboard', label: 'Dashboard', icon: '🎯', public: false },
-  { href: '/profile', label: 'My Profile', icon: '👤', public: false },
-  { href: '/rankings', label: 'Rankings', icon: '🏆', public: true },
-  { href: '/compare', label: 'Compare', icon: '⚔️', public: false },
-  { href: '/rankings?tab=Historical+Rankings', label: 'Historical', icon: '📈', public: true },
+  { href: '/dashboard',                           label: 'Dashboard',  icon: '🎯', public: false },
+  { href: '/profile',                             label: 'My Profile', icon: '👤', public: false },
+  { href: '/rankings',                            label: 'Rankings',   icon: '🏆', public: true  },
+  { href: '/compare',                             label: 'Compare',    icon: '⚔️',  public: false },
+  { href: '/rankings?tab=Historical+Rankings',    label: 'Historical', icon: '📈', public: true  },
 ]
 
-export default function GCLabNav({ role, isSignedIn = false, currentPath = '' }: Props & { isSignedIn?: boolean, currentPath?: string }) {
+const navStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap');
+  .gcnav-logo { font-family: 'Playfair Display', serif; }
+  .gcnav-tab  { font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .gcnav-desk { display: none; }
+  @media (min-width: 768px) { .gcnav-desk { display: flex; align-items: center; gap: 2px; } }
+  .gcnav-drop-item:hover { background: rgba(255,255,255,0.06) !important; color: ${CREAM} !important; }
+`
+
+export default function GCLabNav({ role, isSignedIn = false, currentPath = '' }: Props) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -38,32 +65,48 @@ export default function GCLabNav({ role, isSignedIn = false, currentPath = '' }:
 
   return (
     <>
-      <nav className="bg-white shadow-sm px-4 py-3 flex justify-between items-center relative z-50">
-        <a href="/dashboard" className="text-xl font-bold text-green-600 shrink-0">GCLab</a>
+      <style dangerouslySetInnerHTML={{ __html: navStyles }}/>
 
-        {/* Desktop tab bar */}
-        <div className="hidden md:flex items-center gap-1 bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-100">
+      <nav style={{
+        position: 'sticky', top: 0, zIndex: 100,
+        background: G,
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 20px',
+      }}>
+        {/* Logo */}
+        <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0 }}>
+          <Logo/>
+          <span className="gcnav-logo" style={{ fontSize: 19, color: CREAM, fontWeight: 700, letterSpacing: '-0.3px' }}>GCLab</span>
+        </a>
+
+        {/* Desktop tabs */}
+        <div className="gcnav-desk">
           {DESKTOP_TABS.map(tab => {
-            const isActive = currentPath === tab.href || currentPath.startsWith(tab.href.split('?')[0] + (tab.href.includes('?') ? '?' : '/')) && tab.href !== '/rankings'
+            const tabBase = tab.href.split('?')[0]
+            const isActive = currentPath === tab.href
+              || (currentPath === tabBase && tab.href === tabBase)
+              || (tab.href.includes('Historical') && currentPath === '/rankings' && typeof window !== 'undefined' && window.location.search.includes('Historical'))
             const isLocked = !tab.public && !isSignedIn
             return (
               <a
                 key={tab.href}
                 href={isLocked ? '/login' : tab.href}
-                title={isLocked ? `Sign in to access ${tab.label}` : tab.label}
-                className={[
-                  'relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                  isActive
-                    ? 'bg-white text-green-700 shadow-sm border border-gray-200'
-                    : isLocked
-                    ? 'text-gray-400 hover:text-gray-500 hover:bg-white/60'
-                    : 'text-gray-600 hover:text-green-700 hover:bg-white/80',
-                ].join(' ')}
+                title={isLocked ? `Sign in for ${tab.label}` : tab.label}
+                className="gcnav-tab"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '6px 13px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  textDecoration: 'none',
+                  background: isActive ? 'rgba(74,222,128,0.14)' : 'transparent',
+                  border: `1px solid ${isActive ? 'rgba(74,222,128,0.3)' : 'transparent'}`,
+                  color: isActive ? LIME : isLocked ? 'rgba(232,224,208,0.28)' : 'rgba(232,224,208,0.55)',
+                }}
               >
-                <span className="text-base leading-none">{tab.icon}</span>
+                <span style={{ fontSize: 13, lineHeight: 1 }}>{tab.icon}</span>
                 <span>{tab.label}</span>
                 {isLocked && (
-                  <svg className="w-3 h-3 ml-0.5 opacity-50" fill="currentColor" viewBox="0 0 20 20">
+                  <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20" style={{ opacity: 0.45 }}>
                     <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
                   </svg>
                 )}
@@ -71,56 +114,101 @@ export default function GCLabNav({ role, isSignedIn = false, currentPath = '' }:
             )
           })}
         </div>
+
+        {/* Hamburger */}
         <button
           onClick={() => setOpen(!open)}
-          className="flex flex-col justify-center items-center w-8 h-8 gap-1.5 group"
+          style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: 32, height: 32, gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}
           aria-label="Menu"
         >
-          <span className={`block w-6 h-0.5 bg-gray-600 transition-all duration-200 ${open ? 'rotate-45 translate-y-2' : ''}`} />
-          <span className={`block w-6 h-0.5 bg-gray-600 transition-all duration-200 ${open ? 'opacity-0' : ''}`} />
-          <span className={`block w-6 h-0.5 bg-gray-600 transition-all duration-200 ${open ? '-rotate-45 -translate-y-2' : ''}`} />
+          {[
+            open ? 'rotate(45deg) translate(5px, 5px)' : 'none',
+            '',
+            open ? 'rotate(-45deg) translate(5px, -5px)' : 'none',
+          ].map((tf, i) => (
+            <span key={i} style={{
+              display: 'block', width: 20, height: 1.5,
+              background: 'rgba(232,224,208,0.65)', borderRadius: 1,
+              transition: 'all 0.18s',
+              transform: tf || 'none',
+              opacity: i === 1 && open ? 0 : 1,
+            }}/>
+          ))}
         </button>
       </nav>
 
       {/* Dropdown */}
       {open && (
         <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setOpen(false)}
-          />
-          {/* Menu */}
-          <div className="absolute right-4 top-16 z-50 bg-white border border-gray-200 rounded-lg shadow-lg w-56 py-2">
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)}/>
+          <div style={{
+            position: 'fixed', right: 12, top: 58, zIndex: 50,
+            background: '#0f2e1a',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 12,
+            boxShadow: '0 20px 48px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3)',
+            width: 230, padding: '6px 0',
+          }}>
             {NAV_LINKS.map(link => (
               <a
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600 transition"
+                className="gcnav-tab gcnav-drop-item"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '9px 16px', textDecoration: 'none',
+                  fontSize: 14, color: 'rgba(232,224,208,0.6)',
+                }}
               >
-                {link.label}
+                <span style={{ width: 18, textAlign: 'center' }}>{link.icon}</span>
+                <span>{link.label}</span>
               </a>
             ))}
+
             {isAdmin && (
               <>
-                <div className="border-t my-1" />
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }}/>
                 <a
                   href="/admin"
                   onClick={() => setOpen(false)}
-                  className="block px-4 py-2.5 text-sm text-purple-700 hover:bg-purple-50 transition"
+                  className="gcnav-tab gcnav-drop-item"
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', textDecoration: 'none', fontSize: 14, color: 'rgba(192,132,252,0.7)' }}
                 >
-                  ⚙️ Admin Panel
+                  <span style={{ width: 18, textAlign: 'center' }}>⚙️</span>
+                  <span>Admin Panel</span>
                 </a>
               </>
             )}
-            <div className="border-t my-1" />
-            <button
-              onClick={handleSignOut}
-              className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition"
-            >
-              Sign Out
-            </button>
+
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }}/>
+
+            {isSignedIn ? (
+              <button
+                onClick={handleSignOut}
+                className="gcnav-tab"
+                style={{
+                  width: '100%', textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '9px 16px', fontSize: 14,
+                  color: 'rgba(248,113,113,0.75)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                }}
+              >
+                <span style={{ width: 18, textAlign: 'center' }}>↩</span>
+                <span>Sign Out</span>
+              </button>
+            ) : (
+              <a
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="gcnav-tab"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', textDecoration: 'none', fontSize: 14, color: LIME, fontWeight: 600 }}
+              >
+                <span style={{ width: 18, textAlign: 'center' }}>→</span>
+                <span>Sign In / Sign Up</span>
+              </a>
+            )}
           </div>
         </>
       )}

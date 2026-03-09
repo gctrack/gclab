@@ -252,6 +252,14 @@ function ChartTooltip({ active, payload, label, nameA, nameB }: any) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+
+const ML_STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  .ghl  { font-family: 'Playfair Display', serif; }
+  .gmono{ font-family: 'DM Mono', monospace; }
+  .gsans{ font-family: 'DM Sans', sans-serif; }
+`
+
 export default function ComparePage() {
   const [userProfile, setUserProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -436,10 +444,11 @@ export default function ComparePage() {
   const nameA = playerA ? `${playerA.wcf_first_name} ${playerA.wcf_last_name}` : 'Player A'
   const nameB = playerB ? `${playerB.wcf_first_name} ${playerB.wcf_last_name}` : 'Player B'
 
-  if (loading || signedIn === null) return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading...</div>
+  if (loading || signedIn === null) return <div style={{ minHeight: "100vh", background: "#0d2818", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(232,224,208,0.3)" }}><style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>Loading…</div>
 
   if (!signedIn) return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div style={{ minHeight: "100vh", background: "#f5f2ec", display: "flex", flexDirection: "column" }}>
+      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
       <GCLabNav role="" isSignedIn={false} currentPath="/compare" />
       <div className="flex-1 flex items-center justify-center px-6 py-20">
         <div className="relative w-full max-w-lg">
@@ -488,30 +497,35 @@ export default function ComparePage() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: "100vh", background: "#f5f2ec" }}>
+      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
       <GCLabNav role={userProfile?.role} isSignedIn={true} currentPath="/compare" />
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
 
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">Compare Players</h2>
-          <p className="text-sm text-gray-500">Head to head stats, grade history and career comparisons. Full data available for players with history imported.</p>
-        </div>
-
-        {/* Player pickers */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <PlayerSearch label="Player 1" color="green" selected={playerA}
-              onSelect={(p) => { setPlayerA(p); setGamesA([]); setHistoryA([]) }}
-              exclude={playerB?.id || null} />
-            <PlayerSearch label="Player 2" color="blue" selected={playerB}
-              onSelect={(p) => { setPlayerB(p); setGamesB([]); setHistoryB([]) }}
-              exclude={playerA?.id || null} />
+      {/* Dark ML header with player search */}
+      <div style={{ background: "#0d2818", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)" }}/>
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backgroundImage: "linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)", backgroundSize: "44px 44px" }}/>
+        <div style={{ maxWidth: "80rem", margin: "0 auto", padding: "36px 24px 32px", position: "relative", zIndex: 1 }}>
+          <h2 className="ghl" style={{ fontSize: "clamp(24px,3vw,40px)", color: "#e8e0d0", fontWeight: 900, marginBottom: 8, letterSpacing: "-0.5px" }}>Compare Players</h2>
+          <p className="gsans" style={{ fontSize: 14, color: "rgba(232,224,208,0.5)", marginBottom: 24 }}>Head to head stats, grade history and career comparisons.</p>
+          <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 24 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <PlayerSearch label="Player 1" color="green" selected={playerA}
+                onSelect={(p) => { setPlayerA(p); setGamesA([]); setHistoryA([]) }}
+                exclude={playerB?.id || null} />
+              <PlayerSearch label="Player 2" color="blue" selected={playerB}
+                onSelect={(p) => { setPlayerB(p); setGamesB([]); setHistoryB([]) }}
+                exclude={playerA?.id || null} />
+            </div>
+            {loadingData && (
+              <p className="gsans" style={{ fontSize: 12, color: "rgba(232,224,208,0.35)", textAlign: "center", marginTop: 16 }}>Loading player data...</p>
+            )}
           </div>
-          {loadingData && (
-            <p className="text-xs text-gray-400 text-center mt-4 animate-pulse">Loading player data...</p>
-          )}
         </div>
+        <div style={{ height: 24, background: "linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)" }}/>
+      </div>
+
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
 
         {/* Placeholder */}
         {!playerA && !playerB && (
