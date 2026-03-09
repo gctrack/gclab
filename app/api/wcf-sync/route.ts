@@ -214,6 +214,35 @@ async function runSync(logId: string) {
 
             if (existing.history_imported && dgradeChanged) {
               try {
+                // Write a pre-change snapshot so we preserve the player's state
+                // (dgrade + world rank) as it was BEFORE this event updated their grade.
+                // This becomes the "Last synced" row in the history table.
+                // Only write it if we don't already have a record from today
+                // (prevents duplicates if cron fires twice).
+                const todayMidnight = new Date(now)
+                todayMidnight.setHours(0, 0, 0, 0)
+                const { data: alreadySnappedToday } = await supabase
+                  .from('wcf_dgrade_history')
+                  .select('id')
+                  .eq('wcf_player_id', existing.id)
+                  .gte('recorded_at', todayMidnight.toISOString())
+                  .maybeSingle()
+
+                if (!alreadySnappedToday) {
+                  // Timestamp the pre-change snapshot 1 second before the main record
+                  const preSnapTime = new Date(now.getTime() - 1000).toISOString()
+                  await supabase.from('wcf_dgrade_history').insert({
+                    wcf_player_id: existing.id,
+                    dgrade_value: existing.dgrade,
+                    egrade_value: existing.egrade,
+                    world_ranking: existing.world_ranking,
+                    recorded_at: preSnapTime,
+                    event_name: null,   // null = rendered as "Last synced" in the table
+                    event_url: null,
+                    event_date: null,
+                  })
+                }
+
                 const yearUrl = `https://rank.worldcroquet.org/gcrankdg/player.php?year=${now.getFullYear()}&pfn=${encodeURIComponent(player.wcf_first_name)}&psn=${encodeURIComponent(player.wcf_last_name)}&nt=1&pid=`
                 const res = await fetchWithTimeout(yearUrl, 15000)
                 const yearHtml = await res.text()
@@ -301,16 +330,30 @@ async function runSync(logId: string) {
               }
             }
 
-            await supabase.from('wcf_dgrade_history').insert({
-              wcf_player_id: existing.id,
-              dgrade_value: player.dgrade,
-              egrade_value: egrade,
-              world_ranking: player.world_ranking,
-              recorded_at: nowISO,
-              event_name: eventName,
-              event_url: eventUrl,
-              event_date: eventDate ? new Date(eventDate).toISOString() : null,
-            })
+            // Dedup: don't insert if same player already has a record for today
+            // with the same dgrade (guards against Vercel double-firing crons)
+            const todayStart = new Date(now)
+            todayStart.setHours(0, 0, 0, 0)
+            const { data: existingToday } = await supabase
+              .from('wcf_dgrade_history')
+              .select('id')
+              .eq('wcf_player_id', existing.id)
+              .eq('dgrade_value', player.dgrade)
+              .gte('recorded_at', todayStart.toISOString())
+              .maybeSingle()
+
+            if (!existingToday) {
+              await supabase.from('wcf_dgrade_history').insert({
+                wcf_player_id: existing.id,
+                dgrade_value: player.dgrade,
+                egrade_value: egrade,
+                world_ranking: player.world_ranking,
+                recorded_at: nowISO,
+                event_name: eventName,
+                event_url: eventUrl,
+                event_date: eventDate ? new Date(eventDate).toISOString() : null,
+              })
+            }
             if (existing.linked_user_id && dgradeChanged) {
               await supabase.from('profiles').update({
                 dgrade: player.dgrade,
@@ -333,7 +376,8 @@ async function runSync(logId: string) {
               ...player,
               egrade,
               last_synced_at: nowISO,
-              ...(dgradeChanged && existing.history_imported ? { history_imported: false } : {}),
+              // NOTE: do NOT reset history_imported here — that would trigger the
+              // batch importer to re-import everything and create duplicate history entries
             })
             .eq('id', existing.id)
           updated++
