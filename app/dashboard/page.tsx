@@ -247,6 +247,24 @@ function StatCard({ label, value, sub, accent = false }: { label: string; value:
 
 // ─── WCF link prompt ────────────────────────────────────────────────────────
 
+const COUNTRY_NAMES: Record<string, string> = {
+  'AF':'Afghanistan','AL':'Albania','DZ':'Algeria','AR':'Argentina','AU':'Australia',
+  'AT':'Austria','BE':'Belgium','BR':'Brazil','CA':'Canada','CL':'Chile','CN':'China',
+  'CO':'Colombia','HR':'Croatia','CZ':'Czech Republic','DK':'Denmark','EG':'Egypt',
+  'FI':'Finland','FR':'France','DE':'Germany','GH':'Ghana','GR':'Greece','HU':'Hungary',
+  'IN':'India','ID':'Indonesia','IE':'Ireland','IL':'Israel','IT':'Italy','JP':'Japan',
+  'KE':'Kenya','MY':'Malaysia','MX':'Mexico','MA':'Morocco','NL':'Netherlands',
+  'NZ':'New Zealand','NG':'Nigeria','NO':'Norway','PK':'Pakistan','PH':'Philippines',
+  'PL':'Poland','PT':'Portugal','RO':'Romania','RU':'Russia','ZA':'South Africa',
+  'ES':'Spain','SE':'Sweden','CH':'Switzerland','TZ':'Tanzania','TH':'Thailand',
+  'TN':'Tunisia','TR':'Turkey','UG':'Uganda','UA':'Ukraine','AE':'United Arab Emirates',
+  'US':'United States','GB':'United Kingdom','GB-ENG':'England','GB-SCT':'Scotland',
+  'GB-WLS':'Wales','UY':'Uruguay','VN':'Vietnam','ZW':'Zimbabwe',
+}
+function countryName(code: string): string {
+  return COUNTRY_NAMES[code] || code
+}
+
 function WcfLinkPrompt() {
   return (
     <div style={{
@@ -480,10 +498,24 @@ export default function DashboardPage() {
     return { ...band, w: wins, t: rel.length }
   }).filter(b => b.t > 0)
 
-  // Biggest upset (win with largest grade gap in favour of opponent)
-  const biggestUpset = games
-    .filter((g: any) => g.result === 'win' && g.opp_dgrade_after && g.dgrade_after)
-    .map((g: any) => ({ ...g, diff: g.opp_dgrade_after - g.dgrade_after }))
+  // Biggest upset — use dgrade BEFORE the game (previous game's dgrade_after)
+  // games is sorted chronologically, so we can walk the array to find each game's pre-game grade
+  const gamesWithBefore = games.map((g: any, i: number) => {
+    // Player's grade before this game = dgrade_after of their most recent previous game
+    const prevGame = i > 0 ? games[i - 1] : null
+    const myGradeBefore = prevGame?.dgrade_after || g.dgrade_after
+    // Opponent's grade before this game: find their most recent game before this one as opponent
+    // Since we don't have full opponent history, use opp_dgrade_after of prev game in same event
+    // as a proxy, or fall back to opp_dgrade_after of this game
+    const prevSameEvent = games.slice(0, i).reverse().find((pg: any) =>
+      pg.opponent_first_name === g.opponent_first_name &&
+      pg.opponent_last_name === g.opponent_last_name
+    )
+    const oppGradeBefore = prevSameEvent?.opp_dgrade_after || g.opp_dgrade_after
+    return { ...g, myGradeBefore, oppGradeBefore, diff: oppGradeBefore - myGradeBefore }
+  })
+  const biggestUpset = gamesWithBefore
+    .filter((g: any) => g.result === 'win' && g.oppGradeBefore && g.myGradeBefore)
     .filter((g: any) => g.diff > 0)
     .sort((a: any, b: any) => b.diff - a.diff)[0] || null
 
@@ -503,10 +535,17 @@ export default function DashboardPage() {
   const recentForm = [...games].slice(-10)
 
   // Best wins by opponent grade
-  const bestWins = games
-    .filter((g: any) => g.result === 'win' && g.opp_dgrade_after)
-    .sort((a: any, b: any) => b.opp_dgrade_after - a.opp_dgrade_after)
-    .slice(0, 5)
+  // bestWins uses pre-game grades (same logic as biggestUpset)
+  const winsWithBefore = gamesWithBefore.filter((g: any) =>
+    g.result === 'win' && g.oppGradeBefore && g.myGradeBefore
+  )
+  const bestWinsByGrade = [...winsWithBefore]
+    .sort((a: any, b: any) => b.oppGradeBefore - a.oppGradeBefore)
+    .slice(0, 10)
+  const bestWinsByDiff = [...winsWithBefore]
+    .filter((g: any) => g.diff > 0)
+    .sort((a: any, b: any) => b.diff - a.diff)
+    .slice(0, 10)
 
   // Hero stat values
   const heroStats = [
@@ -712,19 +751,19 @@ export default function DashboardPage() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                           <div>
                             <div className="ghl" style={{ fontSize: 20, color: G, fontWeight: 900 }}>
-                              +{biggestUpset.diff} dGrade gap
+                              -{biggestUpset.diff} dGrade gap
                             </div>
-                            <div className="gsans" style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>Grade advantage to opponent</div>
+                            <div className="gsans" style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>Grade advantage to opponent (pre-game)</div>
                           </div>
                           <div style={{ background: '#16a34a', color: 'white', borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }} className="gmono">
                             {biggestUpset.player_score}–{biggestUpset.opponent_score}
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
-                          <span className="gmono" style={{ fontSize: 22, color: G, fontWeight: 700 }}>{biggestUpset.dgrade_after}</span>
+                          <span className="gmono" style={{ fontSize: 22, color: G, fontWeight: 700 }}>{biggestUpset.myGradeBefore}</span>
                           <span className="gsans" style={{ fontSize: 13, color: '#6b7280' }}>You</span>
                           <span style={{ color: '#9ca3af', fontSize: 14 }}>vs</span>
-                          <span className="gmono" style={{ fontSize: 22, color: '#dc2626', fontWeight: 700 }}>{biggestUpset.opp_dgrade_after}</span>
+                          <span className="gmono" style={{ fontSize: 22, color: '#dc2626', fontWeight: 700 }}>{biggestUpset.oppGradeBefore}</span>
                           <span className="gsans" style={{ fontSize: 13, color: '#6b7280' }}>
                             {biggestUpset.opponent_first_name} {biggestUpset.opponent_last_name}
                           </span>
@@ -797,38 +836,65 @@ export default function DashboardPage() {
               <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
 
                 {/* Best Wins */}
-                <div className="dash-light-card">
-                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
-                    <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Best Wins</h3>
-                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Highest-graded opponents you've beaten</p>
-                  </div>
-                  {bestWins.length === 0 ? (
-                    <div style={{ padding: '24px', color: '#9ca3af' }} className="gsans">No wins recorded yet</div>
-                  ) : (
-                    <div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 72px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
-                        {['', 'Opponent', 'Opp Grade', 'Score'].map(h => (
-                          <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
-                        ))}
-                      </div>
-                      {bestWins.map((g: any, i: number) => (
-                        <div key={i} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '32px 1fr 72px 60px', padding: '9px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
-                          <span className="gmono" style={{ fontSize: 12, color: '#9ca3af' }}>#{i + 1}</span>
-                          <div>
-                            <div className="gsans" style={{ fontSize: 13, color: G, fontWeight: 500 }}>
-                              {g.opponent_first_name} {g.opponent_last_name}
-                            </div>
-                            {g.event_name && (
-                              <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{g.event_name}</div>
-                            )}
+                {(() => {
+                  const [winsSort, setWinsSort] = React.useState<'grade' | 'diff'>('grade')
+                  const bestWins = winsSort === 'grade' ? bestWinsByGrade : bestWinsByDiff
+                  return (
+                    <div className="dash-light-card">
+                      <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid #f0ede8' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                          <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700 }}>Best Wins</h3>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            {(['grade', 'diff'] as const).map(s => (
+                              <button key={s} onClick={() => setWinsSort(s)}
+                                className="gsans"
+                                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 12, border: `1px solid ${winsSort === s ? G : '#e5e7eb'}`,
+                                  background: winsSort === s ? G : 'white', color: winsSort === s ? LIME : '#6b7280',
+                                  cursor: 'pointer', fontWeight: winsSort === s ? 600 : 400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                {s === 'grade' ? 'Top Grade' : 'Biggest Upset'}
+                              </button>
+                            ))}
                           </div>
-                          <span className="gmono" style={{ fontSize: 13, color: '#dc2626', fontWeight: 600 }}>{g.opp_dgrade_after}</span>
-                          <span className="gmono" style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>{g.player_score ?? 0}–{g.opponent_score ?? 0}</span>
                         </div>
-                      ))}
+                        <p className="gsans" style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                          {winsSort === 'grade' ? 'Highest-graded opponents beaten (pre-game grade)' : 'Wins with biggest dGrade gap in opponent's favour (pre-game)'}
+                        </p>
+                      </div>
+                      {bestWins.length === 0 ? (
+                        <div style={{ padding: '24px', color: '#9ca3af' }} className="gsans">No wins recorded yet</div>
+                      ) : (
+                        <div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 62px 62px 52px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
+                            {['', 'Opponent', 'You', 'Them', 'Score'].map(h => (
+                              <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+                            ))}
+                          </div>
+                          {bestWins.map((g: any, i: number) => (
+                            <div key={i} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '28px 1fr 62px 62px 52px', padding: '9px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
+                              <span className="gmono" style={{ fontSize: 11, color: '#9ca3af' }}>#{i + 1}</span>
+                              <div>
+                                <div className="gsans" style={{ fontSize: 13, color: G, fontWeight: 500 }}>
+                                  {g.opponent_first_name} {g.opponent_last_name}
+                                </div>
+                                {g.event_name && (
+                                  <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>
+                                    {g.event_name}{g.event_date ? ` · ${new Date(g.event_date).getFullYear()}` : ''}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="gmono" style={{ fontSize: 12, color: '#374151' }}>{g.myGradeBefore}</span>
+                              <div>
+                                <span className="gmono" style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>{g.oppGradeBefore}</span>
+                                {g.diff > 0 && <span className="gmono" style={{ fontSize: 10, color: '#dc2626', marginLeft: 4 }}>-{g.diff}</span>}
+                              </div>
+                              <span className="gmono" style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>{g.player_score ?? 0}–{g.opponent_score ?? 0}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  )
+                })()}
 
                 {/* Opponents by Country */}
                 <div className="dash-light-card">
@@ -851,7 +917,7 @@ export default function DashboardPage() {
                           <div key={cs.country} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 60px', padding: '8px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                               <span style={{ fontSize: 16 }}>{getFlag(cs.country)}</span>
-                              <span className="gsans" style={{ fontSize: 12, color: G }}>{cs.country}</span>
+                              <span className="gsans" style={{ fontSize: 12, color: G }}>{countryName(cs.country)}</span>
                             </div>
                             <span className="gmono" style={{ fontSize: 12, color: '#6b7280' }}>{cs.games}</span>
                             <span className="gmono" style={{ fontSize: 12, color: '#16a34a' }}>{cs.wins}</span>
@@ -887,7 +953,7 @@ export default function DashboardPage() {
                           <div key={cs.country} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 52px 52px 60px', padding: '8px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                               <span style={{ fontSize: 16 }}>{getFlag(cs.country)}</span>
-                              <span className="gsans" style={{ fontSize: 12, color: G }}>{cs.country}</span>
+                              <span className="gsans" style={{ fontSize: 12, color: G }}>{countryName(cs.country)}</span>
                             </div>
                             <span className="gmono" style={{ fontSize: 12, color: '#6b7280' }}>{cs.games}</span>
                             <span className="gmono" style={{ fontSize: 12, color: '#16a34a' }}>{cs.wins}</span>
