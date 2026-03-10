@@ -1270,12 +1270,23 @@ export default function RankingsPage() {
                   // Event rows: imported events + daily sync points where grade changed
                   const eventPoints = playerHistory.filter((h: any) => h.is_imported || (h.event_name && h.event_name !== 'Daily sync'))
                   const eventPointIds = new Set(eventPoints.map((h: any) => h.id))
+                  // Dates that have a regrade — pre-snap null-event rows on these dates always show
+                  const regradeDates = new Set(
+                    playerHistory
+                      .filter((h: any) => h.event_name && h.event_name.includes('(regrade)'))
+                      .map((h: any) => h.record_date)
+                  )
                   const gradeChangeSync = playerHistory.filter((h: any) => {
                     if (h.is_imported) return false
                     if (eventPointIds.has(h.id)) return false  // already in eventPoints, skip
                     const idx = playerHistory.indexOf(h)
                     if (idx === 0) return false
-                    return h.dgrade_value !== playerHistory[idx - 1].dgrade_value
+                    // Show if grade changed vs previous record
+                    if (h.dgrade_value !== playerHistory[idx - 1].dgrade_value) return true
+                    // Also show null-event pre-snap on regrade days even if grade matches prev day
+                    // (reveals the dip/recovery between pre-snap and regrade)
+                    if (!h.event_name && regradeDates.has(h.record_date)) return true
+                    return false
                   })
                   const tableRows = [...eventPoints, ...gradeChangeSync].sort(
                     (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
@@ -1343,12 +1354,23 @@ export default function RankingsPage() {
                                   <td className="py-1.5 text-right font-semibold text-amber-600">{h.egrade_value || '—'}</td>
                                   <td className="py-1.5 text-right text-gray-600">{h.world_ranking ? `#${h.world_ranking}` : '—'}</td>
                                 </tr>
-                                {showMilestone && (
-                                  <tr className="border-t-2 border-blue-200 bg-blue-50">
-                                    <td className="py-1.5 text-blue-500 text-xs font-medium">3 Mar 2026</td>
-                                    <td className="py-1.5 text-blue-400 italic text-xs" colSpan={5}>↑ World Ranking tracking began</td>
-                                  </tr>
-                                )}
+                                {showMilestone && (() => {
+                                  // Find grade as of Mar 3 — most recent record at or before that date
+                                  const mar3 = new Date('2026-03-03').getTime()
+                                  const gradeAtStart = [...playerHistory]
+                                    .filter((r: any) => new Date(r.recorded_at).getTime() <= mar3)
+                                    .sort((a: any, b: any) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0]
+                                  return (
+                                    <tr className="border-t-2 border-blue-200 bg-blue-50">
+                                      <td className="py-1.5 text-blue-500 text-xs font-medium">3 Mar 2026</td>
+                                      <td className="py-1.5 text-blue-400 italic text-xs">↑ World Ranking tracking began</td>
+                                      <td className="py-1.5 text-right font-semibold text-gray-900 text-xs">{gradeAtStart?.dgrade_value || '—'}</td>
+                                      <td className="py-1.5 text-right text-xs"><span className="text-gray-400">—</span></td>
+                                      <td className="py-1.5 text-right font-semibold text-amber-600 text-xs">{gradeAtStart?.egrade_value || '—'}</td>
+                                      <td className="py-1.5 text-right text-gray-600 text-xs">—</td>
+                                    </tr>
+                                  )
+                                })()}
                               </React.Fragment>
                             )
                           })}
