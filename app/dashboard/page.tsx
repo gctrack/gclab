@@ -37,11 +37,13 @@ const ML = `
 `
 
 const GRADE_BANDS = [
-  { label: 'Under 1500', min: 0,    max: 1499, color: '#94a3b8' },
-  { label: '1500–1700',  min: 1500, max: 1699, color: '#60a5fa' },
-  { label: '1700–1900',  min: 1700, max: 1899, color: LIME },
-  { label: '1900–2100',  min: 1900, max: 2099, color: AMBER },
-  { label: '2100+',      min: 2100, max: 9999, color: RED },
+  { label: '1200–1400', min: 1200, max: 1399, color: '#94a3b8' },
+  { label: '1400–1600', min: 1400, max: 1599, color: '#60a5fa' },
+  { label: '1600–1800', min: 1600, max: 1799, color: '#a78bfa' },
+  { label: '1800–2000', min: 1800, max: 1999, color: LIME },
+  { label: '2000–2200', min: 2000, max: 2199, color: AMBER },
+  { label: '2200–2400', min: 2200, max: 2399, color: '#f97316' },
+  { label: '2400+',     min: 2400, max: 9999, color: RED },
 ]
 
 function pct(w: number, t: number): number | null {
@@ -49,7 +51,7 @@ function pct(w: number, t: number): number | null {
 }
 
 function pctColor(p: number) {
-  return p >= 60 ? LIME : p >= 40 ? AMBER : RED
+  return p >= 50 ? LIME : p >= 30 ? AMBER : RED
 }
 
 function getFlag(code: string): string {
@@ -116,7 +118,7 @@ function CareerChart({ history }: { history: any[] }) {
   const skip = Math.ceil(allYears.length / 10)
 
   return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="cgrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={LIME} stopOpacity="0.2"/>
@@ -163,7 +165,7 @@ function YearBars({ data }: { data: { year: number; w: number; t: number }[] }) 
   const barW = Math.max(8, Math.min(44, CW / n - 6))
   const gapW = (CW - barW * n) / (n + 1)
   return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
       {/* 50% reference */}
       <line x1={PL} y1={PT + CH / 2} x2={W - PR} y2={PT + CH / 2} stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="4 3"/>
       <text x={PL + 2} y={PT + CH / 2 - 4} fill="rgba(255,255,255,0.22)" fontSize="9" fontFamily="DM Mono,monospace">50%</text>
@@ -295,7 +297,6 @@ export default function DashboardPage() {
               .from('wcf_player_games')
               .select('year, result, player_score, opponent_score, opponent_first_name, opponent_last_name, dgrade_after, opp_dgrade_after, event_name, event_date, round_detail')
               .eq('wcf_player_id', prof.wcf_player_id)
-              .eq('is_imported', true)
               .order('event_date', { ascending: true }),
             supabase
               .from('wcf_dgrade_history')
@@ -384,12 +385,14 @@ export default function DashboardPage() {
   const yearsActive     = yearsSet.size
   const countriesPlayed = countryStats.length
 
-  // Win by year
+  // Win by year — fall back to event_date year if year field is null
   const yearMap: Record<number, { w: number; t: number }> = {}
   for (const g of games) {
-    if (!yearMap[g.year]) yearMap[g.year] = { w: 0, t: 0 }
-    yearMap[g.year].t++
-    if (g.result === 'win') yearMap[g.year].w++
+    const yr = g.year || (g.event_date ? new Date(g.event_date).getFullYear() : null)
+    if (!yr) continue
+    if (!yearMap[yr]) yearMap[yr] = { w: 0, t: 0 }
+    yearMap[yr].t++
+    if (g.result === 'win') yearMap[yr].w++
   }
   const yearData = Object.entries(yearMap)
     .map(([y, v]) => ({ year: Number(y), w: v.w, t: v.t }))
@@ -437,7 +440,7 @@ export default function DashboardPage() {
     { label: 'Current dGrade',   value: wcfPlayer?.dgrade ?? profile?.dgrade ?? '—',    accent: false },
     { label: 'Peak dGrade',      value: hasHistory && peakDgrade ? peakDgrade.toLocaleString() : '—', accent: hasHistory && peakDgrade > 0 },
     { label: 'World Rank',       value: wcfPlayer?.world_ranking ? `#${wcfPlayer.world_ranking}` : '—', accent: false },
-    { label: 'Countries Faced',  value: hasHistory && countriesPlayed ? countriesPlayed : yearsActive ? `${yearsActive}yr` : '—', accent: false },
+    { label: 'Countries',        value: hasHistory && countriesPlayed ? countriesPlayed : yearsActive ? `${yearsActive}yr` : '—', accent: false },
   ]
 
   const displayName = profile?.first_name
@@ -499,7 +502,7 @@ export default function DashboardPage() {
         {/* Career chart */}
         {hasHistory && history.length > 1 && (
           <div className="dash-pad" style={{ padding: '0 48px 0', position: 'relative', zIndex: 1 }}>
-            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, overflow: 'hidden' }}>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, overflow: 'hidden', maxWidth: 1200 }}>
               {/* Chart header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap', gap: 12 }}>
                 <div>
@@ -703,12 +706,12 @@ export default function DashboardPage() {
                     <div style={{ padding: '16px 24px', display: 'flex', gap: 16 }}>
                       <div style={{ flex: 1, textAlign: 'center' }}>
                         <div className="gmono" style={{ fontSize: 32, fontWeight: 500, color: '#16a34a', lineHeight: 1 }}>{maxWin}</div>
-                        <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Win streak</div>
+                        <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>All time longest win streak</div>
                       </div>
                       <div style={{ width: 1, background: '#f0ede8' }}/>
                       <div style={{ flex: 1, textAlign: 'center' }}>
                         <div className="gmono" style={{ fontSize: 32, fontWeight: 500, color: '#dc2626', lineHeight: 1 }}>{maxLoss}</div>
-                        <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Loss streak</div>
+                        <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>All time longest loss streak</div>
                       </div>
                     </div>
                   </div>
@@ -745,7 +748,7 @@ export default function DashboardPage() {
                             )}
                           </div>
                           <span className="gmono" style={{ fontSize: 13, color: '#dc2626', fontWeight: 600 }}>{g.opp_dgrade_after}</span>
-                          <span className="gmono" style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>{g.player_score}–{g.opponent_score}</span>
+                          <span className="gmono" style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>{g.player_score ?? 0}–{g.opponent_score ?? 0}</span>
                         </div>
                       ))}
                     </div>
@@ -756,7 +759,7 @@ export default function DashboardPage() {
                 <div className="dash-light-card">
                   <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Opponents by Country</h3>
-                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Nations you've faced · {countriesPlayed} countries</p>
+                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Win/loss record vs opponents from each nation · {countriesPlayed} countries</p>
                   </div>
                   {countryStats.length === 0 ? (
                     <div style={{ padding: '24px', color: '#9ca3af' }} className="gsans">No country data yet</div>
