@@ -1362,12 +1362,12 @@ export default function RankingsPage() {
                                   const gradeAtStart = [...playerHistory]
                                     .filter((r: any) => new Date(r.recorded_at).getTime() <= mar3)
                                     .sort((a: any, b: any) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0]
-                                  // World rank: first record on or after Mar 3 that has a rank,
-                                  // fall back to selectedPlayer current rank if history doesn't have it
+                                  // World rank: earliest record that has a world_ranking value
+                                  // (baseline sync on Mar 2 has the rank before any events)
                                   const firstRankRecord = [...playerHistory]
-                                    .filter((r: any) => new Date(r.recorded_at).getTime() >= mar3 && r.world_ranking)
+                                    .filter((r: any) => r.world_ranking)
                                     .sort((a: any, b: any) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())[0]
-                                  const initialRank = firstRankRecord?.world_ranking || selectedPlayer?.world_ranking
+                                  const initialRank = firstRankRecord?.world_ranking
                                   return (
                                     <tr className="border-t-2 border-blue-200 bg-blue-50">
                                       <td className="py-1.5 text-blue-500 text-xs font-medium">3 Mar 2026</td>
