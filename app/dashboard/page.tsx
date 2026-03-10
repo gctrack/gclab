@@ -198,30 +198,30 @@ function CareerChart({ history }: { history: any[] }) {
 
 function YearBars({ data }: { data: { year: number; w: number; t: number }[] }) {
   if (!data.length) return null
-  const W = 760, H = 140
-  const PL = 8, PR = 8, PT = 22, PB = 22
+  const W = 600, H = 180
+  const PL = 12, PR = 12, PT = 30, PB = 36
   const CW = W - PL - PR, CH = H - PT - PB
   const n = data.length
-  const barW = Math.max(8, Math.min(44, CW / n - 6))
+  const barW = Math.max(24, Math.min(64, CW / n - 8))
   const gapW = (CW - barW * n) / (n + 1)
   return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
+    <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }}>
       {/* 50% reference */}
-      <line x1={PL} y1={PT + CH / 2} x2={W - PR} y2={PT + CH / 2} stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="4 3"/>
-      <text x={PL + 2} y={PT + CH / 2 - 4} fill="rgba(255,255,255,0.22)" fontSize="9" fontFamily="DM Mono,monospace">50%</text>
+      <line x1={PL} y1={PT + CH / 2} x2={W - PR} y2={PT + CH / 2} stroke="rgba(13,40,24,0.12)" strokeWidth="1" strokeDasharray="4 3"/>
+      <text x={PL + 2} y={PT + CH / 2 - 5} fill="rgba(13,40,24,0.3)" fontSize="11" fontFamily="DM Mono,monospace">50%</text>
       {data.map(({ year, w, t }, i) => {
         const p = pct(w, t)
         if (p === null) return null
         const c = pctColor(p)
-        const bH = (p / 100) * CH
+        const bH = Math.max(4, (p / 100) * CH)
         const x = PL + gapW + i * (barW + gapW)
         const y = PT + CH - bH
         return (
           <g key={year}>
-            <rect x={x} y={y} width={barW} height={bH} rx={3} fill={c} fillOpacity="0.7"/>
-            <text x={x + barW / 2} y={y - 4} fill={c} fontSize="9" fontFamily="DM Mono,monospace" textAnchor="middle" fontWeight="500">{p}%</text>
-            <text x={x + barW / 2} y={H - 10} fill="rgba(13,40,24,0.55)" fontSize="9" fontFamily="DM Sans,sans-serif" textAnchor="middle">{year}</text>
-            <text x={x + barW / 2} y={H - 1} fill="rgba(13,40,24,0.3)" fontSize="8" fontFamily="DM Mono,monospace" textAnchor="middle">{t}g</text>
+            <rect x={x} y={y} width={barW} height={bH} rx={4} fill={c} fillOpacity="0.85"/>
+            <text x={x + barW / 2} y={y - 6} fill={c} fontSize="13" fontFamily="DM Mono,monospace" textAnchor="middle" fontWeight="700">{p}%</text>
+            <text x={x + barW / 2} y={H - 18} fill="rgba(13,40,24,0.65)" fontSize="13" fontFamily="DM Sans,sans-serif" textAnchor="middle" fontWeight="500">{year}</text>
+            <text x={x + barW / 2} y={H - 4} fill="rgba(13,40,24,0.35)" fontSize="11" fontFamily="DM Mono,monospace" textAnchor="middle">{t}g</text>
           </g>
         )
       })}
@@ -682,7 +682,7 @@ export default function DashboardPage() {
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Win Rate by Year</h3>
                     <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Annual win percentage across your career</p>
                   </div>
-                  <div style={{ padding: '16px 20px 8px' }}>
+                  <div style={{ padding: '16px 20px 8px', height: 180 }}>
                     <YearBars data={yearData}/>
                   </div>
                   {/* Year table */}
