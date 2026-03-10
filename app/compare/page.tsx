@@ -183,12 +183,12 @@ function PlayerSearch({ label, color, onSelect, selected, exclude }: {
     onSelect(null as any)
   }
 
-  const accent = color === 'green' ? 'ring-green-500 border-green-300' : 'ring-blue-500 border-blue-300'
+
   const badge = color === 'green' ? 'bg-green-600' : 'bg-blue-600'
 
   return (
     <div className="relative">
-      <div className={`text-xs font-semibold uppercase tracking-wide mb-2 ${color === 'green' ? 'text-green-700' : 'text-blue-700'}`}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8, color: color === 'green' ? '#156b3a' : '#1d4ed8' }} className="gsans">
         {label}
       </div>
       <div className="relative">
@@ -197,7 +197,8 @@ function PlayerSearch({ label, color, onSelect, selected, exclude }: {
           onChange={e => handleChange(e.target.value)}
           onFocus={() => selected && setQuery('')}
           placeholder="Search player..."
-          className={`w-full border rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 ${selected ? `${accent} bg-white` : 'border-gray-300 focus:ring-green-500'}`}
+          style={{ background: '#fafaf8', border: `1.5px solid ${selected ? (color === 'green' ? '#15803d' : '#1d4ed8') : '#ddd8d0'}`, borderRadius: 10, padding: '10px 36px 10px 12px', fontSize: 14, color: '#1a2e1a', width: '100%', outline: 'none', fontFamily: 'DM Sans, sans-serif' }}
+          className=""
         />
         {selected && (
           <button onClick={handleClear} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
@@ -513,31 +514,33 @@ export default function ComparePage() {
       <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
       <GCLabNav role={userProfile?.role} isSignedIn={true} currentPath="/compare" />
 
-      {/* Dark ML header with player search */}
+      {/* Dark header — title only */}
       <div style={{ background: "#0d2818", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)" }}/>
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backgroundImage: "linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)", backgroundSize: "44px 44px" }}/>
-        <div style={{ maxWidth: "80rem", margin: "0 auto", padding: "36px 24px 32px", position: "relative", zIndex: 1 }}>
+        <div style={{ maxWidth: "80rem", margin: "0 auto", padding: "36px 24px 28px", position: "relative", zIndex: 1 }}>
           <h2 className="ghl" style={{ fontSize: "clamp(24px,3vw,40px)", color: "#e8e0d0", fontWeight: 900, marginBottom: 8, letterSpacing: "-0.5px" }}>Compare Players</h2>
-          <p className="gsans" style={{ fontSize: 14, color: "rgba(232,224,208,0.5)", marginBottom: 24 }}>Head to head stats, grade history and career comparisons.</p>
-          <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 24 }}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <PlayerSearch label="Player 1" color="green" selected={playerA}
-                onSelect={(p) => { setPlayerA(p); setGamesA([]); setHistoryA([]) }}
-                exclude={playerB?.id || null} />
-              <PlayerSearch label="Player 2" color="blue" selected={playerB}
-                onSelect={(p) => { setPlayerB(p); setGamesB([]); setHistoryB([]) }}
-                exclude={playerA?.id || null} />
-            </div>
-            {loadingData && (
-              <p className="gsans" style={{ fontSize: 12, color: "rgba(232,224,208,0.35)", textAlign: "center", marginTop: 16 }}>Loading player data...</p>
-            )}
-          </div>
+          <p className="gsans" style={{ fontSize: 14, color: "rgba(232,224,208,0.5)" }}>Head to head stats, grade history and career comparisons.</p>
         </div>
         <div style={{ height: 24, background: "linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)" }}/>
       </div>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+
+        {/* ── Player selection ─────────────────────────────────────────── */}
+        <div style={{ background: "white", border: "1px solid #e8e4de", borderRadius: 16, padding: 24, marginBottom: 24, boxShadow: "0 1px 4px rgba(13,40,24,0.06)" }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <PlayerSearch label="Player 1" color="green" selected={playerA}
+              onSelect={(p) => { setPlayerA(p); setGamesA([]); setHistoryA([]) }}
+              exclude={playerB?.id || null} />
+            <PlayerSearch label="Player 2" color="blue" selected={playerB}
+              onSelect={(p) => { setPlayerB(p); setGamesB([]); setHistoryB([]) }}
+              exclude={playerA?.id || null} />
+          </div>
+          {loadingData && (
+            <p className="gsans" style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", marginTop: 16 }}>Loading player data…</p>
+          )}
+        </div>
 
         {/* Placeholder */}
         {!playerA && !playerB && (
