@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
 import WcfMatchBanner from '@/components/WcfMatchBanner'
@@ -66,6 +66,7 @@ function getFlag(code: string): string {
 // ─── Career SVG Chart ────────────────────────────────────────────────────────
 
 function CareerChart({ history }: { history: any[] }) {
+  const [tooltip, setTooltip] = React.useState<{ x: number; y: number; grade: number; date: string } | null>(null)
   const valid = history.filter((h: any) => h.dgrade_value > 0)
   if (!valid.length) return (
     <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: CREAM25, fontSize: 13 }} className="gsans">
@@ -117,8 +118,33 @@ function CareerChart({ history }: { history: any[] }) {
   for (let y = minY; y <= maxY; y++) allYears.push(y)
   const skip = Math.ceil(allYears.length / 10)
 
+  const svgRef = React.useRef<SVGSVGElement>(null)
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return
+    const rect = svgRef.current.getBoundingClientRect()
+    const scaleX = W / rect.width
+    const mouseX = (e.clientX - rect.left) * scaleX
+    // Find closest data point
+    let closest = valid[0], closestDist = Infinity
+    valid.forEach((h: any) => {
+      const px = xf(new Date(h.recorded_at).getTime())
+      const dist = Math.abs(px - mouseX)
+      if (dist < closestDist) { closestDist = dist; closest = h }
+    })
+    if (closestDist < 40) {
+      const px = xf(new Date(closest.recorded_at).getTime())
+      const py = yf(closest.dgrade_value)
+      const dateStr = new Date(closest.recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      setTooltip({ x: px, y: py, grade: closest.dgrade_value, date: dateStr })
+    } else {
+      setTooltip(null)
+    }
+  }
+
   return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
+    <svg ref={svgRef} width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
+      onMouseMove={handleMouseMove} onMouseLeave={() => setTooltip(null)} style={{ cursor: 'crosshair' }}>
       <defs>
         <linearGradient id="cgrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={LIME} stopOpacity="0.2"/>
@@ -144,6 +170,20 @@ function CareerChart({ history }: { history: any[] }) {
       {/* Current dot */}
       <circle cx={lastX} cy={yf(grades[grades.length - 1])} r="4.5" fill={LIME}/>
       <circle cx={lastX} cy={yf(grades[grades.length - 1])} r="8" fill="none" stroke={LIME} strokeWidth="1.5" strokeOpacity="0.35"/>
+      {/* Hover tooltip */}
+      {tooltip && (() => {
+        const tx = Math.min(tooltip.x + 10, W - 110)
+        const ty = Math.max(tooltip.y - 32, 4)
+        return (
+          <g>
+            <line x1={tooltip.x} y1={PT} x2={tooltip.x} y2={PT + CH} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3 3"/>
+            <circle cx={tooltip.x} cy={tooltip.y} r="4" fill={LIME} stroke="rgba(13,40,24,0.8)" strokeWidth="1.5"/>
+            <rect x={tx} y={ty} width={100} height={28} rx={4} fill="rgba(13,40,24,0.92)" stroke="rgba(74,222,128,0.3)" strokeWidth="1"/>
+            <text x={tx + 8} y={ty + 11} fill={LIME} fontSize="10" fontFamily="DM Mono,monospace" fontWeight="600">{tooltip.grade}</text>
+            <text x={tx + 8} y={ty + 22} fill="rgba(255,255,255,0.5)" fontSize="8" fontFamily="DM Sans,sans-serif">{tooltip.date}</text>
+          </g>
+        )
+      })()}
       {/* Year labels */}
       {allYears.filter((_, i) => i % skip === 0).map(y => {
         const x = xf(new Date(y, 6, 1).getTime())
@@ -180,8 +220,8 @@ function YearBars({ data }: { data: { year: number; w: number; t: number }[] }) 
           <g key={year}>
             <rect x={x} y={y} width={barW} height={bH} rx={3} fill={c} fillOpacity="0.7"/>
             <text x={x + barW / 2} y={y - 4} fill={c} fontSize="9" fontFamily="DM Mono,monospace" textAnchor="middle" fontWeight="500">{p}%</text>
-            <text x={x + barW / 2} y={H - 10} fill="rgba(255,255,255,0.35)" fontSize="9" fontFamily="DM Sans,sans-serif" textAnchor="middle">{year}</text>
-            <text x={x + barW / 2} y={H - 1} fill="rgba(255,255,255,0.18)" fontSize="8" fontFamily="DM Mono,monospace" textAnchor="middle">{t}g</text>
+            <text x={x + barW / 2} y={H - 10} fill="rgba(13,40,24,0.55)" fontSize="9" fontFamily="DM Sans,sans-serif" textAnchor="middle">{year}</text>
+            <text x={x + barW / 2} y={H - 1} fill="rgba(13,40,24,0.3)" fontSize="8" fontFamily="DM Mono,monospace" textAnchor="middle">{t}g</text>
           </g>
         )
       })}
@@ -268,6 +308,7 @@ export default function DashboardPage() {
   const [games,        setGames]        = useState<any[]>([])
   const [history,      setHistory]      = useState<any[]>([])
   const [countryStats, setCountryStats] = useState<any[]>([])
+  const [oppCountryStats, setOppCountryStats] = useState<any[]>([])
   const [loading,      setLoading]      = useState(true)
   const [signedIn,     setSignedIn]     = useState<boolean | null>(null)
 
@@ -312,6 +353,40 @@ export default function DashboardPage() {
           setGames(gms || [])
           setHistory(hist || [])
           setCountryStats(cs || [])
+
+          // Build opponent country stats by joining game opponent names to wcf_players
+          if (gms && gms.length > 0) {
+            const { data: oppPlayers } = await supabase
+              .from('wcf_player_games')
+              .select('result, opponent_first_name, opponent_last_name')
+              .eq('wcf_player_id', prof.wcf_player_id)
+            if (oppPlayers) {
+              // Get unique opponent names
+              const nameSet = new Set(oppPlayers.map((g: any) => `${g.opponent_first_name}|||${g.opponent_last_name}`))
+              const namePairs = [...nameSet].map(n => { const [f, l] = n.split('|||'); return { f, l } })
+              // Fetch countries for opponents
+              const { data: playerData } = await supabase
+                .from('wcf_players')
+                .select('wcf_first_name, wcf_last_name, country')
+              if (playerData) {
+                const playerMap: Record<string, string> = {}
+                playerData.forEach((p: any) => { playerMap[`${p.wcf_first_name}|||${p.wcf_last_name}`] = p.country })
+                // Aggregate by country
+                const countryMap: Record<string, { games: number; wins: number }> = {}
+                oppPlayers.forEach((g: any) => {
+                  const country = playerMap[`${g.opponent_first_name}|||${g.opponent_last_name}`]
+                  if (!country) return
+                  if (!countryMap[country]) countryMap[country] = { games: 0, wins: 0 }
+                  countryMap[country].games++
+                  if (g.result === 'win') countryMap[country].wins++
+                })
+                const oppStats = Object.entries(countryMap)
+                  .map(([country, s]) => ({ country, games: s.games, wins: s.wins, losses: s.games - s.wins }))
+                  .sort((a, b) => b.games - a.games)
+                setOppCountryStats(oppStats)
+              }
+            }
+          }
         }
       }
       setLoading(false)
@@ -440,7 +515,7 @@ export default function DashboardPage() {
     { label: 'Current dGrade',   value: wcfPlayer?.dgrade ?? profile?.dgrade ?? '—',    accent: false },
     { label: 'Peak dGrade',      value: hasHistory && peakDgrade ? peakDgrade.toLocaleString() : '—', accent: hasHistory && peakDgrade > 0 },
     { label: 'World Rank',       value: wcfPlayer?.world_ranking ? `#${wcfPlayer.world_ranking}` : '—', accent: false },
-    { label: 'Countries',        value: hasHistory && countriesPlayed ? countriesPlayed : yearsActive ? `${yearsActive}yr` : '—', accent: false },
+    { label: 'Countries Played In', value: hasHistory && countriesPlayed ? countriesPlayed : yearsActive ? `${yearsActive}yr` : '—', accent: false },
   ]
 
   const displayName = profile?.first_name
@@ -755,16 +830,52 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* Country Breakdown */}
+                {/* Opponents by Country */}
                 <div className="dash-light-card">
                   <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Opponents by Country</h3>
-                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Win/loss record vs opponents from each nation · {countriesPlayed} countries</p>
+                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Win/loss record vs players from each nation</p>
+                  </div>
+                  {oppCountryStats.length === 0 ? (
+                    <div style={{ padding: '24px', color: '#9ca3af' }} className="gsans">No opponent data yet</div>
+                  ) : (
+                    <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)', position: 'sticky', top: 0 }}>
+                        {['Country', 'G', 'W', 'L', 'Win%'].map(h => (
+                          <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+                        ))}
+                      </div>
+                      {oppCountryStats.slice(0, 20).map((cs: any) => {
+                        const p = pct(cs.wins, cs.games)
+                        return (
+                          <div key={cs.country} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 60px', padding: '8px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                              <span style={{ fontSize: 16 }}>{getFlag(cs.country)}</span>
+                              <span className="gsans" style={{ fontSize: 12, color: G }}>{cs.country}</span>
+                            </div>
+                            <span className="gmono" style={{ fontSize: 12, color: '#6b7280' }}>{cs.games}</span>
+                            <span className="gmono" style={{ fontSize: 12, color: '#16a34a' }}>{cs.wins}</span>
+                            <span className="gmono" style={{ fontSize: 12, color: '#dc2626' }}>{cs.losses}</span>
+                            <span className="gmono" style={{ fontSize: 12, color: p !== null ? pctColor(p) : '#9ca3af' }}>{p !== null ? `${p}%` : '—'}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Games by Country ──────────────────────────────────────── */}
+              <div style={{ marginBottom: 20 }}>
+                <div className="dash-light-card">
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                    <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Games by Country</h3>
+                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Events played in each country · {countriesPlayed} countries</p>
                   </div>
                   {countryStats.length === 0 ? (
                     <div style={{ padding: '24px', color: '#9ca3af' }} className="gsans">No country data yet</div>
                   ) : (
-                    <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                    <div style={{ maxHeight: 240, overflowY: 'auto' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 52px 52px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)', position: 'sticky', top: 0 }}>
                         {['Country', 'G', 'W', 'Win%'].map(h => (
                           <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
