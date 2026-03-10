@@ -298,10 +298,15 @@ export default function RankingsPage() {
 
   const loadMovers = async () => {
     setLoading(true)
-    const sinceDate = moverPeriod === 0
-      ? FIRST_SYNC_DATE
-      : new Date(Date.now() - moverPeriod * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    const { data } = await supabase.rpc('get_movers', { since_date: sinceDate, limit_count: 20 })
+    let data: any[] | null = null
+    if (moverPeriod === 0) {
+      const res = await supabase.rpc('get_movers_alltime', { limit_count: 20 })
+      data = res.data
+    } else {
+      const sinceDate = new Date(Date.now() - moverPeriod * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const res = await supabase.rpc('get_movers', { since_date: sinceDate, limit_count: 20 })
+      data = res.data
+    }
     if (data) {
       setMovers({
         gains: data.filter((p: any) => p.change > 0).sort((a: any, b: any) => b.change - a.change).slice(0, 10),
