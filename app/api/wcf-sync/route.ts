@@ -206,8 +206,9 @@ async function runSync(logId: string) {
         if (existing) {
           const dgradeChanged = existing.dgrade !== player.dgrade
           const egradeChanged = egrade !== null && existing.egrade !== egrade
+          const rankChanged = existing.world_ranking !== player.world_ranking
 
-          if (dgradeChanged || egradeChanged) {
+          if (dgradeChanged || egradeChanged || rankChanged) {
             // If history imported, try to fetch the new game details from WCF
             let eventName: string | null = null
             let eventUrl: string | null = null
