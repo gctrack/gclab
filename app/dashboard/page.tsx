@@ -905,8 +905,8 @@ export default function DashboardPage() {
                   {oppCountryStats.length === 0 ? (
                     <div style={{ padding: '24px', color: '#9ca3af' }} className="gsans">No opponent data yet</div>
                   ) : (
-                    <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)', position: 'sticky', top: 0 }}>
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
                         {['Country', 'G', 'W', 'L', 'Win%'].map(h => (
                           <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
                         ))}
@@ -941,8 +941,8 @@ export default function DashboardPage() {
                   {countryStats.length === 0 ? (
                     <div style={{ padding: '24px', color: '#9ca3af' }} className="gsans">No country data yet</div>
                   ) : (
-                    <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 52px 52px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)', position: 'sticky', top: 0 }}>
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 52px 52px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
                         {['Country', 'G', 'W', 'Win%'].map(h => (
                           <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
                         ))}
