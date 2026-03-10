@@ -868,7 +868,7 @@ export default function RankingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mb-4">GCLab baseline set 6 Mar 2026 — changes detected by daily sync. Games and Win% show career totals from WCF.</p>
+            <p className="text-xs text-gray-400 mb-4">GCLab baseline set 6 Mar 2026 — changes detected by daily sync. Games and Win% show last 12 months from WCF.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
                 { title: '📈 Biggest Gains', data: movers.gains, positive: true },
@@ -886,8 +886,8 @@ export default function RankingsPage() {
                             <th className="text-left px-4 py-2 text-gray-700 font-semibold">Player</th>
                             <th className="text-right px-4 py-2 text-gray-700 font-semibold">Change</th>
                             <th className="text-right px-4 py-2 text-gray-700 font-semibold">dGrade</th>
-                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Games (career)</th>
-                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Win% (career)</th>
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Games (12mo)</th>
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Win% (12mo)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1281,10 +1281,12 @@ export default function RankingsPage() {
                     if (eventPointIds.has(h.id)) return false  // already in eventPoints, skip
                     const idx = playerHistory.indexOf(h)
                     if (idx === 0) return false
+                    const prev = playerHistory[idx - 1]
                     // Show if grade changed vs previous record
-                    if (h.dgrade_value !== playerHistory[idx - 1].dgrade_value) return true
+                    if (h.dgrade_value !== prev.dgrade_value) return true
+                    // Show if world ranking changed vs previous record
+                    if (h.world_ranking && prev.world_ranking && h.world_ranking !== prev.world_ranking) return true
                     // Also show null-event pre-snap on regrade days even if grade matches prev day
-                    // (reveals the dip/recovery between pre-snap and regrade)
                     if (!h.event_name && regradeDates.has(h.record_date)) return true
                     return false
                   })
@@ -1342,7 +1344,7 @@ export default function RankingsPage() {
                                   <td className="py-1.5 text-gray-500">
                                     {h.event_url
                                       ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">{h.event_name || '—'}</a>
-                                      : h.event_name || <span className="text-gray-400">Grade change</span>}
+                                      : h.event_name || <span className="text-gray-400">{h.world_ranking && playerHistory[playerHistory.findIndex((x: any) => x.recorded_at === h.recorded_at) - 1]?.world_ranking !== h.world_ranking ? 'Rank change' : 'Grade change'}</span>}
                                   </td>
                                   <td className="py-1.5 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
                                   <td className="py-1.5 text-right font-semibold">
@@ -1355,11 +1357,17 @@ export default function RankingsPage() {
                                   <td className="py-1.5 text-right text-gray-600">{h.world_ranking ? `#${h.world_ranking}` : '—'}</td>
                                 </tr>
                                 {showMilestone && (() => {
-                                  // Find grade as of Mar 3 — most recent record at or before that date
                                   const mar3 = new Date('2026-03-03').getTime()
+                                  // Grade: last record at or before Mar 3
                                   const gradeAtStart = [...playerHistory]
                                     .filter((r: any) => new Date(r.recorded_at).getTime() <= mar3)
                                     .sort((a: any, b: any) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0]
+                                  // World rank: first record on or after Mar 3 that has a rank,
+                                  // fall back to selectedPlayer current rank if history doesn't have it
+                                  const firstRankRecord = [...playerHistory]
+                                    .filter((r: any) => new Date(r.recorded_at).getTime() >= mar3 && r.world_ranking)
+                                    .sort((a: any, b: any) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())[0]
+                                  const initialRank = firstRankRecord?.world_ranking || selectedPlayer?.world_ranking
                                   return (
                                     <tr className="border-t-2 border-blue-200 bg-blue-50">
                                       <td className="py-1.5 text-blue-500 text-xs font-medium">3 Mar 2026</td>
@@ -1367,7 +1375,7 @@ export default function RankingsPage() {
                                       <td className="py-1.5 text-right font-semibold text-gray-900 text-xs">{gradeAtStart?.dgrade_value || '—'}</td>
                                       <td className="py-1.5 text-right text-xs"><span className="text-gray-400">—</span></td>
                                       <td className="py-1.5 text-right font-semibold text-amber-600 text-xs">{gradeAtStart?.egrade_value || '—'}</td>
-                                      <td className="py-1.5 text-right text-gray-600 text-xs">—</td>
+                                      <td className="py-1.5 text-right text-gray-600 text-xs">{initialRank ? `#${initialRank}` : '—'}</td>
                                     </tr>
                                   )
                                 })()}
