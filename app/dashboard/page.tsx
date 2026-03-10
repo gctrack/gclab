@@ -857,7 +857,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <p className="gsans" style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-                          {winsSort === 'grade' ? 'Highest-graded opponents beaten (pre-game grade)' : 'Wins with biggest dGrade gap in opponent's favour (pre-game)'}
+                          {winsSort === 'grade' ? 'Highest-graded opponents beaten (pre-game grade)' : "Wins with biggest dGrade gap in opponent's favour (pre-game)"}
                         </p>
                       </div>
                       {bestWins.length === 0 ? (
