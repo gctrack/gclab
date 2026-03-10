@@ -103,9 +103,9 @@ function StatCard({ label, a, b, higherIsBetter = true }: {
     <div className="bg-white rounded-xl border border-gray-100 p-4 text-center shadow-sm">
       <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">{label}</p>
       <div className="flex items-center justify-between gap-2">
-        <span className={`text-xl font-bold ${aWins ? 'text-green-600' : bWins ? 'text-green-400' : 'text-green-500'}`}>{a}</span>
+        <span className="text-xl font-bold text-green-600">{a}</span>
         <span className="text-xs text-gray-300">vs</span>
-        <span className={`text-xl font-bold ${bWins ? 'text-blue-600' : aWins ? 'text-blue-400' : 'text-blue-500'}`}>{b}</span>
+        <span className="text-xl font-bold text-blue-600">{b}</span>
       </div>
     </div>
   )
@@ -121,7 +121,7 @@ function BandRow({ label, a, b }: { label: string; a: { w: number; t: number }; 
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs text-gray-500 w-24 shrink-0">{label}</span>
         <div className="flex-1 flex items-center gap-3">
-          <span className={`text-sm font-semibold w-10 text-right ${aPct > bPct ? 'text-green-600' : 'text-gray-600'}`}>
+          <span className="text-sm font-semibold w-10 text-right text-green-600">
             {pct(a.w, a.t)}
           </span>
           <div className="flex-1 relative h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -134,7 +134,7 @@ function BandRow({ label, a, b }: { label: string; a: { w: number; t: number }; 
               style={{ width: `${(bPct / total) * 50}%` }}
             />
           </div>
-          <span className={`text-sm font-semibold w-10 ${bPct > aPct ? 'text-blue-600' : 'text-gray-600'}`}>
+          <span className="text-sm font-semibold w-10 text-blue-600">
             {pct(b.w, b.t)}
           </span>
         </div>
@@ -361,7 +361,6 @@ export default function ComparePage() {
       .from('wcf_player_games')
       .select('id, year, event_name, event_date, result, player_score, opponent_score, opponent_first_name, opponent_last_name, dgrade_after, opp_dgrade_after, round_detail')
       .eq('wcf_player_id', player.id)
-      .eq('is_imported', true)
       .order('event_date', { ascending: true })
     setter(games || [])
 
@@ -399,10 +398,12 @@ export default function ComparePage() {
       const { data: playerData } = await supabase.from('wcf_players').select('wcf_first_name, wcf_last_name, country')
       if (!playerData) return
       const playerMap: Record<string, string> = {}
-      playerData.forEach((p: any) => { playerMap[`${p.wcf_first_name}|||${p.wcf_last_name}`] = p.country })
+      playerData.forEach((p: any) => {
+        playerMap[`${p.wcf_first_name.trim()}|||${p.wcf_last_name.trim()}`.toLowerCase()] = p.country
+      })
       const countryMap: Record<string, { games: number; wins: number }> = {}
       games.forEach((g: Game) => {
-        const country = playerMap[`${g.opponent_first_name}|||${g.opponent_last_name}`]
+        const country = playerMap[`${(g.opponent_first_name||'').trim()}|||${(g.opponent_last_name||'').trim()}`.toLowerCase()]
         if (!country) return
         if (!countryMap[country]) countryMap[country] = { games: 0, wins: 0 }
         countryMap[country].games++

@@ -373,37 +373,31 @@ export default function DashboardPage() {
           setHistory(hist || [])
           setCountryStats(cs || [])
 
-          // Build opponent country stats by joining game opponent names to wcf_players
+          // Build opponent country stats using gms already loaded
           if (gms && gms.length > 0) {
-            const { data: oppPlayers } = await supabase
-              .from('wcf_player_games')
-              .select('result, opponent_first_name, opponent_last_name')
-              .eq('wcf_player_id', prof.wcf_player_id)
-            if (oppPlayers) {
-              // Get unique opponent names
-              const nameSet = new Set(oppPlayers.map((g: any) => `${g.opponent_first_name}|||${g.opponent_last_name}`))
-              const namePairs = [...nameSet].map(n => { const [f, l] = n.split('|||'); return { f, l } })
-              // Fetch countries for opponents
-              const { data: playerData } = await supabase
-                .from('wcf_players')
-                .select('wcf_first_name, wcf_last_name, country')
-              if (playerData) {
-                const playerMap: Record<string, string> = {}
-                playerData.forEach((p: any) => { playerMap[`${p.wcf_first_name}|||${p.wcf_last_name}`] = p.country })
-                // Aggregate by country
-                const countryMap: Record<string, { games: number; wins: number }> = {}
-                oppPlayers.forEach((g: any) => {
-                  const country = playerMap[`${g.opponent_first_name}|||${g.opponent_last_name}`]
-                  if (!country) return
-                  if (!countryMap[country]) countryMap[country] = { games: 0, wins: 0 }
-                  countryMap[country].games++
-                  if (g.result === 'win') countryMap[country].wins++
-                })
-                const oppStats = Object.entries(countryMap)
-                  .map(([country, s]) => ({ country, games: s.games, wins: s.wins, losses: s.games - s.wins }))
-                  .sort((a, b) => b.games - a.games)
-                setOppCountryStats(oppStats)
-              }
+            const { data: playerData } = await supabase
+              .from('wcf_players')
+              .select('wcf_first_name, wcf_last_name, country')
+            if (playerData) {
+              const playerMap: Record<string, string> = {}
+              playerData.forEach((p: any) => {
+                // Index by multiple key formats to handle spacing/case differences
+                const key = `${p.wcf_first_name.trim()}|||${p.wcf_last_name.trim()}`.toLowerCase()
+                playerMap[key] = p.country
+              })
+              const countryMap: Record<string, { games: number; wins: number }> = {}
+              gms.forEach((g: any) => {
+                const key = `${(g.opponent_first_name||'').trim()}|||${(g.opponent_last_name||'').trim()}`.toLowerCase()
+                const country = playerMap[key]
+                if (!country) return
+                if (!countryMap[country]) countryMap[country] = { games: 0, wins: 0 }
+                countryMap[country].games++
+                if (g.result === 'win') countryMap[country].wins++
+              })
+              const oppStats = Object.entries(countryMap)
+                .map(([country, s]) => ({ country, games: s.games, wins: s.wins, losses: s.games - s.wins }))
+                .sort((a, b) => b.games - a.games)
+              setOppCountryStats(oppStats)
             }
           }
         }
