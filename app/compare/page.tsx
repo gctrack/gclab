@@ -1,60 +1,58 @@
-// SAVE TO: app/compare/page.tsx
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Legend
-} from 'recharts'
+import WcfMatchBanner from '@/components/WcfMatchBanner'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+const G    = '#0d2818'
+const LIME = '#4ade80'
+const CREAM = '#e8e0d0'
+const CREAM60 = 'rgba(232,224,208,0.6)'
+const CREAM25 = 'rgba(232,224,208,0.25)'
+const CREAM10 = 'rgba(232,224,208,0.1)'
+const AMBER = '#eab308'
+const RED   = '#ef4444'
+const CARD_BG = 'rgba(255,255,255,0.055)'
+const CARD_BORDER = 'rgba(255,255,255,0.09)'
 
-type Player = {
-  id: string
-  wcf_first_name: string
-  wcf_last_name: string
-  country: string
-  dgrade: number
-  egrade: number
-  world_ranking: number
-  games: number
-  win_percentage: number
-  history_imported: boolean
-  wcf_profile_url: string
-}
-
-type Game = {
-  id: string
-  year: number
-  event_name: string
-  event_date: string
-  result: 'win' | 'loss'
-  player_score: number
-  opponent_score: number
-  opponent_first_name: string
-  opponent_last_name: string
-  dgrade_after: number
-  opp_dgrade_after: number
-  round_detail: string
-}
-
-type HistoryPoint = {
-  recorded_at: string
-  dgrade_value: number
-  is_imported: boolean
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const ML = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  .ghl  { font-family: 'Playfair Display', serif; }
+  .gmono{ font-family: 'DM Mono', monospace; }
+  .gsans{ font-family: 'DM Sans', sans-serif; }
+  .dash-stat-card { transition: border-color 0.2s; }
+  .dash-stat-card:hover { border-color: rgba(74,222,128,0.25) !important; }
+  .dash-light-card { background: white; border: 1px solid #e5e1d8; border-radius: 16px; overflow: hidden; }
+  .dash-row:hover { background: rgba(13,40,24,0.03) !important; }
+  @media (max-width: 900px) {
+    .dash-hero-grid { grid-template-columns: repeat(3,1fr) !important; }
+    .dash-cols { grid-template-columns: 1fr !important; }
+    .dash-section { padding: 24px !important; }
+    .dash-pad { padding: 24px !important; }
+  }
+  @media (max-width: 600px) {
+    .dash-hero-grid { grid-template-columns: repeat(2,1fr) !important; }
+  }
+`
 
 const GRADE_BANDS = [
-  { label: 'Under 2000', min: 0, max: 1999 },
-  { label: '2000–2200', min: 2000, max: 2200 },
-  { label: '2201–2399', min: 2201, max: 2399 },
-  { label: '2400+', min: 2400, max: 99999 },
+  { label: '1200–1400', min: 1200, max: 1399, color: '#94a3b8' },
+  { label: '1400–1600', min: 1400, max: 1599, color: '#60a5fa' },
+  { label: '1600–1800', min: 1600, max: 1799, color: '#a78bfa' },
+  { label: '1800–2000', min: 1800, max: 1999, color: LIME },
+  { label: '2000–2200', min: 2000, max: 2199, color: AMBER },
+  { label: '2200–2400', min: 2200, max: 2399, color: '#f97316' },
+  { label: '2400+',     min: 2400, max: 9999, color: RED },
 ]
+
+function pct(w: number, t: number): number | null {
+  return t === 0 ? null : Math.round(w / t * 100)
+}
+
+function pctColor(p: number) {
+  return p >= 50 ? LIME : p >= 30 ? AMBER : RED
+}
 
 function getFlag(code: string): string {
   if (!code) return ''
@@ -65,443 +63,402 @@ function getFlag(code: string): string {
   return code.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('')
 }
 
-const pct = (wins: number, total: number) =>
-  total === 0 ? '—' : `${Math.round((wins / total) * 100)}%`
+// ─── Career SVG Chart ────────────────────────────────────────────────────────
 
-const winPctNum = (wins: number, total: number) =>
-  total === 0 ? 0 : Math.round((wins / total) * 100)
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-function StatCard({ label, a, b, higherIsBetter = true }: {
-  label: string; a: string | number; b: string | number; higherIsBetter?: boolean
-}) {
-  const aNum = parseFloat(String(a))
-  const bNum = parseFloat(String(b))
-  const aWins = !isNaN(aNum) && !isNaN(bNum) && (higherIsBetter ? aNum > bNum : aNum < bNum)
-  const bWins = !isNaN(aNum) && !isNaN(bNum) && (higherIsBetter ? bNum > aNum : bNum < aNum)
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4 text-center shadow-sm">
-      <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">{label}</p>
-      <div className="flex items-center justify-between gap-2">
-        <span className={`text-xl font-bold ${aWins ? 'text-green-600' : 'text-gray-700'}`}>{a}</span>
-        <span className="text-xs text-gray-300">vs</span>
-        <span className={`text-xl font-bold ${bWins ? 'text-blue-600' : 'text-gray-700'}`}>{b}</span>
-      </div>
+function CareerChart({ history }: { history: any[] }) {
+  const [tooltip, setTooltip] = React.useState<{ x: number; y: number; grade: number; date: string } | null>(null)
+  const valid = history.filter((h: any) => h.dgrade_value > 0)
+  if (!valid.length) return (
+    <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: CREAM25, fontSize: 13 }} className="gsans">
+      No grade history yet
     </div>
   )
-}
 
-function BandRow({ label, a, b }: { label: string; a: { w: number; t: number }; b: { w: number; t: number } }) {
-  const aPct = winPctNum(a.w, a.t)
-  const bPct = winPctNum(b.w, b.t)
-  const total = Math.max(aPct, bPct, 1)
+  const W = 880, H = 210
+  const PL = 50, PR = 20, PT = 16, PB = 28
+  const CW = W - PL - PR, CH = H - PT - PB
 
-  return (
-    <div className="py-3 border-b border-gray-50 last:border-0">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs text-gray-500 w-24 shrink-0">{label}</span>
-        <div className="flex-1 flex items-center gap-3">
-          <span className={`text-sm font-semibold w-10 text-right ${aPct > bPct ? 'text-green-600' : 'text-gray-600'}`}>
-            {pct(a.w, a.t)}
-          </span>
-          <div className="flex-1 relative h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="absolute left-0 top-0 h-full bg-green-400 rounded-full transition-all"
-              style={{ width: `${(aPct / total) * 50}%` }}
-            />
-            <div
-              className="absolute right-0 top-0 h-full bg-blue-400 rounded-full transition-all"
-              style={{ width: `${(bPct / total) * 50}%` }}
-            />
-          </div>
-          <span className={`text-sm font-semibold w-10 ${bPct > aPct ? 'text-blue-600' : 'text-gray-600'}`}>
-            {pct(b.w, b.t)}
-          </span>
-        </div>
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400 w-24 shrink-0" />
-        <div className="flex-1 flex items-center gap-3">
-          <span className="text-xs text-gray-400 w-10 text-right">{a.t}g</span>
-          <div className="flex-1" />
-          <span className="text-xs text-gray-400 w-10">{b.t}g</span>
-        </div>
-      </div>
-    </div>
+  const times  = valid.map((h: any) => new Date(h.recorded_at).getTime())
+  const grades = valid.map((h: any) => h.dgrade_value as number)
+  const minT = Math.min(...times), maxT = Math.max(...times)
+  const rawMin = Math.min(...grades), rawMax = Math.max(...grades)
+  const span = rawMax - rawMin
+  const padG = Math.max(60, span * 0.18)
+  const minG = rawMin - padG, maxG = rawMax + padG
+
+  const xf = (t: number) => PL + (maxT === minT ? CW / 2 : (t - minT) / (maxT - minT) * CW)
+  const yf = (g: number) => PT + (1 - (g - minG) / (maxG - minG)) * CH
+
+  const pts = valid.map((h: any) =>
+    `${xf(new Date(h.recorded_at).getTime()).toFixed(1)},${yf(h.dgrade_value).toFixed(1)}`
   )
-}
+  const lineD = `M${pts.join(' L')}`
+  const lastX = xf(times[times.length - 1])
+  const firstX = xf(times[0])
+  const botY = PT + CH
+  const areaD = `${lineD} L${lastX.toFixed(1)},${botY} L${firstX.toFixed(1)},${botY} Z`
 
-function PlayerSearch({ label, color, onSelect, selected, exclude }: {
-  label: string
-  color: 'green' | 'blue'
-  onSelect: (p: Player) => void
-  selected: Player | null
-  exclude: string | null
-}) {
-  const [query, setQuery] = useState('')
-  const [suggestions, setSuggestions] = useState<Player[]>([])
-  const timeoutRef = useRef<any>(null)
-  const supabase = createClient()
+  const peakG = Math.max(...grades)
+  const peakIdx = grades.indexOf(peakG)
+  const peakX = xf(times[peakIdx])
+  const peakY = yf(peakG)
+  const labelX = Math.min(peakX + 12, W - 82)
 
-  useEffect(() => {
-    if (selected) setQuery(`${selected.wcf_first_name} ${selected.wcf_last_name}`)
-  }, [selected])
-
-  const handleChange = (v: string) => {
-    setQuery(v)
-    if (selected) return
-    if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    if (v.length < 2) { setSuggestions([]); return }
-    timeoutRef.current = setTimeout(async () => {
-      const parts = v.trim().split(' ')
-      let q = supabase
-        .from('wcf_players')
-        .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, games, win_percentage, history_imported, wcf_profile_url')
-        .order('world_ranking', { ascending: true, nullsFirst: false })
-        .limit(8)
-      if (parts.length >= 2) {
-        q = q.ilike('wcf_first_name', `%${parts[0]}%`).ilike('wcf_last_name', `%${parts[parts.length - 1]}%`)
-      } else {
-        q = q.or(`wcf_first_name.ilike.%${v}%,wcf_last_name.ilike.%${v}%`)
-      }
-      const { data } = await q
-      setSuggestions((data || []).filter((p: Player) => p.id !== exclude))
-    }, 250)
+  // Y ticks
+  const step = span > 600 ? 200 : span > 300 ? 100 : span > 100 ? 50 : 25
+  const yTicks: number[] = []
+  for (let g = Math.ceil(rawMin / step) * step; g <= rawMax + padG; g += step) {
+    if (g > minG && g < maxG) yTicks.push(g)
   }
 
-  const handleSelect = (p: Player) => {
-    onSelect(p)
-    setQuery(`${p.wcf_first_name} ${p.wcf_last_name}`)
-    setSuggestions([])
+  // Year ticks
+  const minY = new Date(minT).getFullYear()
+  const maxY = new Date(maxT).getFullYear()
+  const allYears: number[] = []
+  for (let y = minY; y <= maxY; y++) allYears.push(y)
+  const skip = Math.ceil(allYears.length / 10)
+
+  const svgRef = React.useRef<SVGSVGElement>(null)
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return
+    const rect = svgRef.current.getBoundingClientRect()
+    const scaleX = W / rect.width
+    const mouseX = (e.clientX - rect.left) * scaleX
+    // Find closest data point
+    let closest = valid[0], closestDist = Infinity
+    valid.forEach((h: any) => {
+      const px = xf(new Date(h.recorded_at).getTime())
+      const dist = Math.abs(px - mouseX)
+      if (dist < closestDist) { closestDist = dist; closest = h }
+    })
+    if (closestDist < 40) {
+      const px = xf(new Date(closest.recorded_at).getTime())
+      const py = yf(closest.dgrade_value)
+      const dateStr = new Date(closest.recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      setTooltip({ x: px, y: py, grade: closest.dgrade_value, date: dateStr })
+    } else {
+      setTooltip(null)
+    }
   }
-
-  const handleClear = () => {
-    setQuery('')
-    setSuggestions([])
-    onSelect(null as any)
-  }
-
-
-  const badge = color === 'green' ? 'bg-green-600' : 'bg-blue-600'
 
   return (
-    <div className="relative">
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8, color: color === 'green' ? '#156b3a' : '#1d4ed8' }} className="gsans">
-        {label}
-      </div>
-      <div className="relative">
-        <input
-          value={query}
-          onChange={e => handleChange(e.target.value)}
-          onFocus={() => selected && setQuery('')}
-          placeholder="Search player..."
-          style={{ background: '#fafaf8', border: `1.5px solid ${selected ? (color === 'green' ? '#15803d' : '#1d4ed8') : '#ddd8d0'}`, borderRadius: 10, padding: '10px 36px 10px 12px', fontSize: 14, color: '#1a2e1a', width: '100%', outline: 'none', fontFamily: 'DM Sans, sans-serif' }}
-          className=""
-        />
-        {selected && (
-          <button onClick={handleClear} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
-        )}
-      </div>
-      {suggestions.length > 0 && !selected && (
-        <div className="absolute top-full left-0 right-0 z-20 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-64 overflow-y-auto">
-          {suggestions.map(p => (
-            <button key={p.id} onClick={() => handleSelect(p)}
-              className="w-full text-left px-3 py-2.5 hover:bg-gray-50 flex items-center justify-between gap-2 border-b border-gray-50 last:border-0">
-              <div>
-                <span className="text-sm font-medium text-gray-900">{p.wcf_first_name} {p.wcf_last_name}</span>
-                <span className="text-xs text-gray-400 ml-2">{getFlag(p.country)} {p.country}</span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {p.history_imported && <span className="text-xs text-green-500" title="History imported">●</span>}
-                <span className="text-xs text-gray-400">#{p.world_ranking}</span>
-                <span className="text-xs font-semibold text-gray-700">{p.dgrade}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-      {selected && (
-        <div className={`mt-2 flex items-center gap-2 text-xs px-2 py-1 rounded-md ${color === 'green' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-          <span>{getFlag(selected.country)}</span>
-          <span>#{selected.world_ranking}</span>
-          <span>·</span>
-          <span>dGrade {selected.dgrade}</span>
-          {selected.history_imported && <span className="ml-auto">✓ history</span>}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Custom chart tooltip ─────────────────────────────────────────────────────
-
-function ChartTooltip({ active, payload, label, nameA, nameB }: any) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="text-gray-400 mb-1">{label}</p>
-      {payload.map((entry: any) => (
-        <p key={entry.dataKey} style={{ color: entry.color }} className="font-medium">
-          {entry.dataKey === 'a' ? nameA : nameB}: {entry.value}
-        </p>
+    <svg ref={svgRef} width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
+      onMouseMove={handleMouseMove} onMouseLeave={() => setTooltip(null)} style={{ cursor: 'crosshair' }}>
+      <defs>
+        <linearGradient id="cgrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={LIME} stopOpacity="0.2"/>
+          <stop offset="100%" stopColor={LIME} stopOpacity="0.01"/>
+        </linearGradient>
+      </defs>
+      {/* Grid */}
+      {yTicks.map(g => (
+        <g key={g}>
+          <line x1={PL} y1={yf(g)} x2={W - PR} y2={yf(g)} stroke="rgba(255,255,255,0.048)" strokeWidth="1"/>
+          <text x={PL - 6} y={yf(g) + 4} fill="rgba(255,255,255,0.22)" fontSize="9" fontFamily="DM Mono,monospace" textAnchor="end">{g}</text>
+        </g>
       ))}
+      {/* Area + line */}
+      <path d={areaD} fill="url(#cgrad)"/>
+      <path d={lineD} fill="none" stroke={LIME} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
+      {/* Peak */}
+      <line x1={peakX} y1={peakY} x2={peakX} y2={botY} stroke="rgba(74,222,128,0.14)" strokeWidth="1" strokeDasharray="3 3"/>
+      <circle cx={peakX} cy={peakY} r="5" fill={LIME}/>
+      <circle cx={peakX} cy={peakY} r="9" fill="none" stroke={LIME} strokeWidth="1.5" strokeOpacity="0.4"/>
+      <rect x={labelX} y={peakY - 14} width={70} height={20} rx={4} fill="rgba(13,40,24,0.92)" stroke="rgba(74,222,128,0.3)" strokeWidth="1"/>
+      <text x={labelX + 35} y={peakY + 1} fill={LIME} fontSize="10" fontFamily="DM Mono,monospace" textAnchor="middle" fontWeight="500">Peak {peakG}</text>
+      {/* Current dot */}
+      <circle cx={lastX} cy={yf(grades[grades.length - 1])} r="4.5" fill={LIME}/>
+      <circle cx={lastX} cy={yf(grades[grades.length - 1])} r="8" fill="none" stroke={LIME} strokeWidth="1.5" strokeOpacity="0.35"/>
+      {/* Hover tooltip */}
+      {tooltip && (() => {
+        const tx = Math.min(tooltip.x + 10, W - 110)
+        const ty = Math.max(tooltip.y - 32, 4)
+        return (
+          <g>
+            <line x1={tooltip.x} y1={PT} x2={tooltip.x} y2={PT + CH} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3 3"/>
+            <circle cx={tooltip.x} cy={tooltip.y} r="4" fill={LIME} stroke="rgba(13,40,24,0.8)" strokeWidth="1.5"/>
+            <rect x={tx} y={ty} width={100} height={28} rx={4} fill="rgba(13,40,24,0.92)" stroke="rgba(74,222,128,0.3)" strokeWidth="1"/>
+            <text x={tx + 8} y={ty + 11} fill={LIME} fontSize="10" fontFamily="DM Mono,monospace" fontWeight="600">{tooltip.grade}</text>
+            <text x={tx + 8} y={ty + 22} fill="rgba(255,255,255,0.5)" fontSize="8" fontFamily="DM Sans,sans-serif">{tooltip.date}</text>
+          </g>
+        )
+      })()}
+      {/* Year labels */}
+      {allYears.filter((_, i) => i % skip === 0).map(y => {
+        const x = xf(new Date(y, 6, 1).getTime())
+        if (x < PL || x > W - PR + 10) return null
+        return <text key={y} x={x} y={H - 4} fill="rgba(255,255,255,0.22)" fontSize="10" fontFamily="DM Sans,sans-serif" textAnchor="middle">{y}</text>
+      })}
+    </svg>
+  )
+}
+
+// ─── Win by Year SVG bars ────────────────────────────────────────────────────
+
+function YearBars({ data }: { data: { year: number; w: number; t: number }[] }) {
+  if (!data.length) return null
+  const W = 760, H = 140
+  const PL = 8, PR = 8, PT = 22, PB = 22
+  const CW = W - PL - PR, CH = H - PT - PB
+  const n = data.length
+  const barW = Math.max(8, Math.min(44, CW / n - 6))
+  const gapW = (CW - barW * n) / (n + 1)
+  return (
+    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
+      {/* 50% reference */}
+      <line x1={PL} y1={PT + CH / 2} x2={W - PR} y2={PT + CH / 2} stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeDasharray="4 3"/>
+      <text x={PL + 2} y={PT + CH / 2 - 4} fill="rgba(255,255,255,0.22)" fontSize="9" fontFamily="DM Mono,monospace">50%</text>
+      {data.map(({ year, w, t }, i) => {
+        const p = pct(w, t)
+        if (p === null) return null
+        const c = pctColor(p)
+        const bH = (p / 100) * CH
+        const x = PL + gapW + i * (barW + gapW)
+        const y = PT + CH - bH
+        return (
+          <g key={year}>
+            <rect x={x} y={y} width={barW} height={bH} rx={3} fill={c} fillOpacity="0.7"/>
+            <text x={x + barW / 2} y={y - 4} fill={c} fontSize="9" fontFamily="DM Mono,monospace" textAnchor="middle" fontWeight="500">{p}%</text>
+            <text x={x + barW / 2} y={H - 10} fill="rgba(13,40,24,0.55)" fontSize="9" fontFamily="DM Sans,sans-serif" textAnchor="middle">{year}</text>
+            <text x={x + barW / 2} y={H - 1} fill="rgba(13,40,24,0.3)" fontSize="8" fontFamily="DM Mono,monospace" textAnchor="middle">{t}g</text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ─── Dark stat card ───────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub, accent = false }: { label: string; value: string | number; sub?: string; accent?: boolean }) {
+  return (
+    <div className="dash-stat-card" style={{
+      background: CARD_BG,
+      border: `1px solid ${CARD_BORDER}`,
+      borderRadius: 14, padding: '18px 20px',
+    }}>
+      <div className="gmono" style={{ fontSize: 26, fontWeight: 500, color: accent ? LIME : CREAM, lineHeight: 1 }}>{value}</div>
+      <div className="gsans" style={{ fontSize: 10, color: CREAM25, marginTop: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</div>
+      {sub && <div className="gsans" style={{ fontSize: 11, color: 'rgba(74,222,128,0.6)', marginTop: 3 }}>{sub}</div>}
+    </div>
+  )
+}
+
+// ─── WCF link prompt ────────────────────────────────────────────────────────
+
+const COUNTRY_NAMES: Record<string, string> = {
+  'AF':'Afghanistan','AL':'Albania','DZ':'Algeria','AR':'Argentina','AU':'Australia',
+  'AT':'Austria','BE':'Belgium','BR':'Brazil','CA':'Canada','CL':'Chile','CN':'China',
+  'CO':'Colombia','HR':'Croatia','CZ':'Czech Republic','DK':'Denmark','EG':'Egypt',
+  'FI':'Finland','FR':'France','DE':'Germany','GH':'Ghana','GR':'Greece','HU':'Hungary',
+  'IN':'India','ID':'Indonesia','IE':'Ireland','IL':'Israel','IT':'Italy','JP':'Japan',
+  'KE':'Kenya','MY':'Malaysia','MX':'Mexico','MA':'Morocco','NL':'Netherlands',
+  'NZ':'New Zealand','NG':'Nigeria','NO':'Norway','PK':'Pakistan','PH':'Philippines',
+  'PL':'Poland','PT':'Portugal','RO':'Romania','RU':'Russia','ZA':'South Africa',
+  'ES':'Spain','SE':'Sweden','CH':'Switzerland','TZ':'Tanzania','TH':'Thailand',
+  'TN':'Tunisia','TR':'Turkey','UG':'Uganda','UA':'Ukraine','AE':'United Arab Emirates',
+  'US':'United States','GB':'United Kingdom','GB-ENG':'England','GB-SCT':'Scotland',
+  'GB-WLS':'Wales','UY':'Uruguay','VN':'Vietnam','ZW':'Zimbabwe',
+}
+function countryName(code: string): string {
+  return COUNTRY_NAMES[code] || code
+}
+
+function WcfLinkPrompt() {
+  return (
+    <div style={{
+      background: 'rgba(74,222,128,0.08)',
+      border: '1px solid rgba(74,222,128,0.2)',
+      borderRadius: 16, padding: '28px 32px',
+      display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap',
+    }}>
+      <div style={{ fontSize: 36 }}>🔗</div>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div className="ghl" style={{ fontSize: 20, color: CREAM, fontWeight: 700, marginBottom: 6 }}>Link your WCF profile</div>
+        <div className="gsans" style={{ fontSize: 14, color: CREAM60, lineHeight: 1.6 }}>
+          Connect your World Croquet Federation record to unlock your full career stats — grade history, win rates, best wins and more.
+        </div>
+      </div>
+      <a href="/profile" style={{
+        background: LIME, color: G, padding: '10px 22px', borderRadius: 8,
+        fontSize: 14, fontWeight: 700, textDecoration: 'none',
+        fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
+      }}>
+        Go to My Profile →
+      </a>
+    </div>
+  )
+}
+
+function WcfImportPrompt({ wcfPlayerId }: { wcfPlayerId: string }) {
+  return (
+    <div style={{
+      background: 'rgba(234,179,8,0.08)',
+      border: '1px solid rgba(234,179,8,0.2)',
+      borderRadius: 16, padding: '24px 28px',
+      display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
+    }}>
+      <div style={{ fontSize: 30 }}>📥</div>
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div className="ghl" style={{ fontSize: 17, color: CREAM, fontWeight: 700, marginBottom: 4 }}>Import your full career history</div>
+        <div className="gsans" style={{ fontSize: 13, color: CREAM60, lineHeight: 1.55 }}>
+          Your profile is linked. Import your WCF history to unlock deep stats — win rates by year, grade band performance, your biggest upsets and more.
+        </div>
+      </div>
+      <a href="/profile" style={{
+        background: AMBER, color: '#1a1a00', padding: '9px 20px', borderRadius: 8,
+        fontSize: 13, fontWeight: 700, textDecoration: 'none',
+        fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
+      }}>
+        Import History →
+      </a>
     </div>
   )
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+export default function DashboardPage() {
+  const [user,         setUser]         = useState<any>(null)
+  const [profile,      setProfile]      = useState<any>(null)
+  const [wcfPlayer,    setWcfPlayer]    = useState<any>(null)
+  const [games,        setGames]        = useState<any[]>([])
+  const [history,      setHistory]      = useState<any[]>([])
+  const [countryStats, setCountryStats] = useState<any[]>([])
+  const [oppCountryStats, setOppCountryStats] = useState<any[]>([])
+  const [winsSort, setWinsSort] = useState<'grade' | 'diff'>('grade')
+  const [loading,      setLoading]      = useState(true)
+  const [signedIn,     setSignedIn]     = useState<boolean | null>(null)
 
-const ML_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-  .ghl  { font-family: 'Playfair Display', serif; }
-  .gmono{ font-family: 'DM Mono', monospace; }
-  .gsans{ font-family: 'DM Sans', sans-serif; }
-`
-
-export default function ComparePage() {
-  const [userProfile, setUserProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [signedIn, setSignedIn] = useState<boolean | null>(null)
-  const [playerA, setPlayerA] = useState<Player | null>(null)
-  const [playerB, setPlayerB] = useState<Player | null>(null)
-  const [gamesA, setGamesA] = useState<Game[]>([])
-  const [gamesB, setGamesB] = useState<Game[]>([])
-  const [historyA, setHistoryA] = useState<HistoryPoint[]>([])
-  const [historyB, setHistoryB] = useState<HistoryPoint[]>([])
-  const [countryStatsA, setCountryStatsA] = useState<any[]>([])
-  const [countryStatsB, setCountryStatsB] = useState<any[]>([])
-  const [loadingData, setLoadingData] = useState(false)
-  const [showAllH2H, setShowAllH2H] = useState(false)
-  const [winsSortA, setWinsSortA] = useState<'grade' | 'diff'>('grade')
-  const [winsSortB, setWinsSortB] = useState<'grade' | 'diff'>('grade')
-  const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setSignedIn(false); setLoading(false); return }
+      const { data: { user: u } } = await supabase.auth.getUser()
+      if (!u) { setSignedIn(false); setLoading(false); return }
       setSignedIn(true)
-      const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setUserProfile(data)
+      setUser(u)
+
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', u.id).single()
+      setProfile(prof)
+
+      if (prof?.wcf_player_id) {
+        const { data: wcf } = await supabase
+          .from('wcf_players')
+          .select('dgrade, egrade, world_ranking, games, win_percentage, history_imported, country, wcf_first_name, wcf_last_name')
+          .eq('id', prof.wcf_player_id)
+          .single()
+        setWcfPlayer(wcf)
+
+        if (wcf?.history_imported) {
+          const [{ data: gms }, { data: hist }, { data: cs }] = await Promise.all([
+            supabase
+              .from('wcf_player_games')
+              .select('year, result, player_score, opponent_score, opponent_first_name, opponent_last_name, dgrade_after, opp_dgrade_after, event_name, event_date, round_detail')
+              .eq('wcf_player_id', prof.wcf_player_id)
+              .order('event_date', { ascending: true }),
+            supabase
+              .from('wcf_dgrade_history')
+              .select('recorded_at, dgrade_value, is_imported')
+              .eq('wcf_player_id', prof.wcf_player_id)
+              .order('recorded_at', { ascending: true }),
+            supabase
+              .from('wcf_player_country_stats')
+              .select('country, games, wins, losses, win_percentage')
+              .eq('wcf_player_id', prof.wcf_player_id)
+              .order('games', { ascending: false }),
+          ])
+          setGames(gms || [])
+          setHistory(hist || [])
+          setCountryStats(cs || [])
+
+          // Build opponent country stats by joining game opponent names to wcf_players
+          if (gms && gms.length > 0) {
+            const { data: oppPlayers } = await supabase
+              .from('wcf_player_games')
+              .select('result, opponent_first_name, opponent_last_name')
+              .eq('wcf_player_id', prof.wcf_player_id)
+            if (oppPlayers) {
+              // Get unique opponent names
+              const nameSet = new Set(oppPlayers.map((g: any) => `${g.opponent_first_name}|||${g.opponent_last_name}`))
+              const namePairs = [...nameSet].map(n => { const [f, l] = n.split('|||'); return { f, l } })
+              // Fetch countries for opponents
+              const { data: playerData } = await supabase
+                .from('wcf_players')
+                .select('wcf_first_name, wcf_last_name, country')
+              if (playerData) {
+                const playerMap: Record<string, string> = {}
+                playerData.forEach((p: any) => { playerMap[`${p.wcf_first_name}|||${p.wcf_last_name}`] = p.country })
+                // Aggregate by country
+                const countryMap: Record<string, { games: number; wins: number }> = {}
+                oppPlayers.forEach((g: any) => {
+                  const country = playerMap[`${g.opponent_first_name}|||${g.opponent_last_name}`]
+                  if (!country) return
+                  if (!countryMap[country]) countryMap[country] = { games: 0, wins: 0 }
+                  countryMap[country].games++
+                  if (g.result === 'win') countryMap[country].wins++
+                })
+                const oppStats = Object.entries(countryMap)
+                  .map(([country, s]) => ({ country, games: s.games, wins: s.wins, losses: s.games - s.wins }))
+                  .sort((a, b) => b.games - a.games)
+                setOppCountryStats(oppStats)
+              }
+            }
+          }
+        }
+      }
       setLoading(false)
     }
     init()
   }, [])
 
-  const fetchPlayerData = useCallback(async (player: Player, setter: (g: Game[]) => void, historySetter: (h: HistoryPoint[]) => void, countryStatsSetter: (c: any[]) => void) => {
-    if (!player.history_imported) return
-    const { data: games } = await supabase
-      .from('wcf_player_games')
-      .select('id, year, event_name, event_date, result, player_score, opponent_score, opponent_first_name, opponent_last_name, dgrade_after, opp_dgrade_after, round_detail')
-      .eq('wcf_player_id', player.id)
-      .eq('is_imported', true)
-      .order('event_date', { ascending: true })
-    setter(games || [])
+  const handleWcfLinked = async () => {
+    if (!user) return
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    setProfile(data)
+  }
 
-    const { data: history } = await supabase
-      .from('wcf_dgrade_history')
-      .select('recorded_at, dgrade_value, is_imported')
-      .eq('wcf_player_id', player.id)
-      .order('recorded_at', { ascending: true })
-    historySetter(history || [])
+  // ── Auth gate ──────────────────────────────────────────────────────────────
 
-    const { data: countryStats } = await supabase
-      .from('wcf_player_country_stats')
-      .select('country, games, wins, losses, win_percentage')
-      .eq('wcf_player_id', player.id)
-      .order('games', { ascending: false })
-    if (countryStats) countryStatsSetter(countryStats)
-  }, [])
-
-  useEffect(() => {
-    if (!playerA && !playerB) return
-    setLoadingData(true)
-    const promises = []
-    if (playerA) promises.push(fetchPlayerData(playerA, setGamesA, setHistoryA, setCountryStatsA))
-    else { setGamesA([]); setHistoryA([]); setCountryStatsA([]) }
-    if (playerB) promises.push(fetchPlayerData(playerB, setGamesB, setHistoryB, setCountryStatsB))
-    else { setGamesB([]); setHistoryB([]); setCountryStatsB([]) }
-    Promise.all(promises).then(() => setLoadingData(false))
-  }, [playerA, playerB])
-
-  // ── Derived stats ────────────────────────────────────────────────────────
-
-  // Head to head
-  const h2hGames = gamesA.filter(g =>
-    g.opponent_first_name === playerB?.wcf_first_name &&
-    g.opponent_last_name === playerB?.wcf_last_name
+  if (loading || signedIn === null) return (
+    <div style={{ minHeight: '100vh', background: G, display: 'flex', alignItems: 'center', justifyContent: 'center', color: CREAM25 }} className="gsans">
+      Loading…
+    </div>
   )
-  const h2hWins = h2hGames.filter(g => g.result === 'win').length
-  const h2hLosses = h2hGames.filter(g => g.result === 'loss').length
-
-  // Win % by year
-  const yearStats = (games: Game[]) => {
-    const map: Record<number, { w: number; t: number }> = {}
-    for (const g of games) {
-      if (!map[g.year]) map[g.year] = { w: 0, t: 0 }
-      map[g.year].t++
-      if (g.result === 'win') map[g.year].w++
-    }
-    return map
-  }
-  const yearA = yearStats(gamesA)
-  const yearB = yearStats(gamesB)
-  const allYears = Array.from(new Set([...Object.keys(yearA), ...Object.keys(yearB)]))
-    .map(Number).sort((a, b) => a - b)
-
-  const yearChartData = allYears.map(y => ({
-    year: String(y),
-    a: yearA[y] ? winPctNum(yearA[y].w, yearA[y].t) : null,
-    b: yearB[y] ? winPctNum(yearB[y].w, yearB[y].t) : null,
-  }))
-
-  // Performance vs grade bands
-  const bandStats = (games: Game[]) => GRADE_BANDS.map(band => {
-    const relevant = games.filter(g => g.opp_dgrade_after >= band.min && g.opp_dgrade_after <= band.max)
-    const wins = relevant.filter(g => g.result === 'win').length
-    return { w: wins, t: relevant.length }
-  })
-  const bandsA = bandStats(gamesA)
-  const bandsB = bandStats(gamesB)
-
-  // Recent form (last 10/20/50)
-  const recentForm = (games: Game[], n: number) => {
-    const last = [...games].slice(-n)
-    const wins = last.filter(g => g.result === 'win').length
-    return { w: wins, t: last.length }
-  }
-
-  // Peak dGrade
-  const peakGrade = (games: Game[]) =>
-    games.length ? Math.max(...games.map(g => g.dgrade_after)) : null
-
-  // Streaks
-  const streaks = (games: Game[]) => {
-    let maxWin = 0, maxLoss = 0, curWin = 0, curLoss = 0
-    for (const g of games) {
-      if (g.result === 'win') { curWin++; curLoss = 0; maxWin = Math.max(maxWin, curWin) }
-      else { curLoss++; curWin = 0; maxLoss = Math.max(maxLoss, curLoss) }
-    }
-    return { maxWin, maxLoss }
-  }
-  const streakA = streaks(gamesA)
-  const streakB = streaks(gamesB)
-
-  // Best wins — with pre-game grades (same logic as dashboard)
-  const withBefore = (games: Game[]) => games.map((g, i) => {
-    const prev = i > 0 ? games[i - 1] : null
-    const myGradeBefore = prev?.dgrade_after || g.dgrade_after
-    const prevOpp = games.slice(0, i).reverse().find(pg =>
-      pg.opponent_first_name === g.opponent_first_name &&
-      pg.opponent_last_name === g.opponent_last_name
-    )
-    const oppGradeBefore = prevOpp?.opp_dgrade_after || g.opp_dgrade_after
-    return { ...g, myGradeBefore, oppGradeBefore, diff: (oppGradeBefore || 0) - (myGradeBefore || 0) }
-  })
-  const gamesAWithBefore = withBefore(gamesA)
-  const gamesBWithBefore = withBefore(gamesB)
-  const topWins = (enriched: typeof gamesAWithBefore, sortBy: 'grade' | 'diff') => {
-    const wins = enriched.filter(g => g.result === 'win' && g.oppGradeBefore)
-    if (sortBy === 'grade') return [...wins].sort((a, b) => (b.oppGradeBefore || 0) - (a.oppGradeBefore || 0)).slice(0, 5)
-    return [...wins].filter(g => g.diff > 0).sort((a, b) => b.diff - a.diff).slice(0, 5)
-  }
-
-  // Common opponents
-  const commonOpponents = () => {
-    if (!gamesA.length || !gamesB.length) return []
-    const oppMapA: Record<string, { w: number; t: number }> = {}
-    for (const g of gamesA) {
-      const key = `${g.opponent_first_name} ${g.opponent_last_name}`
-      if (!oppMapA[key]) oppMapA[key] = { w: 0, t: 0 }
-      oppMapA[key].t++
-      if (g.result === 'win') oppMapA[key].w++
-    }
-    const oppMapB: Record<string, { w: number; t: number }> = {}
-    for (const g of gamesB) {
-      const key = `${g.opponent_first_name} ${g.opponent_last_name}`
-      if (!oppMapB[key]) oppMapB[key] = { w: 0, t: 0 }
-      oppMapB[key].t++
-      if (g.result === 'win') oppMapB[key].w++
-    }
-    return Object.keys(oppMapA)
-      .filter(k => oppMapB[k])
-      .map(k => ({ name: k, a: oppMapA[k], b: oppMapB[k] }))
-      .sort((x, y) => Math.min(y.a.t, y.b.t) - Math.min(x.a.t, x.b.t))
-      .slice(0, 10)
-  }
-  const commonOpps = commonOpponents()
-
-  // dGrade chart overlay
-  const gradeChartData = (() => {
-    if (!historyA.length && !historyB.length) return []
-    const allDates = new Set([
-      ...historyA.map(h => h.recorded_at.slice(0, 10)),
-      ...historyB.map(h => h.recorded_at.slice(0, 10)),
-    ])
-    const mapA = new Map(historyA.map(h => [h.recorded_at.slice(0, 10), h.dgrade_value]))
-    const mapB = new Map(historyB.map(h => [h.recorded_at.slice(0, 10), h.dgrade_value]))
-    let lastA: number | null = null, lastB: number | null = null
-    return Array.from(allDates).sort().map(date => {
-      if (mapA.has(date)) lastA = mapA.get(date)!
-      if (mapB.has(date)) lastB = mapB.get(date)!
-      return { date: date.slice(0, 7), a: lastA, b: lastB }
-    }).filter((_, i, arr) => i === 0 || arr[i].date !== arr[i - 1].date)
-  })()
-
-  const hasData = gamesA.length > 0 || gamesB.length > 0
-  const bothHaveData = gamesA.length > 0 && gamesB.length > 0
-  const nameA = playerA ? `${playerA.wcf_first_name} ${playerA.wcf_last_name}` : 'Player A'
-  const nameB = playerB ? `${playerB.wcf_first_name} ${playerB.wcf_last_name}` : 'Player B'
-
-  if (loading || signedIn === null) return <div style={{ minHeight: "100vh", background: "#0d2818", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(232,224,208,0.3)" }}><style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>Loading…</div>
 
   if (!signedIn) return (
-    <div style={{ minHeight: "100vh", background: "#f5f2ec", display: "flex", flexDirection: "column" }}>
-      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
-      <GCLabNav role="" isSignedIn={false} currentPath="/compare" />
-      <div className="flex-1 flex items-center justify-center px-6 py-20">
-        <div className="relative w-full max-w-lg">
-          <div className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm" style={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
-            <div className="p-5 border-b border-gray-100 bg-gray-50 flex gap-3">
-              <div className="flex-1 h-9 bg-gray-200 rounded-lg"/>
-              <div className="w-8 h-9 bg-green-200 rounded-lg"/>
-              <div className="flex-1 h-9 bg-gray-200 rounded-lg"/>
+    <div style={{ minHeight: '100vh', background: '#f5f2ec', display: 'flex', flexDirection: 'column' }}>
+      <style dangerouslySetInnerHTML={{ __html: ML }}/>
+      <GCLabNav role="" isSignedIn={false} currentPath="/dashboard"/>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: 520 }}>
+          {/* Blurred background */}
+          <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid #e5e1d8', background: 'white', filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0ede8', background: '#faf9f7' }}>
+              <div style={{ height: 22, width: 160, background: '#e5e1d8', borderRadius: 4, marginBottom: 8 }}/>
+              <div style={{ height: 14, width: 100, background: '#ede9e2', borderRadius: 4 }}/>
             </div>
-            <div className="p-5 bg-white">
-              <svg width="100%" height="160" viewBox="0 0 600 160">
-                <defs>
-                  <linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#16a34a" stopOpacity="0.25"/><stop offset="100%" stopColor="#16a34a" stopOpacity="0.02"/></linearGradient>
-                  <linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2"/><stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02"/></linearGradient>
-                </defs>
-                {([30,70,110,150] as number[]).map((y) => <line key={y} x1="0" y1={y} x2="600" y2={y} stroke="#e5e7eb" strokeWidth="1"/>)}
-                <path d="M0,130 C60,110 120,70 180,55 C240,40 300,35 360,45 C420,55 480,80 540,100 C570,110 590,120 600,125 L600,160 L0,160 Z" fill="url(#cg1)"/>
-                <path d="M0,130 C60,110 120,70 180,55 C240,40 300,35 360,45 C420,55 480,80 540,100 C570,110 590,120 600,125" fill="none" stroke="#16a34a" strokeWidth="2.5"/>
-                <path d="M0,145 C60,135 120,100 180,85 C240,70 300,65 360,75 C420,85 480,105 540,120 C570,128 590,135 600,138 L600,160 L0,160 Z" fill="url(#cg2)"/>
-                <path d="M0,145 C60,135 120,100 180,85 C240,70 300,65 360,75 C420,85 480,105 540,120 C570,128 590,135 600,138" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeDasharray="5 3"/>
-                <circle cx="300" cy="35" r="5" fill="#16a34a"/>
-                <circle cx="300" cy="65" r="5" fill="#3b82f6"/>
-              </svg>
-            </div>
-            <div className="p-5 border-t border-gray-100 grid grid-cols-3 gap-3">
-              {[{c:'bg-green-50',w:'w-16'},{c:'bg-blue-50',w:'w-20'},{c:'bg-gray-50',w:'w-14'}].map(({c,w},i) => (
-                <div key={i} className={`${c} rounded-lg p-3`}><div className={`h-6 ${w} bg-white/80 rounded mb-1`}/><div className="h-3 w-12 bg-white/60 rounded"/></div>
+            <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
+              {[{ c: '#dcfce7' }, { c: '#dbeafe' }, { c: '#fef3c7' }, { c: '#f3e8ff' }].map(({ c }, i) => (
+                <div key={i} style={{ background: c, borderRadius: 12, padding: 16 }}>
+                  <div style={{ height: 22, width: 64, background: 'rgba(255,255,255,0.7)', borderRadius: 4, marginBottom: 6 }}/>
+                  <div style={{ height: 11, width: 88, background: 'rgba(255,255,255,0.5)', borderRadius: 4 }}/>
+                </div>
               ))}
             </div>
           </div>
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm rounded-2xl">
-            <div className="text-center px-8 py-10 max-w-sm">
-              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5 text-2xl">⚔️</div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Compare any two players</h2>
-              <p className="text-sm text-gray-500 mb-6 leading-relaxed">Head-to-head grade history, win rates, performance trends. Pick any two players and see how they stack up over time.</p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <a href="/login?mode=signup" className="bg-green-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 transition text-center">Create free account</a>
-                <a href="/login" className="border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg text-sm font-medium hover:border-green-500 hover:text-green-700 transition text-center">Sign in</a>
+          {/* Overlay */}
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(6px)', borderRadius: 20 }}>
+            <div style={{ textAlign: 'center', padding: '32px 40px', maxWidth: 360 }}>
+              <div style={{ width: 56, height: 56, background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px', fontSize: 24 }}>🎯</div>
+              <h2 className="ghl" style={{ fontSize: 22, color: G, marginBottom: 8, fontWeight: 900 }}>Your personal dashboard</h2>
+              <p className="gsans" style={{ fontSize: 14, color: '#6b7280', marginBottom: 22, lineHeight: 1.6 }}>Track your grade, career stats, win rates and more. Free to set up in 30 seconds.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <a href="/login?mode=signup" style={{ background: G, color: LIME, padding: '11px 20px', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none', textAlign: 'center', fontFamily: 'DM Sans, sans-serif' }}>Create free account</a>
+                <a href="/login" style={{ border: '1px solid #d1d5db', color: '#374151', padding: '11px 20px', borderRadius: 8, fontSize: 14, fontWeight: 500, textDecoration: 'none', textAlign: 'center', fontFamily: 'DM Sans, sans-serif' }}>Sign in</a>
               </div>
-              <p className="text-xs text-gray-400 mt-4">Free · No credit card · 30 seconds</p>
+              <p className="gsans" style={{ fontSize: 11, color: '#9ca3af', marginTop: 14 }}>Free · No credit card · 30 seconds</p>
             </div>
           </div>
         </div>
@@ -509,405 +466,539 @@ export default function ComparePage() {
     </div>
   )
 
+  // ── Computed stats ─────────────────────────────────────────────────────────
+
+  const hasWcf     = !!profile?.wcf_player_id
+  const hasHistory = hasWcf && wcfPlayer?.history_imported && games.length > 0
+
+  const totalGames      = games.length
+  const totalWins       = games.filter((g: any) => g.result === 'win').length
+  const overallPct      = pct(totalWins, totalGames)
+  const peakDgrade      = games.length ? Math.max(...games.map((g: any) => g.dgrade_after || 0)) : 0
+  const yearsSet        = new Set(games.map((g: any) => g.year))
+  const yearsActive     = yearsSet.size
+  const countriesPlayed = countryStats.length
+
+  // Win by year — fall back to event_date year if year field is null
+  const yearMap: Record<number, { w: number; t: number }> = {}
+  for (const g of games) {
+    const yr = g.year || (g.event_date ? new Date(g.event_date).getFullYear() : null)
+    if (!yr) continue
+    if (!yearMap[yr]) yearMap[yr] = { w: 0, t: 0 }
+    yearMap[yr].t++
+    if (g.result === 'win') yearMap[yr].w++
+  }
+  const yearData = Object.entries(yearMap)
+    .map(([y, v]) => ({ year: Number(y), w: v.w, t: v.t }))
+    .sort((a, b) => a.year - b.year)
+
+  // Win by grade band
+  const bandData = GRADE_BANDS.map(band => {
+    const rel  = games.filter((g: any) => g.opp_dgrade_after >= band.min && g.opp_dgrade_after <= band.max)
+    const wins = rel.filter((g: any) => g.result === 'win').length
+    return { ...band, w: wins, t: rel.length }
+  }).filter(b => b.t > 0)
+
+  // Biggest upset — use dgrade BEFORE the game (previous game's dgrade_after)
+  // games is sorted chronologically, so we can walk the array to find each game's pre-game grade
+  const gamesWithBefore = games.map((g: any, i: number) => {
+    // Player's grade before this game = dgrade_after of their most recent previous game
+    const prevGame = i > 0 ? games[i - 1] : null
+    const myGradeBefore = prevGame?.dgrade_after || g.dgrade_after
+    // Opponent's grade before this game: find their most recent game before this one as opponent
+    // Since we don't have full opponent history, use opp_dgrade_after of prev game in same event
+    // as a proxy, or fall back to opp_dgrade_after of this game
+    const prevSameEvent = games.slice(0, i).reverse().find((pg: any) =>
+      pg.opponent_first_name === g.opponent_first_name &&
+      pg.opponent_last_name === g.opponent_last_name
+    )
+    const oppGradeBefore = prevSameEvent?.opp_dgrade_after || g.opp_dgrade_after
+    return { ...g, myGradeBefore, oppGradeBefore, diff: oppGradeBefore - myGradeBefore }
+  })
+  const biggestUpset = gamesWithBefore
+    .filter((g: any) => g.result === 'win' && g.oppGradeBefore && g.myGradeBefore)
+    .filter((g: any) => g.diff > 0)
+    .sort((a: any, b: any) => b.diff - a.diff)[0] || null
+
+  // Streaks
+  let maxWin = 0, maxLoss = 0, curW = 0, curL = 0, curStreak = 0, curStreakType = ''
+  for (const g of games) {
+    if (g.result === 'win') { curW++; curL = 0; maxWin = Math.max(maxWin, curW) }
+    else                    { curL++; curW = 0; maxLoss = Math.max(maxLoss, curL) }
+  }
+  if (games.length) {
+    const last = games[games.length - 1]
+    curStreakType = last.result === 'win' ? 'W' : 'L'
+    curStreak = last.result === 'win' ? curW : curL
+  }
+
+  // Recent form (last 10 games)
+  const recentForm = [...games].slice(-10)
+
+  // Best wins by opponent grade
+  // bestWins uses pre-game grades (same logic as biggestUpset)
+  const winsWithBefore = gamesWithBefore.filter((g: any) =>
+    g.result === 'win' && g.oppGradeBefore && g.myGradeBefore
+  )
+  const bestWinsByGrade = [...winsWithBefore]
+    .sort((a: any, b: any) => b.oppGradeBefore - a.oppGradeBefore)
+    .slice(0, 10)
+  const bestWinsByDiff = [...winsWithBefore]
+    .filter((g: any) => g.diff > 0)
+    .sort((a: any, b: any) => b.diff - a.diff)
+    .slice(0, 10)
+
+  // Hero stat values
+  const heroStats = [
+    { label: 'Total Games',      value: hasHistory ? totalGames.toLocaleString() : (wcfPlayer?.games ?? '—'),      accent: false },
+    { label: 'Career Win %',     value: hasHistory ? (overallPct !== null ? `${overallPct}%` : '—') : (wcfPlayer?.win_percentage ? `${Math.round(wcfPlayer.win_percentage * 100) / 100}%` : '—'), accent: overallPct !== null && overallPct >= 50 },
+    { label: 'Current dGrade',   value: wcfPlayer?.dgrade ?? profile?.dgrade ?? '—',    accent: false },
+    { label: 'Peak dGrade',      value: hasHistory && peakDgrade ? peakDgrade.toLocaleString() : '—', accent: hasHistory && peakDgrade > 0 },
+    { label: 'World Rank',       value: wcfPlayer?.world_ranking ? `#${wcfPlayer.world_ranking}` : '—', accent: false },
+    { label: 'Countries Played In', value: hasHistory && countriesPlayed ? countriesPlayed : yearsActive ? `${yearsActive}yr` : '—', accent: false },
+  ]
+
+  const displayName = profile?.first_name
+    ? `${profile.first_name}${profile.last_name ? ' ' + profile.last_name : ''}`
+    : user?.email?.split('@')[0] || 'Player'
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f2ec" }}>
-      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
-      <GCLabNav role={userProfile?.role} isSignedIn={true} currentPath="/compare" />
+    <div style={{ minHeight: '100vh', background: '#f5f2ec' }}>
+      <style dangerouslySetInnerHTML={{ __html: ML }}/>
+      <GCLabNav role={profile?.role} isSignedIn={true} currentPath="/dashboard"/>
 
-      {/* Dark header — title only */}
-      <div style={{ background: "#0d2818", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)" }}/>
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backgroundImage: "linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)", backgroundSize: "44px 44px" }}/>
-        <div style={{ maxWidth: "80rem", margin: "0 auto", padding: "36px 24px 28px", position: "relative", zIndex: 1 }}>
-          <h2 className="ghl" style={{ fontSize: "clamp(24px,3vw,40px)", color: "#e8e0d0", fontWeight: 900, marginBottom: 8, letterSpacing: "-0.5px" }}>Compare Players</h2>
-          <p className="gsans" style={{ fontSize: 14, color: "rgba(232,224,208,0.5)" }}>Head to head stats, grade history and career comparisons.</p>
-        </div>
-        <div style={{ height: 24, background: "linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)" }}/>
-      </div>
+      {/* ── DARK HERO ZONE ─────────────────────────────────────────────────── */}
+      <div style={{ background: G, position: 'relative', overflow: 'hidden' }}>
+        {/* Background glow */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)' }}/>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(255,255,255,0.014) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.014) 1px,transparent 1px)', backgroundSize: '44px 44px' }}/>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-
-        {/* ── Player selection ─────────────────────────────────────────── */}
-        <div style={{ background: "white", border: "1px solid #e8e4de", borderRadius: 16, padding: 24, marginBottom: 24, boxShadow: "0 1px 4px rgba(13,40,24,0.06)" }}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <PlayerSearch label="Player 1" color="green" selected={playerA}
-              onSelect={(p) => { setPlayerA(p); setGamesA([]); setHistoryA([]) }}
-              exclude={playerB?.id || null} />
-            <PlayerSearch label="Player 2" color="blue" selected={playerB}
-              onSelect={(p) => { setPlayerB(p); setGamesB([]); setHistoryB([]) }}
-              exclude={playerA?.id || null} />
+        {/* Header */}
+        <div className="dash-pad" style={{ padding: '40px 48px 20px', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(74,222,128,0.09)', border: '1px solid rgba(74,222,128,0.18)', color: LIME, padding: '3px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }} className="gsans">
+            My Dashboard
           </div>
-          {loadingData && (
-            <p className="gsans" style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", marginTop: 16 }}>Loading player data…</p>
+          <h1 className="ghl" style={{ fontSize: 'clamp(28px, 3.5vw, 48px)', color: CREAM, fontWeight: 900, lineHeight: 1.08, marginBottom: 6 }}>
+            Welcome back, {displayName}
+          </h1>
+          {wcfPlayer && (
+            <div className="gsans" style={{ fontSize: 13, color: CREAM60, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span>{getFlag(wcfPlayer.country)} {wcfPlayer.wcf_first_name} {wcfPlayer.wcf_last_name}</span>
+              {wcfPlayer.dgrade && <span>· dGrade <strong style={{ color: LIME }}>{wcfPlayer.dgrade}</strong></span>}
+              {wcfPlayer.world_ranking && <span>· World <strong style={{ color: CREAM }}>#{wcfPlayer.world_ranking}</strong></span>}
+            </div>
           )}
         </div>
 
-        {/* Placeholder */}
-        {!playerA && !playerB && (
-          <div className="text-center py-20 text-gray-300">
-            <p className="text-5xl mb-4">⚔️</p>
-            <p className="text-lg font-medium text-gray-400">Select two players to compare</p>
-            <p className="text-sm mt-1">Players with a green dot have full history imported</p>
+        {/* WCF link / import prompts */}
+        {!hasWcf && (
+          <div className="dash-pad" style={{ padding: '0 48px 28px', position: 'relative', zIndex: 1 }}>
+            {profile && !profile.wcf_player_id && profile.first_name && profile.last_name && (
+              <WcfMatchBanner userId={user.id} firstName={profile.first_name} lastName={profile.last_name} onLinked={handleWcfLinked}/>
+            )}
+            {!(profile?.first_name) && <WcfLinkPrompt/>}
+          </div>
+        )}
+        {hasWcf && !wcfPlayer?.history_imported && (
+          <div className="dash-pad" style={{ padding: '0 48px 24px', position: 'relative', zIndex: 1 }}>
+            <WcfImportPrompt wcfPlayerId={profile.wcf_player_id}/>
           </div>
         )}
 
-        {(playerA || playerB) && (
-          <div className="space-y-6">
+        {/* Hero stat cards */}
+        <div className="dash-pad dash-hero-grid" style={{ padding: '0 48px 32px', display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, position: 'relative', zIndex: 1 }}>
+          {heroStats.map(s => (
+            <StatCard key={s.label} label={s.label} value={s.value} accent={s.accent}/>
+          ))}
+        </div>
 
-            {/* Overview cards */}
-            <section>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Overview</h3>
-
-              {/* Player name headers */}
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="text-center">
-                  <p className="font-semibold text-green-700 truncate">{nameA}</p>
-                  {playerA && <p className="text-xs text-gray-400">{getFlag(playerA.country)} {playerA.country}</p>}
+        {/* Career chart */}
+        {hasHistory && history.length > 1 && (
+          <div className="dash-pad" style={{ padding: '0 48px 0', position: 'relative', zIndex: 1 }}>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, overflow: 'hidden', maxWidth: 1200 }}>
+              {/* Chart header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <div className="ghl" style={{ fontSize: 16, color: CREAM, fontWeight: 700 }}>Grade History</div>
+                  <div className="gsans" style={{ fontSize: 11, color: CREAM25, marginTop: 2 }}>Your complete career arc</div>
                 </div>
-                <div className="text-center">
-                  <p className="font-semibold text-blue-700 truncate">{nameB}</p>
-                  {playerB && <p className="text-xs text-gray-400">{getFlag(playerB.country)} {playerB.country}</p>}
+                <div style={{ display: 'flex', gap: 20 }}>
+                  {[
+                    { label: 'Current', val: wcfPlayer?.dgrade, highlight: false },
+                    { label: 'Peak',    val: peakDgrade || '—',  highlight: true  },
+                    { label: 'Years',   val: yearsActive,        highlight: false },
+                  ].map(({ label, val, highlight }) => (
+                    <div key={label} style={{ textAlign: 'center' }}>
+                      <div className="gmono" style={{ fontSize: 18, fontWeight: 500, color: highlight ? LIME : CREAM, lineHeight: 1 }}>{val || '—'}</div>
+                      <div className="gsans" style={{ fontSize: 10, color: CREAM25, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Chart */}
+              <div style={{ padding: '16px 16px 8px' }}>
+                <CareerChart history={history}/>
+              </div>
+              {/* Legend */}
+              <div style={{ padding: '8px 24px 16px', display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+                {[
+                  { label: 'dGrade', color: LIME, dash: false },
+                  { label: 'Peak grade', color: LIME, dot: true },
+                ].map(({ label, color, dash, dot }: any) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: CREAM25 }} className="gsans">
+                    {dot
+                      ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }}/>
+                      : <span style={{ width: 18, height: 2, background: color, display: 'inline-block', borderRadius: 1 }}/>
+                    }
+                    {label}
+                  </div>
+                ))}
+                <a href="/rankings?tab=Historical+Rankings" style={{ marginLeft: 'auto', fontSize: 11, color: LIME, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif' }}>
+                  Full historical chart →
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Spacer */}
+        <div style={{ height: 40 }}/>
+      </div>
+
+      {/* ── LIGHT STATS SECTION ───────────────────────────────────────────── */}
+      <div className="dash-section" style={{ background: '#f5f2ec', padding: '40px 48px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+
+          {hasHistory ? (
+            <>
+              {/* ── Win Rate by Year + Grade Band ─────────────────────────── */}
+              <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+
+                {/* Win by Year */}
+                <div className="dash-light-card">
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                    <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Win Rate by Year</h3>
+                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Annual win percentage across your career</p>
+                  </div>
+                  <div style={{ padding: '16px 20px 8px' }}>
+                    <YearBars data={yearData}/>
+                  </div>
+                  {/* Year table */}
+                  <div style={{ borderTop: '1px solid #f0ede8' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 70px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
+                      {['Year', 'W', 'L', 'Win %'].map(h => (
+                        <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+                      ))}
+                    </div>
+                    {yearData.slice(-6).reverse().map(({ year, w, t }) => {
+                      const p = pct(w, t)
+                      return (
+                        <div key={year} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 70px', padding: '8px 20px', borderTop: '1px solid #f7f4f0' }}>
+                          <span className="gmono" style={{ fontSize: 13, color: G }}>{year}</span>
+                          <span className="gmono" style={{ fontSize: 13, color: '#16a34a' }}>{w}</span>
+                          <span className="gmono" style={{ fontSize: 13, color: '#dc2626' }}>{t - w}</span>
+                          <span className="gmono" style={{ fontSize: 13, color: p !== null ? pctColor(p) : '#9ca3af' }}>{p !== null ? `${p}%` : '—'}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Win by Grade Band */}
+                <div className="dash-light-card">
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                    <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Performance vs Grade Band</h3>
+                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>How you perform against different opponent grades</p>
+                  </div>
+                  <div style={{ padding: '20px 24px' }}>
+                    {bandData.length === 0 && (
+                      <p className="gsans" style={{ fontSize: 13, color: '#9ca3af' }}>No opponent grade data yet</p>
+                    )}
+                    {bandData.map(band => {
+                      const p = pct(band.w, band.t)
+                      return (
+                        <div key={band.label} style={{ marginBottom: 18 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                            <span className="gsans" style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>{band.label}</span>
+                            <span className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>{band.w}W – {band.t - band.w}L ({band.t} games)</span>
+                          </div>
+                          <div style={{ height: 10, background: '#f0ede8', borderRadius: 5, overflow: 'hidden' }}>
+                            <div style={{ width: `${p || 0}%`, height: '100%', background: p !== null ? pctColor(p) : '#e5e7eb', borderRadius: 5, transition: 'width 0.6s ease' }}/>
+                          </div>
+                          {p !== null && (
+                            <div className="gmono" style={{ fontSize: 11, color: pctColor(p), marginTop: 3, textAlign: 'right' }}>{p}%</div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                <StatCard label="World Ranking" a={playerA ? `#${playerA.world_ranking}` : '—'} b={playerB ? `#${playerB.world_ranking}` : '—'} higherIsBetter={false} />
-                <StatCard label="dGrade" a={playerA?.dgrade ?? '—'} b={playerB?.dgrade ?? '—'} />
-                <StatCard label="eGrade" a={playerA?.egrade || '—'} b={playerB?.egrade || '—'} />
-                <StatCard label="Win % (career)" a={playerA ? `${playerA.win_percentage}%` : '—'} b={playerB ? `${playerB.win_percentage}%` : '—'} />
-                <StatCard label="Total Games" a={playerA?.games ?? '—'} b={playerB?.games ?? '—'} />
-                <StatCard label="Peak dGrade" a={peakGrade(gamesA) ?? (playerA?.dgrade ?? '—')} b={peakGrade(gamesB) ?? (playerB?.dgrade ?? '—')} />
-                <StatCard label="Longest Win Streak" a={streakA.maxWin || '—'} b={streakB.maxWin || '—'} />
-                <StatCard label="Longest Loss Streak" a={streakA.maxLoss || '—'} b={streakB.maxLoss || '—'} higherIsBetter={false} />
-              </div>
-            </section>
+              {/* ── Biggest Upset + Recent Form ───────────────────────────── */}
+              <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
 
-            {/* Head to Head */}
-            {bothHaveData && (
-              <section>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Head to Head</h3>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                  {h2hGames.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-4">No direct matches found in imported data</p>
-                  ) : (
-                    <>
-                      {/* H2H summary */}
-                      <div className="flex items-center justify-center gap-8 mb-6">
-                        <div className="text-center">
-                          <p className="text-4xl font-bold text-green-600">{h2hWins}</p>
-                          <p className="text-xs text-gray-400 mt-1">{nameA.split(' ')[0]} wins</p>
+                {/* Biggest Upset */}
+                <div className="dash-light-card">
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                    <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>🏆 Biggest Upset</h3>
+                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Your best win against a higher-graded opponent</p>
+                  </div>
+                  {biggestUpset ? (
+                    <div style={{ padding: '24px' }}>
+                      <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid #bbf7d0', borderRadius: 12, padding: '20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                          <div>
+                            <div className="ghl" style={{ fontSize: 20, color: G, fontWeight: 900 }}>
+                              -{biggestUpset.diff} dGrade gap
+                            </div>
+                            <div className="gsans" style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>Grade advantage to opponent (pre-game)</div>
+                          </div>
+                          <div style={{ background: '#16a34a', color: 'white', borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }} className="gmono">
+                            {biggestUpset.player_score}–{biggestUpset.opponent_score}
+                          </div>
                         </div>
-                        <div className="text-center">
-                          <p className="text-2xl font-semibold text-gray-300">—</p>
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+                          <span className="gmono" style={{ fontSize: 22, color: G, fontWeight: 700 }}>{biggestUpset.myGradeBefore}</span>
+                          <span className="gsans" style={{ fontSize: 13, color: '#6b7280' }}>You</span>
+                          <span style={{ color: '#9ca3af', fontSize: 14 }}>vs</span>
+                          <span className="gmono" style={{ fontSize: 22, color: '#dc2626', fontWeight: 700 }}>{biggestUpset.oppGradeBefore}</span>
+                          <span className="gsans" style={{ fontSize: 13, color: '#6b7280' }}>
+                            {biggestUpset.opponent_first_name} {biggestUpset.opponent_last_name}
+                          </span>
                         </div>
-                        <div className="text-center">
-                          <p className="text-4xl font-bold text-blue-600">{h2hLosses}</p>
-                          <p className="text-xs text-gray-400 mt-1">{nameB.split(' ')[0]} wins</p>
-                        </div>
+                        {biggestUpset.event_name && (
+                          <div className="gsans" style={{ fontSize: 11, color: '#6b7280' }}>
+                            {biggestUpset.event_name}
+                            {biggestUpset.event_date && ` · ${new Date(biggestUpset.event_date).getFullYear()}`}
+                          </div>
+                        )}
                       </div>
+                    </div>
+                  ) : (
+                    <div style={{ padding: '32px 24px', textAlign: 'center', color: '#9ca3af' }} className="gsans">
+                      No upset wins found yet
+                    </div>
+                  )}
+                </div>
 
-                      {/* H2H game log */}
-                      <div className="space-y-1.5">
-                        {(showAllH2H ? h2hGames : h2hGames.slice(-5)).map(g => (
-                          <div key={g.id} className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${g.result === 'win' ? 'bg-green-50' : 'bg-blue-50'}`}>
-                            <span className={`font-semibold w-8 ${g.result === 'win' ? 'text-green-700' : 'text-blue-700'}`}>
-                              {g.result === 'win' ? 'W' : 'L'}
-                            </span>
-                            <span className="text-gray-600 flex-1">{g.event_name}</span>
-                            <span className="text-gray-500 font-mono">{g.player_score}–{g.opponent_score}</span>
-                            <span className="text-gray-400 ml-3 w-16 text-right">{g.event_date?.slice(0, 7)}</span>
+                {/* Recent Form + Streaks */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {/* Recent Form */}
+                  <div className="dash-light-card" style={{ flex: 1 }}>
+                    <div style={{ padding: '18px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                      <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Recent Form</h3>
+                      <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Last {recentForm.length} games</p>
+                    </div>
+                    <div style={{ padding: '18px 24px' }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {recentForm.map((g: any, i: number) => (
+                          <div key={i} title={`${g.result === 'win' ? 'W' : 'L'} ${g.player_score}–${g.opponent_score} vs ${g.opponent_first_name} ${g.opponent_last_name}`} style={{
+                            width: 36, height: 36, borderRadius: 8,
+                            background: g.result === 'win' ? '#dcfce7' : '#fee2e2',
+                            border: `1px solid ${g.result === 'win' ? '#bbf7d0' : '#fecaca'}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 13, fontWeight: 700,
+                            color: g.result === 'win' ? '#16a34a' : '#dc2626',
+                            fontFamily: 'DM Mono, monospace',
+                          }}>
+                            {g.result === 'win' ? 'W' : 'L'}
                           </div>
                         ))}
                       </div>
-                      {h2hGames.length > 5 && (
-                        <button onClick={() => setShowAllH2H(p => !p)}
-                          className="mt-3 text-xs text-gray-400 hover:text-gray-600 w-full text-center">
-                          {showAllH2H ? 'Show less' : `Show all ${h2hGames.length} matches`}
-                        </button>
+                      {curStreak > 1 && (
+                        <div className="gsans" style={{ marginTop: 12, fontSize: 13, color: curStreakType === 'W' ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                          Current streak: {curStreak} {curStreakType === 'W' ? 'wins' : 'losses'} in a row
+                        </div>
                       )}
-                    </>
-                  )}
-                </div>
-              </section>
-            )}
+                    </div>
+                  </div>
 
-            {/* Best Wins */}
-            {(gamesA.length > 0 || gamesB.length > 0) && (
-              <section>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Best Wins</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {([
-                    { name: nameA, enriched: gamesAWithBefore, sort: winsSortA, setSort: setWinsSortA, color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-100' },
-                    { name: nameB, enriched: gamesBWithBefore, sort: winsSortB, setSort: setWinsSortB, color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-100' },
-                  ]).map(({ name, enriched, sort, setSort, color, bg, border }) => {
-                    const wins = topWins(enriched, sort)
-                    return (
-                      <div key={name} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className={`px-4 py-3 border-b ${border} ${bg} flex items-center justify-between gap-2 flex-wrap`}>
-                          <span className={`font-semibold text-sm ${color}`}>{name}</span>
-                          <div className="flex gap-1.5">
+                  {/* Streaks */}
+                  <div className="dash-light-card">
+                    <div style={{ padding: '16px 24px', display: 'flex', gap: 16 }}>
+                      <div style={{ flex: 1, textAlign: 'center' }}>
+                        <div className="gmono" style={{ fontSize: 32, fontWeight: 500, color: '#16a34a', lineHeight: 1 }}>{maxWin}</div>
+                        <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>All time longest win streak</div>
+                      </div>
+                      <div style={{ width: 1, background: '#f0ede8' }}/>
+                      <div style={{ flex: 1, textAlign: 'center' }}>
+                        <div className="gmono" style={{ fontSize: 32, fontWeight: 500, color: '#dc2626', lineHeight: 1 }}>{maxLoss}</div>
+                        <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>All time longest loss streak</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Best Wins + Country Breakdown ─────────────────────────── */}
+              <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+
+                {/* Best Wins */}
+                {(() => {
+                  const bestWins = winsSort === 'grade' ? bestWinsByGrade : bestWinsByDiff
+                  return (
+                    <div className="dash-light-card">
+                      <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid #f0ede8' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                          <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700 }}>Best Wins</h3>
+                          <div style={{ display: 'flex', gap: 4 }}>
                             {(['grade', 'diff'] as const).map(s => (
-                              <button key={s} onClick={() => setSort(s)}
-                                className={`text-xs px-2.5 py-1 rounded-full border transition ${sort === s ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
+                              <button key={s} onClick={() => setWinsSort(s)}
+                                className="gsans"
+                                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 12, border: `1px solid ${winsSort === s ? G : '#e5e7eb'}`,
+                                  background: winsSort === s ? G : 'white', color: winsSort === s ? LIME : '#6b7280',
+                                  cursor: 'pointer', fontWeight: winsSort === s ? 600 : 400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                 {s === 'grade' ? 'Top Grade' : 'Biggest Upset'}
                               </button>
                             ))}
                           </div>
                         </div>
-                        {wins.length === 0 ? (
-                          <p className="text-sm text-gray-400 p-4 text-center">No wins on record</p>
-                        ) : (
-                          <div>
-                            <div className="grid grid-cols-[20px_1fr_56px_56px_48px] px-4 py-2 bg-gray-50 border-b border-gray-100">
-                              {['', 'Opponent', 'You', 'Them', 'Score'].map(h => (
-                                <span key={h} className="text-xs text-gray-400 uppercase tracking-wide font-medium">{h}</span>
-                              ))}
-                            </div>
-                            {wins.map((g, i) => (
-                              <div key={i} className="grid grid-cols-[20px_1fr_56px_56px_48px] px-4 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 items-center">
-                                <span className="text-xs text-gray-300 font-mono">#{i+1}</span>
-                                <div>
-                                  <div className="text-sm text-gray-800 font-medium">{g.opponent_first_name} {g.opponent_last_name}</div>
-                                  {g.event_name && <div className="text-xs text-gray-400 mt-0.5">{g.event_name}{g.event_date ? ` · ${g.event_date.slice(0,4)}` : ''}</div>}
-                                </div>
-                                <span className="text-xs font-mono text-gray-600">{g.myGradeBefore}</span>
-                                <div>
-                                  <span className="text-xs font-mono text-red-500 font-semibold">{g.oppGradeBefore}</span>
-                                  {g.diff > 0 && <span className="text-xs font-mono text-red-400 ml-1">-{g.diff}</span>}
-                                </div>
-                                <span className="text-xs font-mono text-green-600 font-semibold">{g.player_score ?? 0}–{g.opponent_score ?? 0}</span>
-                              </div>
+                        <p className="gsans" style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                          {winsSort === 'grade' ? 'Highest-graded opponents beaten (pre-game grade)' : "Wins with biggest dGrade gap in opponent's favour (pre-game)"}
+                        </p>
+                      </div>
+                      {bestWins.length === 0 ? (
+                        <div style={{ padding: '24px', color: '#9ca3af' }} className="gsans">No wins recorded yet</div>
+                      ) : (
+                        <div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 62px 62px 52px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
+                            {['', 'Opponent', 'You', 'Them', 'Score'].map(h => (
+                              <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
                             ))}
                           </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-            )}
-
-            {/* dGrade chart */}
-            {gradeChartData.length > 0 && (
-              <section>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">dGrade History</h3>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                  <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={gradeChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
-                        interval={Math.floor(gradeChartData.length / 6)} />
-                      <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
-                        domain={['auto', 'auto']} width={45} />
-                      <Tooltip content={<ChartTooltip nameA={nameA} nameB={nameB} />} />
-                      <Legend formatter={(v) => v === 'a' ? nameA : nameB} />
-                      {playerA && <Line type="monotone" dataKey="a" stroke="#16a34a" strokeWidth={2} dot={false} connectNulls name="a" />}
-                      {playerB && <Line type="monotone" dataKey="b" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls name="b" />}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </section>
-            )}
-
-            {/* Win % by year */}
-            {yearChartData.length > 0 && (
-              <section>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Win % by Year</h3>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                  <ResponsiveContainer width="100%" height={220}>
-                    <LineChart data={yearChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                      <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
-                        domain={[0, 100]} tickFormatter={v => `${v}%`} width={40} />
-                      <ReferenceLine y={50} stroke="#e5e7eb" strokeDasharray="4 4" />
-                      <Tooltip content={<ChartTooltip nameA={nameA} nameB={nameB} />} formatter={(v: any) => `${v}%`} />
-                      <Legend formatter={(v) => v === 'a' ? nameA : nameB} />
-                      {gamesA.length > 0 && <Line type="monotone" dataKey="a" stroke="#16a34a" strokeWidth={2} dot={{ r: 3, fill: '#16a34a' }} connectNulls name="a" />}
-                      {gamesB.length > 0 && <Line type="monotone" dataKey="b" stroke="#2563eb" strokeWidth={2} dot={{ r: 3, fill: '#2563eb' }} connectNulls name="b" />}
-                    </LineChart>
-                  </ResponsiveContainer>
-                  {/* Year table */}
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-gray-100">
-                          <th className="text-left text-gray-400 font-medium py-1.5 pr-4">Year</th>
-                          <th className="text-right text-green-600 font-medium py-1.5 px-2">{nameA.split(' ')[0]}</th>
-                          <th className="text-right text-gray-400 font-medium py-1.5 px-2">Games</th>
-                          <th className="text-right text-blue-600 font-medium py-1.5 px-2">{nameB.split(' ')[0]}</th>
-                          <th className="text-right text-gray-400 font-medium py-1.5 pl-2">Games</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allYears.map(y => (
-                          <tr key={y} className="border-b border-gray-50 last:border-0">
-                            <td className="py-1.5 pr-4 text-gray-500 font-medium">{y}</td>
-                            <td className={`text-right px-2 font-semibold ${yearA[y] && yearB[y] && winPctNum(yearA[y].w, yearA[y].t) > winPctNum(yearB[y].w, yearB[y].t) ? 'text-green-600' : 'text-gray-600'}`}>
-                              {yearA[y] ? pct(yearA[y].w, yearA[y].t) : '—'}
-                            </td>
-                            <td className="text-right px-2 text-gray-400">{yearA[y]?.t ?? '—'}</td>
-                            <td className={`text-right px-2 font-semibold ${yearA[y] && yearB[y] && winPctNum(yearB[y].w, yearB[y].t) > winPctNum(yearA[y].w, yearA[y].t) ? 'text-blue-600' : 'text-gray-600'}`}>
-                              {yearB[y] ? pct(yearB[y].w, yearB[y].t) : '—'}
-                            </td>
-                            <td className="text-right pl-2 text-gray-400">{yearB[y]?.t ?? '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* Performance by opponent grade band */}
-            {hasData && (
-              <section>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Performance vs Opponent Grade</h3>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                  <div className="flex items-center justify-between text-xs text-gray-400 mb-3 px-1">
-                    <span className="w-24">Band</span>
-                    <div className="flex-1 flex items-center gap-3">
-                      <span className="w-10 text-right text-green-600 font-medium">{nameA.split(' ')[0]}</span>
-                      <span className="flex-1 text-center">Win %</span>
-                      <span className="w-10 text-blue-600 font-medium">{nameB.split(' ')[0]}</span>
-                    </div>
-                  </div>
-                  {GRADE_BANDS.map((band, i) => (
-                    <BandRow key={band.label} label={band.label} a={bandsA[i]} b={bandsB[i]} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Recent form */}
-            {hasData && (
-              <section>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Recent Form</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  {[10, 20, 50].map(n => {
-                    const fA = recentForm(gamesA, n)
-                    const fB = recentForm(gamesB, n)
-                    return (
-                      <div key={n} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
-                        <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Last {n} games</p>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`text-lg font-bold ${winPctNum(fA.w, fA.t) > winPctNum(fB.w, fB.t) ? 'text-green-600' : 'text-gray-600'}`}>
-                            {fA.t >= n ? pct(fA.w, fA.t) : fA.t > 0 ? pct(fA.w, fA.t) : '—'}
-                          </span>
-                          <span className="text-xs text-gray-300">vs</span>
-                          <span className={`text-lg font-bold ${winPctNum(fB.w, fB.t) > winPctNum(fA.w, fA.t) ? 'text-blue-600' : 'text-gray-600'}`}>
-                            {fB.t >= n ? pct(fB.w, fB.t) : fB.t > 0 ? pct(fB.w, fB.t) : '—'}
-                          </span>
+                          {bestWins.map((g: any, i: number) => (
+                            <div key={i} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '28px 1fr 62px 62px 52px', padding: '9px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
+                              <span className="gmono" style={{ fontSize: 11, color: '#9ca3af' }}>#{i + 1}</span>
+                              <div>
+                                <div className="gsans" style={{ fontSize: 13, color: G, fontWeight: 500 }}>
+                                  {g.opponent_first_name} {g.opponent_last_name}
+                                </div>
+                                {g.event_name && (
+                                  <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>
+                                    {g.event_name}{g.event_date ? ` · ${new Date(g.event_date).getFullYear()}` : ''}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="gmono" style={{ fontSize: 12, color: '#374151' }}>{g.myGradeBefore}</span>
+                              <div>
+                                <span className="gmono" style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>{g.oppGradeBefore}</span>
+                                {g.diff > 0 && <span className="gmono" style={{ fontSize: 10, color: '#dc2626', marginLeft: 4 }}>-{g.diff}</span>}
+                              </div>
+                              <span className="gmono" style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>{g.player_score ?? 0}–{g.opponent_score ?? 0}</span>
+                            </div>
+                          ))}
                         </div>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {/* Opponents by Country */}
+                <div className="dash-light-card">
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                    <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Opponents by Country</h3>
+                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Win/loss record vs players from each nation</p>
+                  </div>
+                  {oppCountryStats.length === 0 ? (
+                    <div style={{ padding: '24px', color: '#9ca3af' }} className="gsans">No opponent data yet</div>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
+                        {['Country', 'G', 'W', 'L', 'Win%'].map(h => (
+                          <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+                        ))}
                       </div>
-                    )
-                  })}
+                      {oppCountryStats.slice(0, 20).map((cs: any) => {
+                        const p = pct(cs.wins, cs.games)
+                        return (
+                          <div key={cs.country} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 60px', padding: '8px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                              <span style={{ fontSize: 16 }}>{getFlag(cs.country)}</span>
+                              <span className="gsans" style={{ fontSize: 12, color: G }}>{countryName(cs.country)}</span>
+                            </div>
+                            <span className="gmono" style={{ fontSize: 12, color: '#6b7280' }}>{cs.games}</span>
+                            <span className="gmono" style={{ fontSize: 12, color: '#16a34a' }}>{cs.wins}</span>
+                            <span className="gmono" style={{ fontSize: 12, color: '#dc2626' }}>{cs.losses}</span>
+                            <span className="gmono" style={{ fontSize: 12, color: p !== null ? pctColor(p) : '#9ca3af' }}>{p !== null ? `${p}%` : '—'}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
-              </section>
-            )}
-
-            {/* Common opponents */}
-            {commonOpps.length > 0 && (
-              <section>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Common Opponents</h3>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left text-xs text-gray-400 font-medium py-2.5 px-4">Opponent</th>
-                        <th className="text-right text-xs text-green-600 font-medium py-2.5 px-3">{nameA.split(' ')[0]}</th>
-                        <th className="text-right text-xs text-gray-400 font-medium py-2.5 px-3">G</th>
-                        <th className="text-right text-xs text-blue-600 font-medium py-2.5 px-3">{nameB.split(' ')[0]}</th>
-                        <th className="text-right text-xs text-gray-400 font-medium py-2.5 px-4">G</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {commonOpps.map(opp => (
-                        <tr key={opp.name} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
-                          <td className="py-2.5 px-4 text-gray-700 font-medium">{opp.name}</td>
-                          <td className={`text-right px-3 font-semibold ${winPctNum(opp.a.w, opp.a.t) > winPctNum(opp.b.w, opp.b.t) ? 'text-green-600' : 'text-gray-500'}`}>
-                            {pct(opp.a.w, opp.a.t)}
-                          </td>
-                          <td className="text-right px-3 text-gray-400 text-xs">{opp.a.t}</td>
-                          <td className={`text-right px-3 font-semibold ${winPctNum(opp.b.w, opp.b.t) > winPctNum(opp.a.w, opp.a.t) ? 'text-blue-600' : 'text-gray-500'}`}>
-                            {pct(opp.b.w, opp.b.t)}
-                          </td>
-                          <td className="text-right px-4 text-gray-400 text-xs">{opp.b.t}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
-
-            {/* Results by Country */}
-            {(countryStatsA.length > 0 || countryStatsB.length > 0) && (
-              <section>
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Results by Country</h3>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left text-xs text-gray-400 font-medium py-2.5 px-4">Country</th>
-                        <th className="text-right text-xs text-green-600 font-medium py-2.5 px-3">{nameA.split(' ')[0]}</th>
-                        <th className="text-right text-xs text-gray-400 font-medium py-2.5 px-3">G</th>
-                        <th className="text-right text-xs text-blue-600 font-medium py-2.5 px-3">{nameB.split(' ')[0]}</th>
-                        <th className="text-right text-xs text-gray-400 font-medium py-2.5 px-4">G</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        const mapA = Object.fromEntries(countryStatsA.map(r => [r.country, r]))
-                        const mapB = Object.fromEntries(countryStatsB.map(r => [r.country, r]))
-                        const allCountries = Array.from(new Set([
-                          ...countryStatsA.map(r => r.country),
-                          ...countryStatsB.map(r => r.country),
-                        ])).sort((a, b) => {
-                          const totalA = (mapA[a]?.games || 0) + (mapB[a]?.games || 0)
-                          const totalB = (mapA[b]?.games || 0) + (mapB[b]?.games || 0)
-                          return totalB - totalA
-                        })
-                        return allCountries.map(country => {
-                          const a = mapA[country]
-                          const b = mapB[country]
-                          const aPct = a?.win_percentage ?? null
-                          const bPct = b?.win_percentage ?? null
-                          return (
-                            <tr key={country} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
-                              <td className="py-2.5 px-4 text-gray-700 font-medium">
-                                <span className="mr-1.5">{getFlag(country)}</span>{country}
-                              </td>
-                              <td className={`text-right px-3 font-semibold ${aPct !== null && bPct !== null && aPct > bPct ? 'text-green-600' : 'text-gray-500'}`}>
-                                {aPct !== null ? `${aPct}%` : '—'}
-                              </td>
-                              <td className="text-right px-3 text-gray-400 text-xs">{a?.games ?? '—'}</td>
-                              <td className={`text-right px-3 font-semibold ${aPct !== null && bPct !== null && bPct > aPct ? 'text-blue-600' : 'text-gray-500'}`}>
-                                {bPct !== null ? `${bPct}%` : '—'}
-                              </td>
-                              <td className="text-right px-4 text-gray-400 text-xs">{b?.games ?? '—'}</td>
-                            </tr>
-                          )
-                        })
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
-
-            {/* No history notice */}
-            {(playerA && !playerA.history_imported) || (playerB && !playerB.history_imported) ? (
-              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm text-amber-700">
-                {playerA && !playerA.history_imported && <p>⚠️ <strong>{nameA}</strong> has no history imported — detailed stats unavailable.</p>}
-                {playerB && !playerB.history_imported && <p>⚠️ <strong>{nameB}</strong> has no history imported — detailed stats unavailable.</p>}
               </div>
-            ) : null}
 
-          </div>
-        )}
-      </main>
+              {/* ── Games by Country ──────────────────────────────────────── */}
+              <div style={{ marginBottom: 20 }}>
+                <div className="dash-light-card">
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                    <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Games by Country</h3>
+                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Events played in each country · {countriesPlayed} countries</p>
+                  </div>
+                  {countryStats.length === 0 ? (
+                    <div style={{ padding: '24px', color: '#9ca3af' }} className="gsans">No country data yet</div>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 52px 52px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
+                        {['Country', 'G', 'W', 'Win%'].map(h => (
+                          <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+                        ))}
+                      </div>
+                      {countryStats.slice(0, 20).map((cs: any) => {
+                        const p = cs.win_percentage ? Math.round(cs.win_percentage) : pct(cs.wins, cs.games)
+                        return (
+                          <div key={cs.country} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 52px 52px 60px', padding: '8px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                              <span style={{ fontSize: 16 }}>{getFlag(cs.country)}</span>
+                              <span className="gsans" style={{ fontSize: 12, color: G }}>{countryName(cs.country)}</span>
+                            </div>
+                            <span className="gmono" style={{ fontSize: 12, color: '#6b7280' }}>{cs.games}</span>
+                            <span className="gmono" style={{ fontSize: 12, color: '#16a34a' }}>{cs.wins}</span>
+                            <span className="gmono" style={{ fontSize: 12, color: p !== null ? pctColor(p) : '#9ca3af' }}>{p !== null ? `${p}%` : '—'}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* No history yet — show basic profile quick links */
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
+              {[
+                { href: '/profile',  icon: '👤', title: 'My Profile',        desc: 'Update details and link WCF',   color: '#f0fdf4' },
+                { href: '/rankings', icon: '🏆', title: 'Rankings',          desc: 'WCF world rankings',            color: '#eff6ff' },
+                { href: '/compare',  icon: '⚔️',  title: 'Compare Players',  desc: 'Head to head stats',            color: '#fdf4ff' },
+              ].map(({ href, icon, title, desc, color }) => (
+                <a key={href} href={href} style={{ background: color, border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 22px', textDecoration: 'none', display: 'block', transition: 'box-shadow 0.2s' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(13,40,24,0.1)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}>
+                  <div style={{ fontSize: 24, marginBottom: 10 }}>{icon}</div>
+                  <div className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, marginBottom: 4 }}>{title}</div>
+                  <div className="gsans" style={{ fontSize: 12, color: '#6b7280' }}>{desc}</div>
+                </a>
+              ))}
+            </div>
+          )}
+
+          {/* Admin link */}
+          {['admin', 'super_admin'].includes(profile?.role) && (
+            <a href="/admin" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.15)',
+              borderRadius: 12, padding: '14px 20px', textDecoration: 'none',
+            }}>
+              <span>⚙️</span>
+              <span className="gsans" style={{ fontSize: 14, color: '#7c3aed', fontWeight: 600 }}>Admin Panel</span>
+            </a>
+          )}
+
+        </div>
+      </div>
     </div>
   )
 }
