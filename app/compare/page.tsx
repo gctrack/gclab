@@ -274,6 +274,8 @@ export default function ComparePage() {
   const [countryStatsB, setCountryStatsB] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(false)
   const [showAllH2H, setShowAllH2H] = useState(false)
+  const [winsSortA, setWinsSortA] = useState<'grade' | 'diff'>('grade')
+  const [winsSortB, setWinsSortB] = useState<'grade' | 'diff'>('grade')
   const router = useRouter()
   const supabase = createClient()
 
@@ -388,14 +390,24 @@ export default function ComparePage() {
   const streakA = streaks(gamesA)
   const streakB = streaks(gamesB)
 
-  // Best win (highest opponent dgrade beaten)
-  const bestWin = (games: Game[]) => {
-    const wins = games.filter(g => g.result === 'win')
-    if (!wins.length) return null
-    return wins.reduce((best, g) => g.opp_dgrade_after > best.opp_dgrade_after ? g : best)
+  // Best wins — with pre-game grades (same logic as dashboard)
+  const withBefore = (games: Game[]) => games.map((g, i) => {
+    const prev = i > 0 ? games[i - 1] : null
+    const myGradeBefore = prev?.dgrade_after || g.dgrade_after
+    const prevOpp = games.slice(0, i).reverse().find(pg =>
+      pg.opponent_first_name === g.opponent_first_name &&
+      pg.opponent_last_name === g.opponent_last_name
+    )
+    const oppGradeBefore = prevOpp?.opp_dgrade_after || g.opp_dgrade_after
+    return { ...g, myGradeBefore, oppGradeBefore, diff: (oppGradeBefore || 0) - (myGradeBefore || 0) }
+  })
+  const gamesAWithBefore = withBefore(gamesA)
+  const gamesBWithBefore = withBefore(gamesB)
+  const topWins = (enriched: typeof gamesAWithBefore, sortBy: 'grade' | 'diff') => {
+    const wins = enriched.filter(g => g.result === 'win' && g.oppGradeBefore)
+    if (sortBy === 'grade') return [...wins].sort((a, b) => (b.oppGradeBefore || 0) - (a.oppGradeBefore || 0)).slice(0, 5)
+    return [...wins].filter(g => g.diff > 0).sort((a, b) => b.diff - a.diff).slice(0, 5)
   }
-  const bestWinA = bestWin(gamesA)
-  const bestWinB = bestWin(gamesB)
 
   // Common opponents
   const commonOpponents = () => {
@@ -563,6 +575,7 @@ export default function ComparePage() {
                 <StatCard label="Total Games" a={playerA?.games ?? '—'} b={playerB?.games ?? '—'} />
                 <StatCard label="Peak dGrade" a={peakGrade(gamesA) ?? (playerA?.dgrade ?? '—')} b={peakGrade(gamesB) ?? (playerB?.dgrade ?? '—')} />
                 <StatCard label="Longest Win Streak" a={streakA.maxWin || '—'} b={streakB.maxWin || '—'} />
+                <StatCard label="Longest Loss Streak" a={streakA.maxLoss || '—'} b={streakB.maxLoss || '—'} higherIsBetter={false} />
               </div>
             </section>
 
@@ -611,6 +624,62 @@ export default function ComparePage() {
                       )}
                     </>
                   )}
+                </div>
+              </section>
+            )}
+
+            {/* Best Wins */}
+            {(gamesA.length > 0 || gamesB.length > 0) && (
+              <section>
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Best Wins</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {([
+                    { name: nameA, enriched: gamesAWithBefore, sort: winsSortA, setSort: setWinsSortA, color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-100' },
+                    { name: nameB, enriched: gamesBWithBefore, sort: winsSortB, setSort: setWinsSortB, color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-100' },
+                  ]).map(({ name, enriched, sort, setSort, color, bg, border }) => {
+                    const wins = topWins(enriched, sort)
+                    return (
+                      <div key={name} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className={`px-4 py-3 border-b ${border} ${bg} flex items-center justify-between gap-2 flex-wrap`}>
+                          <span className={`font-semibold text-sm ${color}`}>{name}</span>
+                          <div className="flex gap-1.5">
+                            {(['grade', 'diff'] as const).map(s => (
+                              <button key={s} onClick={() => setSort(s)}
+                                className={`text-xs px-2.5 py-1 rounded-full border transition ${sort === s ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}>
+                                {s === 'grade' ? 'Top Grade' : 'Biggest Upset'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {wins.length === 0 ? (
+                          <p className="text-sm text-gray-400 p-4 text-center">No wins on record</p>
+                        ) : (
+                          <div>
+                            <div className="grid grid-cols-[20px_1fr_56px_56px_48px] px-4 py-2 bg-gray-50 border-b border-gray-100">
+                              {['', 'Opponent', 'You', 'Them', 'Score'].map(h => (
+                                <span key={h} className="text-xs text-gray-400 uppercase tracking-wide font-medium">{h}</span>
+                              ))}
+                            </div>
+                            {wins.map((g, i) => (
+                              <div key={i} className="grid grid-cols-[20px_1fr_56px_56px_48px] px-4 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 items-center">
+                                <span className="text-xs text-gray-300 font-mono">#{i+1}</span>
+                                <div>
+                                  <div className="text-sm text-gray-800 font-medium">{g.opponent_first_name} {g.opponent_last_name}</div>
+                                  {g.event_name && <div className="text-xs text-gray-400 mt-0.5">{g.event_name}{g.event_date ? ` · ${g.event_date.slice(0,4)}` : ''}</div>}
+                                </div>
+                                <span className="text-xs font-mono text-gray-600">{g.myGradeBefore}</span>
+                                <div>
+                                  <span className="text-xs font-mono text-red-500 font-semibold">{g.oppGradeBefore}</span>
+                                  {g.diff > 0 && <span className="text-xs font-mono text-red-400 ml-1">-{g.diff}</span>}
+                                </div>
+                                <span className="text-xs font-mono text-green-600 font-semibold">{g.player_score ?? 0}–{g.opponent_score ?? 0}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </section>
             )}
