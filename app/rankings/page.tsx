@@ -890,9 +890,10 @@ export default function RankingsPage() {
                           <tr>
                             <th className="text-left px-4 py-2 text-gray-700 font-semibold">Player</th>
                             <th className="text-right px-4 py-2 text-gray-700 font-semibold">Change</th>
-                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">dGrade</th>
-                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Games (12mo)</th>
-                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Win% (12mo)</th>
+                            {moverPeriod === 0 && <th className="text-right px-4 py-2 text-gray-700 font-semibold">Start</th>}
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Current</th>
+                            {moverPeriod !== 0 && <th className="text-right px-4 py-2 text-gray-700 font-semibold">Games (12mo)</th>}
+                            {moverPeriod !== 0 && <th className="text-right px-4 py-2 text-gray-700 font-semibold">Win% (12mo)</th>}
                           </tr>
                         </thead>
                         <tbody>
@@ -906,9 +907,10 @@ export default function RankingsPage() {
                               <td className={`px-4 py-2 text-right font-semibold ${positive ? 'text-green-600' : 'text-red-500'}`}>
                                 {positive ? `+${p.change}` : p.change}
                               </td>
+                              {moverPeriod === 0 && <td className="px-4 py-2 text-right text-gray-500">{p.old_dgrade || '—'}</td>}
                               <td className="px-4 py-2 text-right font-semibold text-gray-900">{p.current_dgrade}</td>
-                              <td className="px-4 py-2 text-right text-gray-700">{p.games || '—'}</td>
-                              <td className="px-4 py-2 text-right text-gray-700">{p.win_percentage ? `${p.win_percentage}%` : '—'}</td>
+                              {moverPeriod !== 0 && <td className="px-4 py-2 text-right text-gray-700">{p.games || '—'}</td>}
+                              {moverPeriod !== 0 && <td className="px-4 py-2 text-right text-gray-700">{p.win_percentage ? `${p.win_percentage}%` : '—'}</td>}
                             </tr>
                           ))}
                         </tbody>
