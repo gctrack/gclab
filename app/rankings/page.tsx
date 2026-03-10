@@ -868,7 +868,7 @@ export default function RankingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mb-4">GCLab baseline set 6 Mar 2026 — changes detected by daily sync. Showing moves of 10+ points only. Games and Win% show last 12 months from WCF.</p>
+            <p className="text-xs text-gray-400 mb-4">GCLab baseline set 6 Mar 2026 — changes detected by daily sync. Showing moves of 10+ points only. Games and Win% show last 12 months from WCF. Note: all grades are regraded with each WCF entry — your grade can change without playing a game based on the performance of other players who have been regraded.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
                 { title: '📈 Biggest Gains', data: movers.gains, positive: true },
