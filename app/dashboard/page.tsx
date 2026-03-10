@@ -327,6 +327,7 @@ export default function DashboardPage() {
   const [history,      setHistory]      = useState<any[]>([])
   const [countryStats, setCountryStats] = useState<any[]>([])
   const [oppCountryStats, setOppCountryStats] = useState<any[]>([])
+  const [winsSort, setWinsSort] = useState<'grade' | 'diff'>('grade')
   const [loading,      setLoading]      = useState(true)
   const [signedIn,     setSignedIn]     = useState<boolean | null>(null)
 
@@ -837,7 +838,6 @@ export default function DashboardPage() {
 
                 {/* Best Wins */}
                 {(() => {
-                  const [winsSort, setWinsSort] = React.useState<'grade' | 'diff'>('grade')
                   const bestWins = winsSort === 'grade' ? bestWinsByGrade : bestWinsByDiff
                   return (
                     <div className="dash-light-card">
