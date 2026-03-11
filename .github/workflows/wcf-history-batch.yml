@@ -1,4 +1,4 @@
-yamlname: WCF History Batch Import
+name: WCF History Batch Import
 
 on:
   schedule:
