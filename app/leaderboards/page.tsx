@@ -11,7 +11,7 @@ type HeroStat = {
   icon: string
   accentColor: string
   loading: boolean
-  player?: { name: string; country: string; value: string; detail?: string; event?: string; date?: string; score?: string }
+  player?: { name: string; country: string; value: string; detail?: string; event?: string; date?: string; score?: string; vsDisplay?: string; sublabelOverride?: string }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -85,12 +85,23 @@ function HeroCard({ stat }: { stat: HeroStat }) {
             <div className="gmono" style={{ fontSize: 34, fontWeight: 700, color: accentColor, lineHeight: 1, marginBottom: 8 }}>
               {player.value}
             </div>
-            {/* Player name + flag */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: player.detail ? 10 : 0 }}>
-              <span style={{ fontSize: 18 }}>{getFlag(player.country)}</span>
-              <span className="gsans" style={{ fontSize: 16, fontWeight: 600, color: '#111827' }}>{player.name}</span>
-              <span className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>{countryName(player.country)}</span>
-            </div>
+            {/* Grade comparison (upset) or player name */}
+            {player.vsDisplay ? (
+              <div style={{ marginBottom: 10 }}>
+                <div className="gmono" style={{ fontSize: 18, fontWeight: 700, color: '#374151', marginBottom: 4 }}>{player.vsDisplay}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ fontSize: 16 }}>{getFlag(player.country)}</span>
+                  <span className="gsans" style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{player.name}</span>
+                  <span className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>{countryName(player.country)}</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: player.detail ? 10 : 0 }}>
+                <span style={{ fontSize: 18 }}>{getFlag(player.country)}</span>
+                <span className="gsans" style={{ fontSize: 16, fontWeight: 600, color: '#111827' }}>{player.name}</span>
+                <span className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>{countryName(player.country)}</span>
+              </div>
+            )}
             {/* Detail line */}
             {player.detail && (
               <p className="gsans" style={{ fontSize: 12, color: '#6b7280', margin: '6px 0 0', lineHeight: 1.5 }}>{player.detail}</p>
@@ -176,12 +187,12 @@ export default function LeaderboardsPage() {
   const [tab, setTab]                 = useState<'records' | 'countries' | 'new'>('records')
 
   const [heroStats, setHeroStats] = useState<HeroStat[]>([
-    { label: 'Most Games Played',    sublabel: 'All WCF imported records', icon: '🎮', accentColor: '#2563eb', loading: true },
-    { label: 'Best Win Rate',        sublabel: 'Minimum 100 games played', icon: '🏆', accentColor: '#16a34a', loading: true },
-    { label: 'Most Travelled',       sublabel: 'Countries played in',      icon: '✈️', accentColor: '#ea580c', loading: true },
-    { label: 'Most Opponents',       sublabel: 'Unique opponents faced',   icon: '🤝', accentColor: '#7c3aed', loading: true },
-    { label: 'Biggest Career Rise',  sublabel: 'Largest all-time dGrade gain', icon: '📈', accentColor: '#0891b2', loading: true },
-    { label: 'Biggest Upset Win',    sublabel: 'Largest grade gap victory', icon: '⚡', accentColor: '#dc2626', loading: true },
+    { label: 'Most Games Played',    sublabel: 'Imported players only', icon: '🎮', accentColor: '#2563eb', loading: true },
+    { label: 'Best Win Rate',        sublabel: 'Min 100 imported games · career record', icon: '🏆', accentColor: '#16a34a', loading: true },
+    { label: 'Most Travelled',       sublabel: 'Countries played in · imported players', icon: '✈️', accentColor: '#ea580c', loading: true },
+    { label: 'Most Opponents',       sublabel: 'Unique opponents · imported players', icon: '🤝', accentColor: '#7c3aed', loading: true },
+    { label: 'Biggest Career Rise',  sublabel: 'All-time dGrade gain · imported players', icon: '📈', accentColor: '#0891b2', loading: true },
+    { label: 'Biggest Upset Win',    sublabel: 'Winner vs opponent dGrade · imported players', icon: '⚡', accentColor: '#dc2626', loading: true },
   ])
 
   const [totalByCountry,  setTotalByCountry]  = useState<{country:string;value:number}[]>([])
@@ -221,10 +232,11 @@ export default function LeaderboardsPage() {
       else updateHero(0, undefined)
     }
 
-    // 1 — Best Win Rate (min 100 games, using wcf_players fields)
+    // 1 — Best Win Rate (min 100 imported games, calculated from wcf_player_games)
     {
-      const { data } = await supabase.from('wcf_players').select('wcf_first_name, wcf_last_name, country, win_percentage, games').gte('games', 100).order('win_percentage', { ascending: false }).limit(1)
-      if (data?.[0]) updateHero(1, { name: `${data[0].wcf_first_name} ${data[0].wcf_last_name}`, country: data[0].country, value: `${data[0].win_percentage}%`, detail: `${data[0].games} career games` })
+      const { data } = await supabase.rpc('get_best_win_rate')
+      const r = data?.[0]
+      if (r) updateHero(1, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: `${r.win_rate}%`, detail: `${r.game_count} career games` })
       else updateHero(1, undefined)
     }
 
@@ -260,7 +272,7 @@ export default function LeaderboardsPage() {
         name: `${r.wcf_first_name} ${r.wcf_last_name}`,
         country: r.country,
         value: `+${r.gap}`,
-        detail: `Beat ${r.opponent_name} (${r.opp_dgrade} dGrade) · Winner was ${r.winner_dgrade}`,
+        vsDisplay: `${r.winner_dgrade} vs ${r.opp_dgrade}`,
         event: r.event_name,
         score: r.score,
         date: r.event_date ? new Date(r.event_date).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }) : '',
