@@ -16,11 +16,10 @@ type HeroStat = {
     country: string
     value: string
     detail?: string
+    detail2?: string
     event?: string
     date?: string
     score?: string
-    vsDisplay?: string
-    sublabelOverride?: string
     opponentName?: string
     opponentCountry?: string
     winnerDgrade?: string
@@ -57,7 +56,8 @@ const ML = `
   .hero-card:hover { transform: translateY(-3px); box-shadow: 0 12px 36px rgba(0,0,0,0.12) !important; }
   .tab-btn { transition: all 0.15s; cursor: pointer; border: none; }
   .tab-btn:hover { opacity: 0.85; }
-  .country-row:hover { background: rgba(0,0,0,0.025) !important; }
+  .tbl-row:hover { background: rgba(0,0,0,0.025) !important; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 `
 
 const DARK_GREEN = '#0d2818'
@@ -66,19 +66,13 @@ const CREAM = '#f5f0e8'
 // ── Hero Card ──────────────────────────────────────────────────────────────
 function HeroCard({ stat }: { stat: HeroStat }) {
   const { label, sublabel, icon, accentColor, loading, player } = stat
-
   return (
     <div className="hero-card" style={{
-      background: 'white', borderRadius: 20,
-      border: '1px solid #e5e1d8',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.07)',
-      overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      background: 'white', borderRadius: 20, border: '1px solid #e5e1d8',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.07)', overflow: 'hidden', display: 'flex', flexDirection: 'column',
     }}>
-      {/* Accent top strip */}
       <div style={{ height: 4, background: accentColor }}/>
-
       <div style={{ padding: '20px 22px 22px' }}>
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
             <p className="gsans" style={{ color: '#6b7280', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 4px' }}>{label}</p>
@@ -95,28 +89,23 @@ function HeroCard({ stat }: { stat: HeroStat }) {
           </div>
         ) : player ? (
           <div>
-            {/* Big value */}
             <div className="gmono" style={{ fontSize: 34, fontWeight: 700, color: accentColor, lineHeight: 1, marginBottom: 8 }}>
               {player.value}
             </div>
 
-            {/* Upset win layout or normal player name */}
             {player.opponentName ? (
               <div style={{ marginBottom: 8 }}>
-                {/* Winner row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 16 }}>{getFlag(player.country)}</span>
                   <span className="gsans" style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{player.name}</span>
                   {player.winnerDgrade && (
-                    <span className="gmono" style={{ fontSize: 12, fontWeight: 600, color: accentColor }}>{player.winnerDgrade}</span>
+                    <span className="gmono" style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{player.winnerDgrade}</span>
                   )}
                   <span className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>{countryName(player.country)}</span>
                 </div>
-                {/* Beat label */}
                 <div style={{ paddingLeft: 2, marginBottom: 6 }}>
                   <span className="gsans" style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic' }}>beat</span>
                 </div>
-                {/* Opponent row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 16 }}>{getFlag(player.opponentCountry || '')}</span>
                   <span className="gsans" style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>{player.opponentName}</span>
@@ -127,16 +116,18 @@ function HeroCard({ stat }: { stat: HeroStat }) {
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: player.detail ? 10 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: (player.detail || player.detail2) ? 10 : 0 }}>
                 <span style={{ fontSize: 18 }}>{getFlag(player.country)}</span>
                 <span className="gsans" style={{ fontSize: 16, fontWeight: 600, color: '#111827' }}>{player.name}</span>
                 <span className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>{countryName(player.country)}</span>
               </div>
             )}
 
-            {/* Detail line */}
             {player.detail && (
-              <p className="gsans" style={{ fontSize: 12, color: '#6b7280', margin: '6px 0 0', lineHeight: 1.5 }}>{player.detail}</p>
+              <p className="gsans" style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0', lineHeight: 1.5 }}>{player.detail}</p>
+            )}
+            {player.detail2 && (
+              <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0', lineHeight: 1.5 }}>{player.detail2}</p>
             )}
             {player.event && (
               <div style={{ marginTop: 8, padding: '7px 10px', background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
@@ -154,8 +145,132 @@ function HeroCard({ stat }: { stat: HeroStat }) {
   )
 }
 
+// ── Section Divider ────────────────────────────────────────────────────────
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div style={{ margin: '48px 0 20px' }}>
+      <p className="gsans" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9ca3af', margin: '0 0 8px' }}>{title}</p>
+      <div style={{ height: 1, background: '#e5e1d8' }}/>
+      {subtitle && <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0 0' }}>{subtitle}</p>}
+    </div>
+  )
+}
+
+// ── Generic Top-10 Table ───────────────────────────────────────────────────
+function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, subText }: {
+  title: string
+  icon: string
+  accentColor: string
+  rows: any[]
+  loading: boolean
+  renderValue: (row: any) => React.ReactNode
+  subText?: (row: any) => string | null
+}) {
+  return (
+    <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e5e1d8', overflow: 'hidden' }}>
+      <div style={{ height: 3, background: accentColor }}/>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e1d8', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 18 }}>{icon}</span>
+        <h3 className="gsans" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#111827' }}>{title}</h3>
+      </div>
+      {loading ? (
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[...Array(5)].map((_, i) => (
+            <div key={i} style={{ height: 36, background: '#f3f4f6', borderRadius: 6, animation: 'pulse 1.5s ease-in-out infinite' }}/>
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="gsans" style={{ padding: '20px', color: '#9ca3af', fontSize: 13, margin: 0 }}>No data yet — import more players to populate this table.</p>
+      ) : (
+        <div>
+          {rows.map((row, i) => (
+            <div key={i} className="tbl-row" style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 20px',
+              borderBottom: i < rows.length - 1 ? '1px solid #f3f4f6' : 'none',
+            }}>
+              <span className="gmono" style={{ color: '#9ca3af', fontSize: 12, width: 20, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>{getFlag(row.country)}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span className="gsans" style={{ fontSize: 13, fontWeight: 600, color: '#111827', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {row.wcf_first_name} {row.wcf_last_name}
+                </span>
+                {subText && subText(row) && (
+                  <span className="gsans" style={{ fontSize: 10, color: '#9ca3af', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {subText(row)}
+                  </span>
+                )}
+              </div>
+              <span className="gsans" style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>{countryName(row.country)}</span>
+              {renderValue(row)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Upset Wins Table ───────────────────────────────────────────────────────
+function UpsetTable({ rows, loading }: { rows: any[]; loading: boolean }) {
+  return (
+    <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e5e1d8', overflow: 'hidden' }}>
+      <div style={{ height: 3, background: '#dc2626' }}/>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e1d8', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 18 }}>⚡</span>
+        <h3 className="gsans" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#111827' }}>Biggest Upset Wins — All Time</h3>
+      </div>
+      {loading ? (
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[...Array(5)].map((_, i) => (
+            <div key={i} style={{ height: 52, background: '#f3f4f6', borderRadius: 6, animation: 'pulse 1.5s ease-in-out infinite' }}/>
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="gsans" style={{ padding: '20px', color: '#9ca3af', fontSize: 13, margin: 0 }}>No data yet — import more players to populate this table.</p>
+      ) : (
+        <div>
+          {rows.map((row, i) => (
+            <div key={i} className="tbl-row" style={{
+              padding: '12px 20px',
+              borderBottom: i < rows.length - 1 ? '1px solid #f3f4f6' : 'none',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: row.event_name ? 5 : 0 }}>
+                <span className="gmono" style={{ color: '#9ca3af', fontSize: 12, width: 20, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+                <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#dc2626', flexShrink: 0, minWidth: 44 }}>+{row.gap}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 15 }}>{getFlag(row.country)}</span>
+                  <span className="gsans" style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{row.wcf_first_name} {row.wcf_last_name}</span>
+                  <span className="gmono" style={{ fontSize: 11, color: '#374151' }}>{row.winner_dgrade}</span>
+                </div>
+                <span className="gsans" style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic', flexShrink: 0 }}>beat</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 15 }}>{getFlag(row.opponent_country || '')}</span>
+                  <span className="gsans" style={{ fontSize: 13, color: '#374151' }}>{row.opponent_name}</span>
+                  <span className="gmono" style={{ fontSize: 11, color: '#9ca3af' }}>{row.opp_dgrade}</span>
+                </div>
+              </div>
+              {row.event_name && (
+                <div style={{ paddingLeft: 72, display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <span className="gsans" style={{ fontSize: 11, color: '#6b7280' }}>{row.event_name}</span>
+                  {row.score && <span className="gmono" style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>{row.score}</span>}
+                  {row.event_date && (
+                    <span className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>
+                      {new Date(row.event_date).toLocaleDateString('en-CA', { year: 'numeric', month: 'short' })}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Country Stat Tables ────────────────────────────────────────────────────
-function CountryTable({ title, data, valueLabel }: { title: string; data: {country:string; value:number}[]; valueLabel: string }) {
+function CountryTable({ title, data, valueLabel }: { title: string; data: {country:string;value:number}[]; valueLabel: string }) {
   return (
     <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e5e1d8', overflow: 'hidden' }}>
       <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e1d8' }}>
@@ -163,12 +278,11 @@ function CountryTable({ title, data, valueLabel }: { title: string; data: {count
       </div>
       <div>
         {data.slice(0, 15).map((row, i) => (
-          <div key={row.country} className="country-row" style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '10px 20px',
-            borderBottom: i < data.length - 1 ? '1px solid #f3f4f6' : 'none',
+          <div key={row.country} className="tbl-row" style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px',
+            borderBottom: i < Math.min(data.length, 15) - 1 ? '1px solid #f3f4f6' : 'none',
           }}>
-            <span className="gmono" style={{ color: '#9ca3af', fontSize: 12, width: 22, textAlign: 'right' }}>{i+1}</span>
+            <span className="gmono" style={{ color: '#9ca3af', fontSize: 12, width: 22, textAlign: 'right' }}>{i + 1}</span>
             <span style={{ fontSize: 18 }}>{getFlag(row.country)}</span>
             <span className="gsans" style={{ flex: 1, fontSize: 14, color: '#374151' }}>{countryName(row.country)}</span>
             <span className="gmono" style={{ fontSize: 14, fontWeight: 600, color: DARK_GREEN }}>{row.value.toLocaleString()}</span>
@@ -193,9 +307,8 @@ function NewPlayersTable({ players }: { players: any[] }) {
       ) : (
         <div>
           {players.map((p, i) => (
-            <div key={p.id} className="country-row" style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '10px 20px',
+            <div key={p.id} className="tbl-row" style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px',
               borderBottom: i < players.length - 1 ? '1px solid #f3f4f6' : 'none',
             }}>
               <span style={{ fontSize: 18 }}>{getFlag(p.country)}</span>
@@ -219,13 +332,23 @@ export default function LeaderboardsPage() {
   const [tab, setTab]                 = useState<'records' | 'countries' | 'new'>('records')
 
   const [heroStats, setHeroStats] = useState<HeroStat[]>([
-    { label: 'Most Games Played',    sublabel: 'Career total games · imported players', icon: '🎮', accentColor: '#2563eb', loading: true },
-    { label: 'Best Win Rate',        sublabel: 'Min 100 games · min 5 losses · career %', icon: '🏆', accentColor: '#16a34a', loading: true },
-    { label: 'Most Travelled',       sublabel: 'Countries played in · imported players', icon: '✈️', accentColor: '#ea580c', loading: true },
-    { label: 'Most Opponents',       sublabel: 'Unique opponents · imported players', icon: '🤝', accentColor: '#7c3aed', loading: true },
-    { label: 'Biggest Career Rise',  sublabel: 'All-time dGrade gain · imported players', icon: '📈', accentColor: '#0891b2', loading: true },
-    { label: 'Biggest Upset Win',    sublabel: 'Winner vs opponent dGrade · imported players', icon: '⚡', accentColor: '#dc2626', loading: true },
+    { label: 'Most Games Played',   sublabel: 'Career total · imported players',          icon: '🎮', accentColor: '#2563eb', loading: true },
+    { label: 'Best Win Rate',       sublabel: 'Min 100 games · min 5 losses · career %',  icon: '🏆', accentColor: '#16a34a', loading: true },
+    { label: 'Most Travelled',      sublabel: 'Countries played in · imported players',   icon: '✈️', accentColor: '#ea580c', loading: true },
+    { label: 'Longest Win Streak',  sublabel: 'Consecutive wins · imported players',      icon: '🔥', accentColor: '#7c3aed', loading: true },
+    { label: 'Biggest Career Rise', sublabel: 'All-time dGrade gain · imported players',  icon: '📈', accentColor: '#0891b2', loading: true },
+    { label: 'Biggest Upset Win',   sublabel: 'Winner vs opponent dGrade gap',            icon: '⚡', accentColor: '#dc2626', loading: true },
   ])
+
+  const [top10Games,      setTop10Games]      = useState<any[]>([])
+  const [top10WinRate,    setTop10WinRate]    = useState<any[]>([])
+  const [top10Travelled,  setTop10Travelled]  = useState<any[]>([])
+  const [top10Opponents,  setTop10Opponents]  = useState<any[]>([])
+  const [top10CareerRise, setTop10CareerRise] = useState<any[]>([])
+  const [top10Streak,     setTop10Streak]     = useState<any[]>([])
+  const [top10EventJump,  setTop10EventJump]  = useState<any[]>([])
+  const [top10Upsets,     setTop10Upsets]     = useState<any[]>([])
+  const [tablesLoading,   setTablesLoading]   = useState(true)
 
   const [totalByCountry,  setTotalByCountry]  = useState<{country:string;value:number}[]>([])
   const [activeByCountry, setActiveByCountry] = useState<{country:string;value:number}[]>([])
@@ -247,6 +370,7 @@ export default function LeaderboardsPage() {
 
   useEffect(() => {
     loadHeroStats()
+    loadTop10Tables()
     loadCountryStats()
     loadNewPlayers()
   }, [])
@@ -256,7 +380,7 @@ export default function LeaderboardsPage() {
   }
 
   const loadHeroStats = async () => {
-    // 0 — Most Games
+    // 0 — Most Games + unique opponents
     {
       const { data } = await supabase.rpc('get_most_games_player')
       const r = data?.[0]
@@ -265,11 +389,12 @@ export default function LeaderboardsPage() {
         country: r.country,
         value: Number(r.game_count).toLocaleString(),
         detail: 'career games played',
+        detail2: `${Number(r.opponent_count).toLocaleString()} unique opponents`,
       })
       else updateHero(0, undefined)
     }
 
-    // 1 — Best Win Rate (career % from imported games, min 100 games, min 5 losses)
+    // 1 — Best Win Rate
     {
       const { data } = await supabase.rpc('get_best_win_rate')
       const r = data?.[0]
@@ -295,15 +420,15 @@ export default function LeaderboardsPage() {
       else updateHero(2, undefined)
     }
 
-    // 3 — Most Unique Opponents
+    // 3 — Longest Win Streak
     {
-      const { data } = await supabase.rpc('get_most_unique_opponents')
+      const { data } = await supabase.rpc('get_longest_win_streak')
       const r = data?.[0]
       if (r) updateHero(3, {
         name: `${r.wcf_first_name} ${r.wcf_last_name}`,
         country: r.country,
-        value: `${r.opponent_count}`,
-        detail: 'unique opponents',
+        value: `${r.streak}`,
+        detail: 'consecutive wins',
       })
       else updateHero(3, undefined)
     }
@@ -341,10 +466,41 @@ export default function LeaderboardsPage() {
     }
   }
 
+  const loadTop10Tables = async () => {
+    setTablesLoading(true)
+    const [
+      { data: games },
+      { data: winRate },
+      { data: travelled },
+      { data: opponents },
+      { data: careerRise },
+      { data: streak },
+      { data: eventJump },
+      { data: upsets },
+    ] = await Promise.all([
+      supabase.rpc('get_top10_most_games'),
+      supabase.rpc('get_top10_win_rate'),
+      supabase.rpc('get_top10_most_travelled'),
+      supabase.rpc('get_top10_most_opponents'),
+      supabase.rpc('get_top10_career_rise'),
+      supabase.rpc('get_top10_longest_win_streak'),
+      supabase.rpc('get_top10_single_event_jump'),
+      supabase.rpc('get_top10_upset_wins'),
+    ])
+    setTop10Games(games || [])
+    setTop10WinRate(winRate || [])
+    setTop10Travelled(travelled || [])
+    setTop10Opponents(opponents || [])
+    setTop10CareerRise(careerRise || [])
+    setTop10Streak(streak || [])
+    setTop10EventJump(eventJump || [])
+    setTop10Upsets(upsets || [])
+    setTablesLoading(false)
+  }
+
   const loadCountryStats = async () => {
     const { data: total } = await supabase.rpc('get_players_by_country')
     if (total) setTotalByCountry(total.map((r: any) => ({ country: r.country, value: Number(r.total) })))
-
     const { data: active } = await supabase.rpc('get_active_players_by_country')
     if (active) setActiveByCountry(active.map((r: any) => ({ country: r.country, value: Number(r.total) })))
   }
@@ -384,43 +540,130 @@ export default function LeaderboardsPage() {
 
       {/* Tab bar */}
       <div style={{ background: 'white', borderBottom: '1px solid #e5e1d8', position: 'sticky', top: 52, zIndex: 10 }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', gap: 0, padding: '0 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', padding: '0 24px' }}>
           {TABS.map(t => (
-            <button key={t.id} className="tab-btn gsans" onClick={() => setTab(t.id)}
-              style={{
-                padding: '14px 20px', fontSize: 13, fontWeight: 600,
-                background: 'none', color: tab === t.id ? DARK_GREEN : '#9ca3af',
-                borderBottom: tab === t.id ? `2px solid ${DARK_GREEN}` : '2px solid transparent',
-                marginBottom: -1,
-              }}>
+            <button key={t.id} className="tab-btn gsans" onClick={() => setTab(t.id)} style={{
+              padding: '14px 20px', fontSize: 13, fontWeight: 600,
+              background: 'none', color: tab === t.id ? DARK_GREEN : '#9ca3af',
+              borderBottom: tab === t.id ? `2px solid ${DARK_GREEN}` : '2px solid transparent',
+              marginBottom: -1,
+            }}>
               {t.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px 60px' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px 80px' }}>
 
         {/* ── Record Holders ── */}
         {tab === 'records' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
-            {heroStats.map((stat, i) => <HeroCard key={i} stat={stat}/>)}
-          </div>
+          <>
+            {/* Hero cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
+              {heroStats.map((stat, i) => <HeroCard key={i} stat={stat}/>)}
+            </div>
+
+            {/* Volume & Games */}
+            <SectionHeader title="Volume & Games" subtitle="Who has played the most — and who went on the longest winning tear" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(460px, 1fr))', gap: 20 }}>
+              <LeaderTable
+                title="Most Games Played" icon="🎮" accentColor="#2563eb"
+                rows={top10Games} loading={tablesLoading}
+                renderValue={(row) => (
+                  <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#2563eb', flexShrink: 0 }}>
+                    {Number(row.game_count).toLocaleString()}
+                  </span>
+                )}
+              />
+              <LeaderTable
+                title="Longest Win Streak" icon="🔥" accentColor="#7c3aed"
+                rows={top10Streak} loading={tablesLoading}
+                renderValue={(row) => (
+                  <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#7c3aed', flexShrink: 0 }}>
+                    {row.streak} wins
+                  </span>
+                )}
+              />
+            </div>
+
+            {/* Reach & Opponents */}
+            <SectionHeader title="Reach & Opponents" subtitle="Who has travelled furthest and faced the widest field" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(460px, 1fr))', gap: 20 }}>
+              <LeaderTable
+                title="Most Travelled" icon="✈️" accentColor="#ea580c"
+                rows={top10Travelled} loading={tablesLoading}
+                renderValue={(row) => (
+                  <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#ea580c', flexShrink: 0 }}>
+                    {row.country_count} countries
+                  </span>
+                )}
+              />
+              <LeaderTable
+                title="Most Unique Opponents" icon="🤝" accentColor="#6b7280"
+                rows={top10Opponents} loading={tablesLoading}
+                renderValue={(row) => (
+                  <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#374151', flexShrink: 0 }}>
+                    {Number(row.opponent_count).toLocaleString()}
+                  </span>
+                )}
+              />
+            </div>
+
+            {/* Grade Achievements */}
+            <SectionHeader title="Grade Achievements" subtitle="The biggest dGrade rises over a career and within a single event" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(460px, 1fr))', gap: 20 }}>
+              <LeaderTable
+                title="Biggest Career Rise" icon="📈" accentColor="#0891b2"
+                rows={top10CareerRise} loading={tablesLoading}
+                renderValue={(row) => (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
+                    <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#0891b2' }}>+{row.gain}</span>
+                    <span className="gmono" style={{ fontSize: 10, color: '#9ca3af' }}>{row.min_dgrade}→{row.max_dgrade}</span>
+                  </div>
+                )}
+              />
+              <LeaderTable
+                title="Biggest Single-Event Jump" icon="🚀" accentColor="#0284c7"
+                rows={top10EventJump} loading={tablesLoading}
+                subText={(row) => row.event_name || null}
+                renderValue={(row) => (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
+                    <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#0284c7' }}>+{row.jump}</span>
+                    <span className="gmono" style={{ fontSize: 10, color: '#9ca3af' }}>{row.grade_before}→{row.grade_after}</span>
+                  </div>
+                )}
+              />
+            </div>
+
+            {/* Best Win Rate */}
+            <SectionHeader title="Best Win Rate" subtitle="Career win percentage — minimum 100 games and 5 losses" />
+            <div style={{ maxWidth: 560 }}>
+              <LeaderTable
+                title="Best Career Win Rate" icon="🏆" accentColor="#16a34a"
+                rows={top10WinRate} loading={tablesLoading}
+                renderValue={(row) => (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
+                    <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#16a34a' }}>{row.win_rate}%</span>
+                    <span className="gmono" style={{ fontSize: 10, color: '#9ca3af' }}>
+                      {Number(row.win_count).toLocaleString()}/{Number(row.game_count).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              />
+            </div>
+
+            {/* Biggest Upsets */}
+            <SectionHeader title="Biggest Upsets" subtitle="The largest grade-gap victories ever recorded in imported data" />
+            <UpsetTable rows={top10Upsets} loading={tablesLoading}/>
+          </>
         )}
 
         {/* ── Players by Country ── */}
         {tab === 'countries' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-            <CountryTable
-              title="🌍 Total Ranked Players by Country"
-              data={totalByCountry}
-              valueLabel="players"
-            />
-            <CountryTable
-              title="⚡ Active Players by Country (last 12 months)"
-              data={activeByCountry}
-              valueLabel="active"
-            />
+            <CountryTable title="🌍 Total Ranked Players by Country" data={totalByCountry} valueLabel="players"/>
+            <CountryTable title="⚡ Active Players by Country (last 12 months)" data={activeByCountry} valueLabel="active"/>
           </div>
         )}
 
