@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import WcfMatchBanner from '@/components/WcfMatchBanner'
 import GCLabNav from '@/components/GCLabNav'
+import { getFlag } from '@/lib/countries'
 
 const GC_COUNTRIES = [
   { code: 'AU', name: 'Australia' },
@@ -205,17 +206,6 @@ const ALL_COUNTRIES = [
 
 const GRIP_OPTIONS = ['Irish', 'Solomon', 'Standard', 'Other']
 
-function getFlag(code: string) {
-  if (code === 'GB-ENG') return '🏴󠁧󠁢󠁥󠁮󠁧󠁿'
-  if (code === 'GB-SCT') return '🏴󠁧󠁢󠁳󠁣󠁴󠁿'
-  if (code === 'GB-WLS') return '🏴󠁧󠁢󠁷󠁬󠁳󠁿'
-  return code
-    .toUpperCase()
-    .split('')
-    .map(c => String.fromCodePoint(c.charCodeAt(0) + 127397))
-    .join('')
-}
-
 function Toggle({ enabled, onChange }: { enabled: boolean, onChange: (v: boolean) => void }) {
   return (
     <button
@@ -246,7 +236,6 @@ type ImportResult = {
   startingGrade: number | null
 }
 
-
 const ML_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
   .ghl  { font-family: 'Playfair Display', serif; }
@@ -264,7 +253,6 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState('')
   const [historyImported, setHistoryImported] = useState(false)
 
-  // Import state
   const [importing, setImporting] = useState(false)
   const [importSteps, setImportSteps] = useState<ImportStep[]>([])
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
@@ -335,7 +323,6 @@ export default function ProfilePage() {
         setSelectedGrips(data.grips || [])
         if (data.avatar_url) setAvatarUrl(data.avatar_url)
 
-        // Check if history already imported
         if (data.wcf_player_id) {
           const { data: wcfPlayer } = await supabase
             .from('wcf_players')
@@ -350,7 +337,6 @@ export default function ProfilePage() {
     getProfile()
   }, [])
 
-  // Auto-scroll import log
   useEffect(() => {
     if (importLogRef.current) {
       importLogRef.current.scrollTop = importLogRef.current.scrollHeight
@@ -374,10 +360,7 @@ export default function ProfilePage() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setImporting(false)
-        return
-      }
+      if (!session) { setImporting(false); return }
 
       const response = await fetch('/api/wcf-history-import', {
         method: 'POST',
@@ -394,7 +377,6 @@ export default function ProfilePage() {
         return
       }
 
-      // Read SSE stream
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
@@ -415,9 +397,7 @@ export default function ProfilePage() {
               setImportResult({ totalGames: data.totalGames, years: data.years, startingGrade: data.startingGrade })
               setHistoryImported(true)
             }
-          } catch {
-            // ignore parse errors
-          }
+          } catch {}
         }
       }
     } catch (err) {
@@ -441,9 +421,7 @@ export default function ProfilePage() {
       setUploadingAvatar(false)
       return
     }
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath)
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath)
     await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId)
     setAvatarUrl(`${publicUrl}?t=${Date.now()}`)
     setUploadingAvatar(false)
@@ -459,11 +437,7 @@ export default function ProfilePage() {
   const handleWcfLinked = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     if (data) {
       setProfile(p => ({
         ...p,
@@ -490,19 +464,11 @@ export default function ProfilePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: existing } = await supabase
-      .from('profiles')
-      .select('dgrade')
-      .eq('id', user.id)
-      .single()
-
+    const { data: existing } = await supabase.from('profiles').select('dgrade').eq('id', user.id).single()
     const newDgrade = profile.dgrade ? parseInt(profile.dgrade as string) : null
 
     if (newDgrade && existing?.dgrade !== newDgrade) {
-      await supabase.from('dgrade_history').insert({
-        user_id: user.id,
-        dgrade_value: newDgrade,
-      })
+      await supabase.from('dgrade_history').insert({ user_id: user.id, dgrade_value: newDgrade })
     }
 
     let wcfUrl = profile.wcf_profile_url
@@ -550,10 +516,15 @@ export default function ProfilePage() {
     return '•'
   }
 
-  if (loading || signedIn === null) return <div style={{ minHeight:"100vh", background:"#0d2818", display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(232,224,208,0.3)" }}><style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>Loading…</div>
+  if (loading || signedIn === null) return (
+    <div style={{ minHeight: '100vh', background: '#0d2818', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(232,224,208,0.3)' }}>
+      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
+      Loading…
+    </div>
+  )
 
   if (!signedIn) return (
-    <div style={{ minHeight:"100vh", background:"#f5f2ec", display:"flex", flexDirection:"column" }}>
+    <div style={{ minHeight: '100vh', background: '#f5f2ec', display: 'flex', flexDirection: 'column' }}>
       <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
       <GCLabNav role="" isSignedIn={false} currentPath="/profile" />
       <div className="flex-1 flex items-center justify-center px-6 py-20">
@@ -570,11 +541,11 @@ export default function ProfilePage() {
             </div>
             <div className="p-5 grid grid-cols-2 gap-3">
               {[
-                {label:'dGrade',val:'1,842',color:'bg-green-50 border-green-100'},
-                {label:'World Rank',val:'#512',color:'bg-blue-50 border-blue-100'},
-                {label:'Win Rate',val:'58%',color:'bg-amber-50 border-amber-100'},
-                {label:'Games',val:'340',color:'bg-purple-50 border-purple-100'},
-              ].map(({color},i) => (
+                { color: 'bg-green-50 border-green-100' },
+                { color: 'bg-blue-50 border-blue-100' },
+                { color: 'bg-amber-50 border-amber-100' },
+                { color: 'bg-purple-50 border-purple-100' },
+              ].map(({ color }, i) => (
                 <div key={i} className={`${color} border rounded-xl p-4`}>
                   <div className="h-7 w-14 bg-white/70 rounded mb-1"/>
                   <div className="h-3 w-20 bg-white/50 rounded"/>
@@ -582,8 +553,11 @@ export default function ProfilePage() {
               ))}
             </div>
             <div className="p-5 border-t border-gray-100 space-y-2">
-              {[85,65,75].map((w,i) => (
-                <div key={i} className="flex gap-3"><div className="h-3 rounded bg-gray-200" style={{width:`${w}%`}}/><div className="h-3 w-12 rounded bg-gray-100"/></div>
+              {[85, 65, 75].map((w, i) => (
+                <div key={i} className="flex gap-3">
+                  <div className="h-3 rounded bg-gray-200" style={{ width: `${w}%` }}/>
+                  <div className="h-3 w-12 rounded bg-gray-100"/>
+                </div>
               ))}
             </div>
           </div>
@@ -605,33 +579,32 @@ export default function ProfilePage() {
   )
 
   return (
-    <div style={{ minHeight:"100vh", background:"#f5f2ec" }}>
+    <div style={{ minHeight: '100vh', background: '#f5f2ec' }}>
       <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
       <GCLabNav role={profile?.role || ''} isSignedIn={true} currentPath="/profile" />
 
       {/* Dark ML header */}
-      <div style={{ background:"#0d2818", position:"relative", overflow:"hidden" }}>
-        <div style={{ position:"absolute", inset:0, pointerEvents:"none", background:"radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)" }}/>
-        <div style={{ position:"absolute", inset:0, pointerEvents:"none", backgroundImage:"linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)", backgroundSize:"44px 44px" }}/>
-        <div style={{ maxWidth:"48rem", margin:"0 auto", padding:"32px 24px 40px", position:"relative", zIndex:1 }}>
-          <div style={{ display:"inline-flex", alignItems:"center", gap:7, background:"rgba(74,222,128,0.09)", border:"1px solid rgba(74,222,128,0.18)", color:"#4ade80", padding:"3px 12px", borderRadius:20, fontSize:11, fontWeight:500, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:14 }} className="gsans">My Profile</div>
-          <h2 className="ghl" style={{ fontSize:"clamp(24px,3vw,38px)", color:"#e8e0d0", fontWeight:900, letterSpacing:"-0.5px", marginBottom:6 }}>
+      <div style={{ background: '#0d2818', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)' }}/>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)', backgroundSize: '44px 44px' }}/>
+        <div style={{ maxWidth: '48rem', margin: '0 auto', padding: '32px 24px 40px', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(74,222,128,0.09)', border: '1px solid rgba(74,222,128,0.18)', color: '#4ade80', padding: '3px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }} className="gsans">My Profile</div>
+          <h2 className="ghl" style={{ fontSize: 'clamp(24px,3vw,38px)', color: '#e8e0d0', fontWeight: 900, letterSpacing: '-0.5px', marginBottom: 6 }}>
             {profile?.first_name ? `${profile.first_name}${profile.last_name ? ' ' + profile.last_name : ''}` : 'Your Profile'}
           </h2>
-          {profile?.dgrade && <div className="gsans" style={{ fontSize:14, color:"rgba(232,224,208,0.5)" }}>dGrade <strong style={{ color:"#4ade80" }}>{profile.dgrade}</strong>{profile?.country && ` · ${profile.country}`}</div>}
+          {profile?.dgrade && (
+            <div className="gsans" style={{ fontSize: 14, color: 'rgba(232,224,208,0.5)' }}>
+              dGrade <strong style={{ color: '#4ade80' }}>{profile.dgrade}</strong>{profile?.country && ` · ${profile.country}`}
+            </div>
+          )}
         </div>
-        <div style={{ height:24, background:"linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)" }}/>
+        <div style={{ height: 24, background: 'linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)' }}/>
       </div>
 
       <main className="max-w-2xl mx-auto px-6 py-6">
 
         {!profile.wcf_player_id && profile.first_name && profile.last_name && (
-          <WcfMatchBanner
-            userId={userId}
-            firstName={profile.first_name}
-            lastName={profile.last_name}
-            onLinked={handleWcfLinked}
-          />
+          <WcfMatchBanner userId={userId} firstName={profile.first_name} lastName={profile.last_name} onLinked={handleWcfLinked}/>
         )}
 
         {message && (
@@ -643,9 +616,7 @@ export default function ProfilePage() {
         {profile.wcf_player_id && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-700">
             ✓ Linked to WCF record —
-            <a href={profile.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="underline ml-1">
-              view WCF profile
-            </a>
+            <a href={profile.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="underline ml-1">view WCF profile</a>
           </div>
         )}
 
@@ -663,50 +634,38 @@ export default function ProfilePage() {
                     : 'Import your complete WCF career — every game, opponent, score and dGrade change going back to when you started. Takes 10–30 seconds depending on how many years you have played.'}
                 </p>
                 {historyImported && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Re-import if your starting grade was revised or you want to refresh your data.
-                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Re-import if your starting grade was revised or you want to refresh your data.</p>
                 )}
               </div>
               <button
                 onClick={handleImportHistory}
                 disabled={importing}
                 className={`shrink-0 px-4 py-2 rounded-md text-sm font-medium transition ${
-                  importing
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : historyImported
-                    ? 'bg-white border border-gray-300 text-gray-600 hover:border-green-500 hover:text-green-600'
-                    : 'bg-green-600 text-white hover:bg-green-700'
+                  importing ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : historyImported ? 'bg-white border border-gray-300 text-gray-600 hover:border-green-500 hover:text-green-600'
+                  : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
               >
                 {importing ? 'Importing...' : historyImported ? 'Re-import' : 'Import History'}
               </button>
             </div>
 
-            {/* Progress log */}
             {showImportLog && (
               <div className="mt-4">
-                <div
-                  ref={importLogRef}
-                  className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-48 overflow-y-auto font-mono text-xs space-y-1"
-                >
+                <div ref={importLogRef} className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-48 overflow-y-auto font-mono text-xs space-y-1">
                   {importSteps.map((step, i) => (
                     <div key={i} className={`flex gap-2 ${
                       step.type === 'complete' ? 'text-green-700 font-semibold' :
                       step.type === 'error' || step.type === 'year_error' ? 'text-red-600' :
-                      step.type === 'year_done' ? 'text-gray-700' :
-                      'text-gray-400'
+                      step.type === 'year_done' ? 'text-gray-700' : 'text-gray-400'
                     }`}>
                       <span>{stepIcon(step.type)}</span>
                       <span>{step.message}</span>
                     </div>
                   ))}
-                  {importing && (
-                    <div className="text-gray-400 animate-pulse">• Working...</div>
-                  )}
+                  {importing && <div className="text-gray-400 animate-pulse">• Working...</div>}
                 </div>
 
-                {/* Completion summary */}
                 {importResult && (
                   <div className="mt-3 grid grid-cols-3 gap-3">
                     <div className="bg-green-50 border border-green-100 rounded-md p-3 text-center">
@@ -741,11 +700,7 @@ export default function ProfilePage() {
           <div className="flex items-center gap-4">
             <div className="relative">
               {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt="Profile photo"
-                  className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
-                />
+                <img src={avatarUrl} alt="Profile photo" className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"/>
               ) : (
                 <div className="w-20 h-20 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center text-gray-400 text-2xl">
                   {profile.first_name ? profile.first_name.charAt(0).toUpperCase() : '?'}
@@ -753,42 +708,25 @@ export default function ProfilePage() {
               )}
             </div>
             <div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingAvatar}
-                className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-md hover:bg-gray-200 transition disabled:opacity-50"
-              >
+              <button onClick={() => fileInputRef.current?.click()} disabled={uploadingAvatar}
+                className="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-md hover:bg-gray-200 transition disabled:opacity-50">
                 {uploadingAvatar ? 'Uploading...' : avatarUrl ? 'Change photo' : 'Upload photo'}
               </button>
               <p className="text-xs text-gray-400 mt-1">JPG or PNG, max 2MB</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png"
-                onChange={handleAvatarUpload}
-                className="hidden"
-              />
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png" onChange={handleAvatarUpload} className="hidden"/>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input
-                type="text"
-                value={profile.first_name}
-                onChange={(e) => setProfile(p => ({ ...p, first_name: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+              <input type="text" value={profile.first_name} onChange={(e) => setProfile(p => ({ ...p, first_name: e.target.value }))}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"/>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input
-                type="text"
-                value={profile.last_name}
-                onChange={(e) => setProfile(p => ({ ...p, last_name: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+              <input type="text" value={profile.last_name} onChange={(e) => setProfile(p => ({ ...p, last_name: e.target.value }))}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"/>
             </div>
           </div>
 
@@ -796,21 +734,14 @@ export default function ProfilePage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
             <div className="flex items-center gap-2">
               {selectedFlag && <span className="text-2xl">{selectedFlag}</span>}
-              <select
-                value={profile.country}
-                onChange={(e) => setProfile(p => ({ ...p, country: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
+              <select value={profile.country} onChange={(e) => setProfile(p => ({ ...p, country: e.target.value }))}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500">
                 <option value="">Select your country</option>
                 <optgroup label="── Golf Croquet Countries ──">
-                  {GC_COUNTRIES.map(c => (
-                    <option key={c.code} value={c.code}>{c.name}</option>
-                  ))}
+                  {GC_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
                 </optgroup>
                 <optgroup label="── All Other Countries ──">
-                  {ALL_COUNTRIES.map(c => (
-                    <option key={c.code} value={c.code}>{c.name}</option>
-                  ))}
+                  {ALL_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
                 </optgroup>
               </select>
             </div>
@@ -819,68 +750,45 @@ export default function ProfilePage() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-gray-700">City</label>
-              <Toggle enabled={profile.show_city} onChange={(v) => setProfile(p => ({ ...p, show_city: v }))} />
+              <Toggle enabled={profile.show_city} onChange={(v) => setProfile(p => ({ ...p, show_city: v }))}/>
             </div>
-            <input
-              type="text"
-              value={profile.city}
-              onChange={(e) => setProfile(p => ({ ...p, city: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+            <input type="text" value={profile.city} onChange={(e) => setProfile(p => ({ ...p, city: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"/>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">dGrade</label>
-            <input
-              type="number"
-              value={profile.dgrade}
-              onChange={(e) => setProfile(p => ({ ...p, dgrade: e.target.value }))}
+            <input type="number" value={profile.dgrade} onChange={(e) => setProfile(p => ({ ...p, dgrade: e.target.value }))}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="e.g. 1750"
-            />
+              placeholder="e.g. 1750"/>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">WCF Profile URL</label>
-            <input
-              type="text"
-              value={profile.wcf_profile_url}
-              onChange={(e) => setProfile(p => ({ ...p, wcf_profile_url: e.target.value }))}
+            <input type="text" value={profile.wcf_profile_url} onChange={(e) => setProfile(p => ({ ...p, wcf_profile_url: e.target.value }))}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Auto-generated from your name"
-            />
+              placeholder="Auto-generated from your name"/>
             {profile.wcf_profile_url && (
               <div className="mt-1">
-                <a href={profile.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-sm text-green-600 hover:underline">
-                  View WCF ranking page →
-                </a>
+                <a href={profile.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-sm text-green-600 hover:underline">View WCF ranking page →</a>
               </div>
             )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Mallet Type</label>
-            <input
-              type="text"
-              value={profile.mallet_type}
-              onChange={(e) => setProfile(p => ({ ...p, mallet_type: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+            <input type="text" value={profile.mallet_type} onChange={(e) => setProfile(p => ({ ...p, mallet_type: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"/>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Grips Used</label>
             <div className="flex gap-2 flex-wrap mb-3">
               {GRIP_OPTIONS.map(grip => (
-                <button
-                  key={grip}
-                  onClick={() => toggleGrip(grip)}
+                <button key={grip} onClick={() => toggleGrip(grip)}
                   className={`px-4 py-2 rounded-full border text-sm font-medium transition ${
-                    selectedGrips.includes(grip)
-                      ? 'bg-green-600 text-white border-green-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
-                  }`}
-                >
+                    selectedGrips.includes(grip) ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
+                  }`}>
                   {grip}
                 </button>
               ))}
@@ -888,22 +796,14 @@ export default function ProfilePage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Grip Notes <span className="text-gray-400 font-normal">e.g. which shots do you use each grip for?</span>
             </label>
-            <textarea
-              value={profile.grip_notes}
-              onChange={(e) => setProfile(p => ({ ...p, grip_notes: e.target.value }))}
-              rows={3}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+            <textarea value={profile.grip_notes} onChange={(e) => setProfile(p => ({ ...p, grip_notes: e.target.value }))} rows={3}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"/>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-            <textarea
-              value={profile.bio}
-              onChange={(e) => setProfile(p => ({ ...p, bio: e.target.value }))}
-              rows={4}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+            <textarea value={profile.bio} onChange={(e) => setProfile(p => ({ ...p, bio: e.target.value }))} rows={4}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"/>
           </div>
 
           <div className="border-t pt-4">
@@ -913,47 +813,32 @@ export default function ProfilePage() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-gray-700">Phone</label>
-                  <Toggle enabled={profile.show_phone} onChange={(v) => setProfile(p => ({ ...p, show_phone: v }))} />
+                  <Toggle enabled={profile.show_phone} onChange={(v) => setProfile(p => ({ ...p, show_phone: v }))}/>
                 </div>
-                <input
-                  type="text"
-                  value={profile.phone}
-                  onChange={(e) => setProfile(p => ({ ...p, phone: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <input type="text" value={profile.phone} onChange={(e) => setProfile(p => ({ ...p, phone: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"/>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-gray-700">WhatsApp</label>
-                  <Toggle enabled={profile.show_whatsapp} onChange={(v) => setProfile(p => ({ ...p, show_whatsapp: v }))} />
+                  <Toggle enabled={profile.show_whatsapp} onChange={(v) => setProfile(p => ({ ...p, show_whatsapp: v }))}/>
                 </div>
-                <input
-                  type="text"
-                  value={profile.whatsapp}
-                  onChange={(e) => setProfile(p => ({ ...p, whatsapp: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <input type="text" value={profile.whatsapp} onChange={(e) => setProfile(p => ({ ...p, whatsapp: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"/>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-gray-700">Contact Email</label>
-                  <Toggle enabled={profile.show_contact_email} onChange={(v) => setProfile(p => ({ ...p, show_contact_email: v }))} />
+                  <Toggle enabled={profile.show_contact_email} onChange={(v) => setProfile(p => ({ ...p, show_contact_email: v }))}/>
                 </div>
-                <input
-                  type="email"
-                  value={profile.contact_email}
-                  onChange={(e) => setProfile(p => ({ ...p, contact_email: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <input type="email" value={profile.contact_email} onChange={(e) => setProfile(p => ({ ...p, contact_email: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"/>
               </div>
             </div>
           </div>
 
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full bg-green-600 text-white py-2 rounded-md hover:bg-green-700 transition disabled:opacity-50"
-          >
+          <button onClick={handleSave} disabled={saving}
+            className="w-full bg-green-600 text-white py-2 rounded-md hover:bg-green-700 transition disabled:opacity-50">
             {saving ? 'Saving...' : 'Save Profile'}
           </button>
 
