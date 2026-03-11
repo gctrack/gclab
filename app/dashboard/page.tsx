@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
 import WcfMatchBanner from '@/components/WcfMatchBanner'
+import { getFlag, countryName } from '@/lib/countries'
 
 const G    = '#0d2818'
 const LIME = '#4ade80'
@@ -54,15 +55,6 @@ function pctColor(p: number) {
   return p >= 50 ? LIME : p >= 30 ? AMBER : RED
 }
 
-function getFlag(code: string): string {
-  if (!code) return ''
-  if (code === 'GB-ENG') return '🏴󠁧󠁢󠁥󠁮󠁧󠁿'
-  if (code === 'GB-SCT') return '🏴󠁧󠁢󠁳󠁣󠁴󠁿'
-  if (code === 'GB-WLS') return '🏴󠁧󠁢󠁷󠁬󠁳󠁿'
-  if (code.length !== 2) return ''
-  return code.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('')
-}
-
 // ─── Career SVG Chart ────────────────────────────────────────────────────────
 
 function CareerChart({ history }: { history: any[] }) {
@@ -104,14 +96,12 @@ function CareerChart({ history }: { history: any[] }) {
   const peakY = yf(peakG)
   const labelX = Math.min(peakX + 12, W - 82)
 
-  // Y ticks
   const step = span > 600 ? 200 : span > 300 ? 100 : span > 100 ? 50 : 25
   const yTicks: number[] = []
   for (let g = Math.ceil(rawMin / step) * step; g <= rawMax + padG; g += step) {
     if (g > minG && g < maxG) yTicks.push(g)
   }
 
-  // Year ticks
   const minY = new Date(minT).getFullYear()
   const maxY = new Date(maxT).getFullYear()
   const allYears: number[] = []
@@ -125,7 +115,6 @@ function CareerChart({ history }: { history: any[] }) {
     const rect = svgRef.current.getBoundingClientRect()
     const scaleX = W / rect.width
     const mouseX = (e.clientX - rect.left) * scaleX
-    // Find closest data point
     let closest = valid[0], closestDist = Infinity
     valid.forEach((h: any) => {
       const px = xf(new Date(h.recorded_at).getTime())
@@ -151,26 +140,21 @@ function CareerChart({ history }: { history: any[] }) {
           <stop offset="100%" stopColor={LIME} stopOpacity="0.01"/>
         </linearGradient>
       </defs>
-      {/* Grid */}
       {yTicks.map(g => (
         <g key={g}>
           <line x1={PL} y1={yf(g)} x2={W - PR} y2={yf(g)} stroke="rgba(255,255,255,0.048)" strokeWidth="1"/>
           <text x={PL - 6} y={yf(g) + 4} fill="rgba(255,255,255,0.22)" fontSize="9" fontFamily="DM Mono,monospace" textAnchor="end">{g}</text>
         </g>
       ))}
-      {/* Area + line */}
       <path d={areaD} fill="url(#cgrad)"/>
       <path d={lineD} fill="none" stroke={LIME} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
-      {/* Peak */}
       <line x1={peakX} y1={peakY} x2={peakX} y2={botY} stroke="rgba(74,222,128,0.14)" strokeWidth="1" strokeDasharray="3 3"/>
       <circle cx={peakX} cy={peakY} r="5" fill={LIME}/>
       <circle cx={peakX} cy={peakY} r="9" fill="none" stroke={LIME} strokeWidth="1.5" strokeOpacity="0.4"/>
       <rect x={labelX} y={peakY - 14} width={70} height={20} rx={4} fill="rgba(13,40,24,0.92)" stroke="rgba(74,222,128,0.3)" strokeWidth="1"/>
       <text x={labelX + 35} y={peakY + 1} fill={LIME} fontSize="10" fontFamily="DM Mono,monospace" textAnchor="middle" fontWeight="500">Peak {peakG}</text>
-      {/* Current dot */}
       <circle cx={lastX} cy={yf(grades[grades.length - 1])} r="4.5" fill={LIME}/>
       <circle cx={lastX} cy={yf(grades[grades.length - 1])} r="8" fill="none" stroke={LIME} strokeWidth="1.5" strokeOpacity="0.35"/>
-      {/* Hover tooltip */}
       {tooltip && (() => {
         const tx = Math.min(tooltip.x + 10, W - 110)
         const ty = Math.max(tooltip.y - 32, 4)
@@ -184,7 +168,6 @@ function CareerChart({ history }: { history: any[] }) {
           </g>
         )
       })()}
-      {/* Year labels */}
       {allYears.filter((_, i) => i % skip === 0).map(y => {
         const x = xf(new Date(y, 6, 1).getTime())
         if (x < PL || x > W - PR + 10) return null
@@ -206,7 +189,6 @@ function YearBars({ data }: { data: { year: number; w: number; t: number }[] }) 
   const gapW = (CW - barW * n) / (n + 1)
   return (
     <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }}>
-      {/* 50% reference */}
       <line x1={PL} y1={PT + CH / 2} x2={W - PR} y2={PT + CH / 2} stroke="rgba(13,40,24,0.12)" strokeWidth="1" strokeDasharray="4 3"/>
       <text x={PL + 2} y={PT + CH / 2 - 5} fill="rgba(13,40,24,0.3)" fontSize="11" fontFamily="DM Mono,monospace">50%</text>
       {data.map(({ year, w, t }, i) => {
@@ -233,11 +215,7 @@ function YearBars({ data }: { data: { year: number; w: number; t: number }[] }) 
 
 function StatCard({ label, value, sub, accent = false }: { label: string; value: string | number; sub?: string; accent?: boolean }) {
   return (
-    <div className="dash-stat-card" style={{
-      background: CARD_BG,
-      border: `1px solid ${CARD_BORDER}`,
-      borderRadius: 14, padding: '18px 20px',
-    }}>
+    <div className="dash-stat-card" style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: '18px 20px' }}>
       <div className="gmono" style={{ fontSize: 26, fontWeight: 500, color: accent ? LIME : CREAM, lineHeight: 1 }}>{value}</div>
       <div className="gsans" style={{ fontSize: 10, color: CREAM25, marginTop: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</div>
       {sub && <div className="gsans" style={{ fontSize: 11, color: 'rgba(74,222,128,0.6)', marginTop: 3 }}>{sub}</div>}
@@ -245,34 +223,11 @@ function StatCard({ label, value, sub, accent = false }: { label: string; value:
   )
 }
 
-// ─── WCF link prompt ────────────────────────────────────────────────────────
-
-const COUNTRY_NAMES: Record<string, string> = {
-  'AF':'Afghanistan','AL':'Albania','DZ':'Algeria','AR':'Argentina','AU':'Australia',
-  'AT':'Austria','BE':'Belgium','BR':'Brazil','CA':'Canada','CL':'Chile','CN':'China',
-  'CO':'Colombia','HR':'Croatia','CZ':'Czech Republic','DK':'Denmark','EG':'Egypt',
-  'FI':'Finland','FR':'France','DE':'Germany','GH':'Ghana','GR':'Greece','HU':'Hungary',
-  'IN':'India','ID':'Indonesia','IE':'Ireland','IL':'Israel','IT':'Italy','JP':'Japan',
-  'KE':'Kenya','MY':'Malaysia','MX':'Mexico','MA':'Morocco','NL':'Netherlands',
-  'NZ':'New Zealand','NG':'Nigeria','NO':'Norway','PK':'Pakistan','PH':'Philippines',
-  'PL':'Poland','PT':'Portugal','RO':'Romania','RU':'Russia','ZA':'South Africa',
-  'ES':'Spain','SE':'Sweden','CH':'Switzerland','TZ':'Tanzania','TH':'Thailand',
-  'TN':'Tunisia','TR':'Turkey','UG':'Uganda','UA':'Ukraine','AE':'United Arab Emirates',
-  'US':'United States','GB':'United Kingdom','GB-ENG':'England','GB-SCT':'Scotland',
-  'GB-WLS':'Wales','UY':'Uruguay','VN':'Vietnam','ZW':'Zimbabwe',
-}
-function countryName(code: string): string {
-  return COUNTRY_NAMES[code] || code
-}
+// ─── WCF link / import prompts ───────────────────────────────────────────────
 
 function WcfLinkPrompt() {
   return (
-    <div style={{
-      background: 'rgba(74,222,128,0.08)',
-      border: '1px solid rgba(74,222,128,0.2)',
-      borderRadius: 16, padding: '28px 32px',
-      display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap',
-    }}>
+    <div style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 16, padding: '28px 32px', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
       <div style={{ fontSize: 36 }}>🔗</div>
       <div style={{ flex: 1, minWidth: 220 }}>
         <div className="ghl" style={{ fontSize: 20, color: CREAM, fontWeight: 700, marginBottom: 6 }}>Link your WCF profile</div>
@@ -280,11 +235,7 @@ function WcfLinkPrompt() {
           Connect your World Croquet Federation record to unlock your full career stats — grade history, win rates, best wins and more.
         </div>
       </div>
-      <a href="/profile" style={{
-        background: LIME, color: G, padding: '10px 22px', borderRadius: 8,
-        fontSize: 14, fontWeight: 700, textDecoration: 'none',
-        fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
-      }}>
+      <a href="/profile" style={{ background: LIME, color: G, padding: '10px 22px', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap' }}>
         Go to My Profile →
       </a>
     </div>
@@ -293,12 +244,7 @@ function WcfLinkPrompt() {
 
 function WcfImportPrompt({ wcfPlayerId }: { wcfPlayerId: string }) {
   return (
-    <div style={{
-      background: 'rgba(234,179,8,0.08)',
-      border: '1px solid rgba(234,179,8,0.2)',
-      borderRadius: 16, padding: '24px 28px',
-      display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
-    }}>
+    <div style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: 16, padding: '24px 28px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
       <div style={{ fontSize: 30 }}>📥</div>
       <div style={{ flex: 1, minWidth: 200 }}>
         <div className="ghl" style={{ fontSize: 17, color: CREAM, fontWeight: 700, marginBottom: 4 }}>Import your full career history</div>
@@ -306,11 +252,7 @@ function WcfImportPrompt({ wcfPlayerId }: { wcfPlayerId: string }) {
           Your profile is linked. Import your WCF history to unlock deep stats — win rates by year, grade band performance, your biggest upsets and more.
         </div>
       </div>
-      <a href="/profile" style={{
-        background: AMBER, color: '#1a1a00', padding: '9px 20px', borderRadius: 8,
-        fontSize: 13, fontWeight: 700, textDecoration: 'none',
-        fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
-      }}>
+      <a href="/profile" style={{ background: AMBER, color: '#1a1a00', padding: '9px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap' }}>
         Import History →
       </a>
     </div>
@@ -373,15 +315,11 @@ export default function DashboardPage() {
           setHistory(hist || [])
           setCountryStats(cs || [])
 
-          // Build opponent country stats using gms already loaded
           if (gms && gms.length > 0) {
-            const { data: playerData } = await supabase
-              .from('wcf_players')
-              .select('wcf_first_name, wcf_last_name, country')
+            const { data: playerData } = await supabase.from('wcf_players').select('wcf_first_name, wcf_last_name, country')
             if (playerData) {
               const playerMap: Record<string, string> = {}
               playerData.forEach((p: any) => {
-                // Index by multiple key formats to handle spacing/case differences
                 const key = `${p.wcf_first_name.trim()}|||${p.wcf_last_name.trim()}`.toLowerCase()
                 playerMap[key] = p.country
               })
@@ -427,7 +365,6 @@ export default function DashboardPage() {
       <GCLabNav role="" isSignedIn={false} currentPath="/dashboard"/>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 520 }}>
-          {/* Blurred background */}
           <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid #e5e1d8', background: 'white', filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0ede8', background: '#faf9f7' }}>
               <div style={{ height: 22, width: 160, background: '#e5e1d8', borderRadius: 4, marginBottom: 8 }}/>
@@ -442,7 +379,6 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
-          {/* Overlay */}
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(6px)', borderRadius: 20 }}>
             <div style={{ textAlign: 'center', padding: '32px 40px', maxWidth: 360 }}>
               <div style={{ width: 56, height: 56, background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px', fontSize: 24 }}>🎯</div>
@@ -473,7 +409,6 @@ export default function DashboardPage() {
   const yearsActive     = yearsSet.size
   const countriesPlayed = countryStats.length
 
-  // Win by year — fall back to event_date year if year field is null
   const yearMap: Record<number, { w: number; t: number }> = {}
   for (const g of games) {
     const yr = g.year || (g.event_date ? new Date(g.event_date).getFullYear() : null)
@@ -486,35 +421,25 @@ export default function DashboardPage() {
     .map(([y, v]) => ({ year: Number(y), w: v.w, t: v.t }))
     .sort((a, b) => a.year - b.year)
 
-  // Win by grade band
   const bandData = GRADE_BANDS.map(band => {
     const rel  = games.filter((g: any) => g.opp_dgrade_after >= band.min && g.opp_dgrade_after <= band.max)
     const wins = rel.filter((g: any) => g.result === 'win').length
     return { ...band, w: wins, t: rel.length }
   }).filter(b => b.t > 0)
 
-  // Biggest upset — use dgrade BEFORE the game (previous game's dgrade_after)
-  // games is sorted chronologically, so we can walk the array to find each game's pre-game grade
   const gamesWithBefore = games.map((g: any, i: number) => {
-    // Player's grade before this game = dgrade_after of their most recent previous game
     const prevGame = i > 0 ? games[i - 1] : null
     const myGradeBefore = prevGame?.dgrade_after || g.dgrade_after
-    // Opponent's grade before this game: find their most recent game before this one as opponent
-    // Since we don't have full opponent history, use opp_dgrade_after of prev game in same event
-    // as a proxy, or fall back to opp_dgrade_after of this game
     const prevSameEvent = games.slice(0, i).reverse().find((pg: any) =>
-      pg.opponent_first_name === g.opponent_first_name &&
-      pg.opponent_last_name === g.opponent_last_name
+      pg.opponent_first_name === g.opponent_first_name && pg.opponent_last_name === g.opponent_last_name
     )
     const oppGradeBefore = prevSameEvent?.opp_dgrade_after || g.opp_dgrade_after
     return { ...g, myGradeBefore, oppGradeBefore, diff: oppGradeBefore - myGradeBefore }
   })
   const biggestUpset = gamesWithBefore
-    .filter((g: any) => g.result === 'win' && g.oppGradeBefore && g.myGradeBefore)
-    .filter((g: any) => g.diff > 0)
+    .filter((g: any) => g.result === 'win' && g.oppGradeBefore && g.myGradeBefore && g.diff > 0)
     .sort((a: any, b: any) => b.diff - a.diff)[0] || null
 
-  // Streaks
   let maxWin = 0, maxLoss = 0, curW = 0, curL = 0, curStreak = 0, curStreakType = ''
   for (const g of games) {
     if (g.result === 'win') { curW++; curL = 0; maxWin = Math.max(maxWin, curW) }
@@ -526,29 +451,18 @@ export default function DashboardPage() {
     curStreak = last.result === 'win' ? curW : curL
   }
 
-  // Recent form (last 10 games)
   const recentForm = [...games].slice(-10)
 
-  // Best wins by opponent grade
-  // bestWins uses pre-game grades (same logic as biggestUpset)
-  const winsWithBefore = gamesWithBefore.filter((g: any) =>
-    g.result === 'win' && g.oppGradeBefore && g.myGradeBefore
-  )
-  const bestWinsByGrade = [...winsWithBefore]
-    .sort((a: any, b: any) => b.oppGradeBefore - a.oppGradeBefore)
-    .slice(0, 10)
-  const bestWinsByDiff = [...winsWithBefore]
-    .filter((g: any) => g.diff > 0)
-    .sort((a: any, b: any) => b.diff - a.diff)
-    .slice(0, 10)
+  const winsWithBefore = gamesWithBefore.filter((g: any) => g.result === 'win' && g.oppGradeBefore && g.myGradeBefore)
+  const bestWinsByGrade = [...winsWithBefore].sort((a: any, b: any) => b.oppGradeBefore - a.oppGradeBefore).slice(0, 10)
+  const bestWinsByDiff  = [...winsWithBefore].filter((g: any) => g.diff > 0).sort((a: any, b: any) => b.diff - a.diff).slice(0, 10)
 
-  // Hero stat values
   const heroStats = [
-    { label: 'Total Games',      value: hasHistory ? totalGames.toLocaleString() : (wcfPlayer?.games ?? '—'),      accent: false },
-    { label: 'Career Win %',     value: hasHistory ? (overallPct !== null ? `${overallPct}%` : '—') : (wcfPlayer?.win_percentage ? `${Math.round(wcfPlayer.win_percentage * 100) / 100}%` : '—'), accent: overallPct !== null && overallPct >= 50 },
-    { label: 'Current dGrade',   value: wcfPlayer?.dgrade ?? profile?.dgrade ?? '—',    accent: false },
-    { label: 'Peak dGrade',      value: hasHistory && peakDgrade ? peakDgrade.toLocaleString() : '—', accent: hasHistory && peakDgrade > 0 },
-    { label: 'World Rank',       value: wcfPlayer?.world_ranking ? `#${wcfPlayer.world_ranking}` : '—', accent: false },
+    { label: 'Total Games',         value: hasHistory ? totalGames.toLocaleString() : (wcfPlayer?.games ?? '—'),      accent: false },
+    { label: 'Career Win %',        value: hasHistory ? (overallPct !== null ? `${overallPct}%` : '—') : (wcfPlayer?.win_percentage ? `${Math.round(wcfPlayer.win_percentage * 100) / 100}%` : '—'), accent: overallPct !== null && overallPct >= 50 },
+    { label: 'Current dGrade',      value: wcfPlayer?.dgrade ?? profile?.dgrade ?? '—',    accent: false },
+    { label: 'Peak dGrade',         value: hasHistory && peakDgrade ? peakDgrade.toLocaleString() : '—', accent: hasHistory && peakDgrade > 0 },
+    { label: 'World Rank',          value: wcfPlayer?.world_ranking ? `#${wcfPlayer.world_ranking}` : '—', accent: false },
     { label: 'Countries Played In', value: hasHistory && countriesPlayed ? countriesPlayed : yearsActive ? `${yearsActive}yr` : '—', accent: false },
   ]
 
@@ -563,13 +477,10 @@ export default function DashboardPage() {
       <style dangerouslySetInnerHTML={{ __html: ML }}/>
       <GCLabNav role={profile?.role} isSignedIn={true} currentPath="/dashboard"/>
 
-      {/* ── DARK HERO ZONE ─────────────────────────────────────────────────── */}
       <div style={{ background: G, position: 'relative', overflow: 'hidden' }}>
-        {/* Background glow */}
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)' }}/>
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(255,255,255,0.014) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.014) 1px,transparent 1px)', backgroundSize: '44px 44px' }}/>
 
-        {/* Header */}
         <div className="dash-pad" style={{ padding: '40px 48px 20px', position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(74,222,128,0.09)', border: '1px solid rgba(74,222,128,0.18)', color: LIME, padding: '3px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }} className="gsans">
             My Dashboard
@@ -586,7 +497,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* WCF link / import prompts */}
         {!hasWcf && (
           <div className="dash-pad" style={{ padding: '0 48px 28px', position: 'relative', zIndex: 1 }}>
             {profile && !profile.wcf_player_id && profile.first_name && profile.last_name && (
@@ -601,18 +511,13 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Hero stat cards */}
         <div className="dash-pad dash-hero-grid" style={{ padding: '0 48px 32px', display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, position: 'relative', zIndex: 1 }}>
-          {heroStats.map(s => (
-            <StatCard key={s.label} label={s.label} value={s.value} accent={s.accent}/>
-          ))}
+          {heroStats.map(s => <StatCard key={s.label} label={s.label} value={s.value} accent={s.accent}/>)}
         </div>
 
-        {/* Career chart */}
         {hasHistory && history.length > 1 && (
           <div className="dash-pad" style={{ padding: '0 48px 0', position: 'relative', zIndex: 1 }}>
             <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, overflow: 'hidden', maxWidth: 1200 }}>
-              {/* Chart header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <div className="ghl" style={{ fontSize: 16, color: CREAM, fontWeight: 700 }}>Grade History</div>
@@ -631,33 +536,20 @@ export default function DashboardPage() {
                   ))}
                 </div>
               </div>
-              {/* Chart */}
-              <div style={{ padding: '16px 16px 8px' }}>
-                <CareerChart history={history}/>
-              </div>
-              {/* Legend */}
+              <div style={{ padding: '16px 16px 8px' }}><CareerChart history={history}/></div>
               <div style={{ padding: '8px 24px 16px', display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-                {[
-                  { label: 'dGrade', color: LIME, dash: false },
-                  { label: 'Peak grade', color: LIME, dot: true },
-                ].map(({ label, color, dash, dot }: any) => (
+                {[{ label: 'dGrade', color: LIME, dot: false }, { label: 'Peak grade', color: LIME, dot: true }].map(({ label, color, dot }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: CREAM25 }} className="gsans">
-                    {dot
-                      ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }}/>
-                      : <span style={{ width: 18, height: 2, background: color, display: 'inline-block', borderRadius: 1 }}/>
-                    }
+                    {dot ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }}/> : <span style={{ width: 18, height: 2, background: color, display: 'inline-block', borderRadius: 1 }}/>}
                     {label}
                   </div>
                 ))}
-                <a href="/rankings?tab=Historical+Rankings" style={{ marginLeft: 'auto', fontSize: 11, color: LIME, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif' }}>
-                  Full historical chart →
-                </a>
+                <a href="/rankings?tab=Historical+Rankings" style={{ marginLeft: 'auto', fontSize: 11, color: LIME, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif' }}>Full historical chart →</a>
               </div>
             </div>
           </div>
         )}
 
-        {/* Spacer */}
         <div style={{ height: 40 }}/>
       </div>
 
@@ -667,24 +559,16 @@ export default function DashboardPage() {
 
           {hasHistory ? (
             <>
-              {/* ── Win Rate by Year + Grade Band ─────────────────────────── */}
               <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-
-                {/* Win by Year */}
                 <div className="dash-light-card">
                   <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Win Rate by Year</h3>
                     <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Annual win percentage across your career</p>
                   </div>
-                  <div style={{ padding: '16px 20px 8px', height: 180 }}>
-                    <YearBars data={yearData}/>
-                  </div>
-                  {/* Year table */}
+                  <div style={{ padding: '16px 20px 8px', height: 180 }}><YearBars data={yearData}/></div>
                   <div style={{ borderTop: '1px solid #f0ede8' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 70px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
-                      {['Year', 'W', 'L', 'Win %'].map(h => (
-                        <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
-                      ))}
+                      {['Year', 'W', 'L', 'Win %'].map(h => <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
                     </div>
                     {yearData.slice(-6).reverse().map(({ year, w, t }) => {
                       const p = pct(w, t)
@@ -700,16 +584,13 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Win by Grade Band */}
                 <div className="dash-light-card">
                   <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Performance vs Grade Band</h3>
                     <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>How you perform against different opponent grades</p>
                   </div>
                   <div style={{ padding: '20px 24px' }}>
-                    {bandData.length === 0 && (
-                      <p className="gsans" style={{ fontSize: 13, color: '#9ca3af' }}>No opponent grade data yet</p>
-                    )}
+                    {bandData.length === 0 && <p className="gsans" style={{ fontSize: 13, color: '#9ca3af' }}>No opponent grade data yet</p>}
                     {bandData.map(band => {
                       const p = pct(band.w, band.t)
                       return (
@@ -721,9 +602,7 @@ export default function DashboardPage() {
                           <div style={{ height: 10, background: '#f0ede8', borderRadius: 5, overflow: 'hidden' }}>
                             <div style={{ width: `${p || 0}%`, height: '100%', background: p !== null ? pctColor(p) : '#e5e7eb', borderRadius: 5, transition: 'width 0.6s ease' }}/>
                           </div>
-                          {p !== null && (
-                            <div className="gmono" style={{ fontSize: 11, color: pctColor(p), marginTop: 3, textAlign: 'right' }}>{p}%</div>
-                          )}
+                          {p !== null && <div className="gmono" style={{ fontSize: 11, color: pctColor(p), marginTop: 3, textAlign: 'right' }}>{p}%</div>}
                         </div>
                       )
                     })}
@@ -731,10 +610,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* ── Biggest Upset + Recent Form ───────────────────────────── */}
               <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-
-                {/* Biggest Upset */}
                 <div className="dash-light-card">
                   <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>🏆 Biggest Upset</h3>
@@ -745,9 +621,7 @@ export default function DashboardPage() {
                       <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid #bbf7d0', borderRadius: 12, padding: '20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                           <div>
-                            <div className="ghl" style={{ fontSize: 20, color: G, fontWeight: 900 }}>
-                              -{biggestUpset.diff} dGrade gap
-                            </div>
+                            <div className="ghl" style={{ fontSize: 20, color: G, fontWeight: 900 }}>-{biggestUpset.diff} dGrade gap</div>
                             <div className="gsans" style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>Grade advantage to opponent (pre-game)</div>
                           </div>
                           <div style={{ background: '#16a34a', color: 'white', borderRadius: 8, padding: '4px 10px', fontSize: 13, fontWeight: 700 }} className="gmono">
@@ -759,28 +633,21 @@ export default function DashboardPage() {
                           <span className="gsans" style={{ fontSize: 13, color: '#6b7280' }}>You</span>
                           <span style={{ color: '#9ca3af', fontSize: 14 }}>vs</span>
                           <span className="gmono" style={{ fontSize: 22, color: '#dc2626', fontWeight: 700 }}>{biggestUpset.oppGradeBefore}</span>
-                          <span className="gsans" style={{ fontSize: 13, color: '#6b7280' }}>
-                            {biggestUpset.opponent_first_name} {biggestUpset.opponent_last_name}
-                          </span>
+                          <span className="gsans" style={{ fontSize: 13, color: '#6b7280' }}>{biggestUpset.opponent_first_name} {biggestUpset.opponent_last_name}</span>
                         </div>
                         {biggestUpset.event_name && (
                           <div className="gsans" style={{ fontSize: 11, color: '#6b7280' }}>
-                            {biggestUpset.event_name}
-                            {biggestUpset.event_date && ` · ${new Date(biggestUpset.event_date).getFullYear()}`}
+                            {biggestUpset.event_name}{biggestUpset.event_date && ` · ${new Date(biggestUpset.event_date).getFullYear()}`}
                           </div>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <div style={{ padding: '32px 24px', textAlign: 'center', color: '#9ca3af' }} className="gsans">
-                      No upset wins found yet
-                    </div>
+                    <div style={{ padding: '32px 24px', textAlign: 'center', color: '#9ca3af' }} className="gsans">No upset wins found yet</div>
                   )}
                 </div>
 
-                {/* Recent Form + Streaks */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {/* Recent Form */}
                   <div className="dash-light-card" style={{ flex: 1 }}>
                     <div style={{ padding: '18px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
                       <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Recent Form</h3>
@@ -809,8 +676,6 @@ export default function DashboardPage() {
                       )}
                     </div>
                   </div>
-
-                  {/* Streaks */}
                   <div className="dash-light-card">
                     <div style={{ padding: '16px 24px', display: 'flex', gap: 16 }}>
                       <div style={{ flex: 1, textAlign: 'center' }}>
@@ -827,10 +692,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* ── Best Wins + Country Breakdown ─────────────────────────── */}
               <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-
-                {/* Best Wins */}
                 {(() => {
                   const bestWins = winsSort === 'grade' ? bestWinsByGrade : bestWinsByDiff
                   return (
@@ -840,11 +702,8 @@ export default function DashboardPage() {
                           <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700 }}>Best Wins</h3>
                           <div style={{ display: 'flex', gap: 4 }}>
                             {(['grade', 'diff'] as const).map(s => (
-                              <button key={s} onClick={() => setWinsSort(s)}
-                                className="gsans"
-                                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 12, border: `1px solid ${winsSort === s ? G : '#e5e7eb'}`,
-                                  background: winsSort === s ? G : 'white', color: winsSort === s ? LIME : '#6b7280',
-                                  cursor: 'pointer', fontWeight: winsSort === s ? 600 : 400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                              <button key={s} onClick={() => setWinsSort(s)} className="gsans"
+                                style={{ fontSize: 10, padding: '3px 10px', borderRadius: 12, border: `1px solid ${winsSort === s ? G : '#e5e7eb'}`, background: winsSort === s ? G : 'white', color: winsSort === s ? LIME : '#6b7280', cursor: 'pointer', fontWeight: winsSort === s ? 600 : 400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                 {s === 'grade' ? 'Top Grade' : 'Biggest Upset'}
                               </button>
                             ))}
@@ -859,22 +718,14 @@ export default function DashboardPage() {
                       ) : (
                         <div>
                           <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 62px 62px 52px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
-                            {['', 'Opponent', 'You', 'Them', 'Score'].map(h => (
-                              <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
-                            ))}
+                            {['', 'Opponent', 'You', 'Them', 'Score'].map(h => <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
                           </div>
                           {bestWins.map((g: any, i: number) => (
                             <div key={i} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '28px 1fr 62px 62px 52px', padding: '9px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
                               <span className="gmono" style={{ fontSize: 11, color: '#9ca3af' }}>#{i + 1}</span>
                               <div>
-                                <div className="gsans" style={{ fontSize: 13, color: G, fontWeight: 500 }}>
-                                  {g.opponent_first_name} {g.opponent_last_name}
-                                </div>
-                                {g.event_name && (
-                                  <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>
-                                    {g.event_name}{g.event_date ? ` · ${new Date(g.event_date).getFullYear()}` : ''}
-                                  </div>
-                                )}
+                                <div className="gsans" style={{ fontSize: 13, color: G, fontWeight: 500 }}>{g.opponent_first_name} {g.opponent_last_name}</div>
+                                {g.event_name && <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{g.event_name}{g.event_date ? ` · ${new Date(g.event_date).getFullYear()}` : ''}</div>}
                               </div>
                               <span className="gmono" style={{ fontSize: 12, color: '#374151' }}>{g.myGradeBefore}</span>
                               <div>
@@ -890,7 +741,6 @@ export default function DashboardPage() {
                   )
                 })()}
 
-                {/* Opponents by Country */}
                 <div className="dash-light-card">
                   <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Opponents by Country</h3>
@@ -901,9 +751,7 @@ export default function DashboardPage() {
                   ) : (
                     <div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
-                        {['Country', 'G', 'W', 'L', 'Win%'].map(h => (
-                          <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
-                        ))}
+                        {['Country', 'G', 'W', 'L', 'Win%'].map(h => <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
                       </div>
                       {oppCountryStats.slice(0, 20).map((cs: any) => {
                         const p = pct(cs.wins, cs.games)
@@ -925,7 +773,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* ── Games by Country ──────────────────────────────────────── */}
               <div style={{ marginBottom: 20 }}>
                 <div className="dash-light-card">
                   <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
@@ -937,9 +784,7 @@ export default function DashboardPage() {
                   ) : (
                     <div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 52px 52px 60px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
-                        {['Country', 'G', 'W', 'Win%'].map(h => (
-                          <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
-                        ))}
+                        {['Country', 'G', 'W', 'Win%'].map(h => <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
                       </div>
                       {countryStats.slice(0, 20).map((cs: any) => {
                         const p = cs.win_percentage ? Math.round(cs.win_percentage) : pct(cs.wins, cs.games)
@@ -961,12 +806,11 @@ export default function DashboardPage() {
               </div>
             </>
           ) : (
-            /* No history yet — show basic profile quick links */
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
               {[
-                { href: '/profile',  icon: '👤', title: 'My Profile',        desc: 'Update details and link WCF',   color: '#f0fdf4' },
-                { href: '/rankings', icon: '🏆', title: 'Rankings',          desc: 'WCF world rankings',            color: '#eff6ff' },
-                { href: '/compare',  icon: '⚔️',  title: 'Compare Players',  desc: 'Head to head stats',            color: '#fdf4ff' },
+                { href: '/profile',  icon: '👤', title: 'My Profile',       desc: 'Update details and link WCF', color: '#f0fdf4' },
+                { href: '/rankings', icon: '🏆', title: 'Rankings',         desc: 'WCF world rankings',          color: '#eff6ff' },
+                { href: '/compare',  icon: '⚔️',  title: 'Compare Players', desc: 'Head to head stats',          color: '#fdf4ff' },
               ].map(({ href, icon, title, desc, color }) => (
                 <a key={href} href={href} style={{ background: color, border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 22px', textDecoration: 'none', display: 'block', transition: 'box-shadow 0.2s' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(13,40,24,0.1)' }}
@@ -979,18 +823,12 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Admin link */}
           {['admin', 'super_admin'].includes(profile?.role) && (
-            <a href="/admin" style={{
-              display: 'inline-flex', alignItems: 'center', gap: 10,
-              background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.15)',
-              borderRadius: 12, padding: '14px 20px', textDecoration: 'none',
-            }}>
+            <a href="/admin" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.15)', borderRadius: 12, padding: '14px 20px', textDecoration: 'none' }}>
               <span>⚙️</span>
               <span className="gsans" style={{ fontSize: 14, color: '#7c3aed', fontWeight: 600 }}>Admin Panel</span>
             </a>
           )}
-
         </div>
       </div>
     </div>
