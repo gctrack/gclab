@@ -24,8 +24,8 @@ const ML = `
   .gsans{ font-family: 'DM Sans', sans-serif; }
   .dash-stat-card { transition: border-color 0.2s; }
   .dash-stat-card:hover { border-color: rgba(74,222,128,0.25) !important; }
-  .dash-light-card { background: white; border: 1px solid #e5e1d8; border-radius: 16px; overflow: hidden; }
-  .dash-row:hover { background: rgba(13,40,24,0.03) !important; }
+  .dash-light-card { background: #faf9f7; border: 1px solid #e5e1d8; border-radius: 16px; overflow: hidden; }
+  .dash-row:hover { background: rgba(13,40,24,0.025) !important; }
   .gtab-dark {
     background: transparent;
     border: 1px solid rgba(255,255,255,0.14);
@@ -460,7 +460,7 @@ export default function DashboardPage() {
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 520 }}>
           <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid #e5e1d8', background: 'white', filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0ede8', background: '#faf9f7' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #ede9e2', background: '#faf9f7' }}>
               <div style={{ height: 22, width: 160, background: '#e5e1d8', borderRadius: 4, marginBottom: 8 }}/>
               <div style={{ height: 14, width: 100, background: '#ede9e2', borderRadius: 4 }}/>
             </div>
@@ -582,13 +582,6 @@ export default function DashboardPage() {
           <h1 className="ghl" style={{ fontSize: 'clamp(28px, 3.5vw, 48px)', color: CREAM, fontWeight: 900, lineHeight: 1.08, marginBottom: 6 }}>
             Welcome back, {displayName}
           </h1>
-          {wcfPlayer && (
-            <div className="gsans" style={{ fontSize: 13, color: CREAM60, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <span>{getFlag(wcfPlayer.country)} {wcfPlayer.wcf_first_name} {wcfPlayer.wcf_last_name}</span>
-              {wcfPlayer.dgrade && <span>· dGrade <strong style={{ color: LIME }}>{wcfPlayer.dgrade}</strong></span>}
-              {wcfPlayer.world_ranking && <span>· World <strong style={{ color: CREAM }}>#{wcfPlayer.world_ranking}</strong></span>}
-            </div>
-          )}
         </div>
 
         {!hasWcf && (
@@ -631,37 +624,33 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Stat cards shown below chart when history exists */}
-        {hasHistory && (
-          <div className="dash-pad dash-hero-grid" style={{ padding: '16px 48px 0', display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, position: 'relative', zIndex: 1 }}>
-            {heroStats.map(s => <StatCard key={s.label} label={s.label} value={s.value} accent={s.accent}/>)}
-          </div>
-        )}
+
+
 
         <div style={{ height: 40 }}/>
       </div>
 
       {/* ── LIGHT STATS SECTION ───────────────────────────────────────────── */}
-      <div className="dash-section" style={{ background: '#f5f2ec', padding: '40px 48px' }}>
+      <div className="dash-section" style={{ background: '#f0ece4', padding: '40px 48px' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
           {hasHistory ? (
             <>
               <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
                 <div className="dash-light-card">
-                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #ede9e2' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Win Rate by Year</h3>
                     <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Annual win percentage across your career</p>
                   </div>
                   <div style={{ padding: '16px 20px 8px', height: 180 }}><YearBars data={yearData}/></div>
-                  <div style={{ borderTop: '1px solid #f0ede8' }}>
+                  <div style={{ borderTop: '1px solid #ede9e2' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 70px', padding: '8px 20px', background: 'rgba(13,40,24,0.04)' }}>
                       {['Year', 'W', 'L', 'Win %'].map(h => <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
                     </div>
                     {yearData.slice(-6).reverse().map(({ year, w, t }) => {
                       const p = pct(w, t)
                       return (
-                        <div key={year} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 70px', padding: '8px 20px', borderTop: '1px solid #f7f4f0' }}>
+                        <div key={year} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 70px', padding: '8px 20px', borderTop: '1px solid #ede9e2' }}>
                           <span className="gmono" style={{ fontSize: 13, color: G }}>{year}</span>
                           <span className="gmono" style={{ fontSize: 13, color: '#16a34a' }}>{w}</span>
                           <span className="gmono" style={{ fontSize: 13, color: '#dc2626' }}>{t - w}</span>
@@ -673,24 +662,26 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="dash-light-card">
-                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #ede9e2' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Performance vs Grade Band</h3>
                     <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>How you perform against different opponent grades</p>
                   </div>
-                  <div style={{ padding: '20px 24px' }}>
-                    {bandData.length === 0 && <p className="gsans" style={{ fontSize: 13, color: '#9ca3af' }}>No opponent grade data yet</p>}
+                  <div style={{ padding: '4px 0 8px' }}>
+                    {bandData.length === 0 && <p className="gsans" style={{ fontSize: 13, color: '#9ca3af', padding: '16px 24px' }}>No opponent grade data yet</p>}
                     {bandData.map(band => {
                       const p = pct(band.w, band.t)
                       return (
-                        <div key={band.label} style={{ marginBottom: 18 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                            <span className="gsans" style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>{band.label}</span>
-                            <span className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>{band.w}W – {band.t - band.w}L ({band.t} games)</span>
+                        <div key={band.label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 24px', borderBottom: '1px solid #ede9e2' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                              <span className="gsans" style={{ fontSize: 13, color: G, fontWeight: 600 }}>{band.label}</span>
+                              <span className="gmono" style={{ fontSize: 13, color: p !== null ? pctColor(p) : '#9ca3af', fontWeight: 700 }}>{p !== null ? `${p}%` : '—'}</span>
+                            </div>
+                            <div style={{ height: 6, background: '#ede9e2', borderRadius: 3, overflow: 'hidden' }}>
+                              <div style={{ width: `${p || 0}%`, height: '100%', background: p !== null ? pctColor(p) : '#e5e7eb', borderRadius: 3, transition: 'width 0.6s ease' }}/>
+                            </div>
+                            <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>{band.w}W · {band.t - band.w}L · {band.t} games</div>
                           </div>
-                          <div style={{ height: 10, background: '#f0ede8', borderRadius: 5, overflow: 'hidden' }}>
-                            <div style={{ width: `${p || 0}%`, height: '100%', background: p !== null ? pctColor(p) : '#e5e7eb', borderRadius: 5, transition: 'width 0.6s ease' }}/>
-                          </div>
-                          {p !== null && <div className="gmono" style={{ fontSize: 11, color: pctColor(p), marginTop: 3, textAlign: 'right' }}>{p}%</div>}
                         </div>
                       )
                     })}
@@ -700,13 +691,13 @@ export default function DashboardPage() {
 
               <div className="dash-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
                 <div className="dash-light-card">
-                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #ede9e2' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>🏆 Biggest Upset</h3>
                     <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Your best win against a higher-graded opponent</p>
                   </div>
                   {biggestUpset ? (
                     <div style={{ padding: '24px' }}>
-                      <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid #bbf7d0', borderRadius: 12, padding: '20px' }}>
+                      <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #e8f9ee)', border: '1px solid #bbf7d0', borderRadius: 12, padding: '20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                           <div>
                             <div className="ghl" style={{ fontSize: 20, color: G, fontWeight: 900 }}>-{biggestUpset.diff} dGrade gap</div>
@@ -737,7 +728,7 @@ export default function DashboardPage() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div className="dash-light-card" style={{ flex: 1 }}>
-                    <div style={{ padding: '18px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                    <div style={{ padding: '18px 24px 14px', borderBottom: '1px solid #ede9e2' }}>
                       <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Recent Form</h3>
                       <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Last {recentForm.length} games</p>
                     </div>
@@ -746,7 +737,7 @@ export default function DashboardPage() {
                         {recentForm.map((g: any, i: number) => (
                           <div key={i} title={`${g.result === 'win' ? 'W' : 'L'} ${g.player_score}–${g.opponent_score} vs ${g.opponent_first_name} ${g.opponent_last_name}`} style={{
                             width: 36, height: 36, borderRadius: 8,
-                            background: g.result === 'win' ? '#dcfce7' : '#fee2e2',
+                            background: g.result === 'win' ? '#d8f8e4' : '#fee2e2',
                             border: `1px solid ${g.result === 'win' ? '#bbf7d0' : '#fecaca'}`,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: 13, fontWeight: 700,
@@ -770,7 +761,7 @@ export default function DashboardPage() {
                         <div className="gmono" style={{ fontSize: 32, fontWeight: 500, color: '#16a34a', lineHeight: 1 }}>{maxWin}</div>
                         <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>All time longest win streak</div>
                       </div>
-                      <div style={{ width: 1, background: '#f0ede8' }}/>
+                      <div style={{ width: 1, background: '#ede9e2' }}/>
                       <div style={{ flex: 1, textAlign: 'center' }}>
                         <div className="gmono" style={{ fontSize: 32, fontWeight: 500, color: '#dc2626', lineHeight: 1 }}>{maxLoss}</div>
                         <div className="gsans" style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>All time longest loss streak</div>
@@ -785,7 +776,7 @@ export default function DashboardPage() {
                   const bestWins = winsSort === 'grade' ? bestWinsByGrade : bestWinsByDiff
                   return (
                     <div className="dash-light-card">
-                      <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid #f0ede8' }}>
+                      <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid #ede9e2' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                           <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700 }}>Best Wins</h3>
                           <div style={{ display: 'flex', gap: 4 }}>
@@ -809,7 +800,7 @@ export default function DashboardPage() {
                             {['', 'Opponent', 'You', 'Them', 'Score'].map(h => <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>)}
                           </div>
                           {bestWins.map((g: any, i: number) => (
-                            <div key={i} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '28px 1fr 62px 62px 52px', padding: '9px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
+                            <div key={i} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '28px 1fr 62px 62px 52px', padding: '9px 20px', borderTop: '1px solid #ede9e2', alignItems: 'center' }}>
                               <span className="gmono" style={{ fontSize: 11, color: '#9ca3af' }}>#{i + 1}</span>
                               <div>
                                 <div className="gsans" style={{ fontSize: 13, color: G, fontWeight: 500 }}>{g.opponent_first_name} {g.opponent_last_name}</div>
@@ -830,7 +821,7 @@ export default function DashboardPage() {
                 })()}
 
                 <div className="dash-light-card">
-                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #ede9e2' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Opponents by Country</h3>
                     <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Win/loss record vs players from each nation</p>
                   </div>
@@ -844,7 +835,7 @@ export default function DashboardPage() {
                       {oppCountryStats.slice(0, 20).map((cs: any) => {
                         const p = pct(cs.wins, cs.games)
                         return (
-                          <div key={cs.country} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 60px', padding: '8px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
+                          <div key={cs.country} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 60px', padding: '8px 20px', borderTop: '1px solid #ede9e2', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                               <span style={{ fontSize: 16 }}>{getFlag(cs.country)}</span>
                               <span className="gsans" style={{ fontSize: 12, color: G }}>{countryName(cs.country)}</span>
@@ -863,7 +854,7 @@ export default function DashboardPage() {
 
               <div style={{ marginBottom: 20 }}>
                 <div className="dash-light-card">
-                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0ede8' }}>
+                  <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #ede9e2' }}>
                     <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Games by Country</h3>
                     <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Events played in each country · {countriesPlayed} countries</p>
                   </div>
@@ -877,7 +868,7 @@ export default function DashboardPage() {
                       {countryStats.slice(0, 20).map((cs: any) => {
                         const p = cs.win_percentage ? Math.round(cs.win_percentage) : pct(cs.wins, cs.games)
                         return (
-                          <div key={cs.country} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 52px 52px 60px', padding: '8px 20px', borderTop: '1px solid #f7f4f0', alignItems: 'center' }}>
+                          <div key={cs.country} className="dash-row" style={{ display: 'grid', gridTemplateColumns: '1fr 52px 52px 60px', padding: '8px 20px', borderTop: '1px solid #ede9e2', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                               <span style={{ fontSize: 16 }}>{getFlag(cs.country)}</span>
                               <span className="gsans" style={{ fontSize: 12, color: G }}>{countryName(cs.country)}</span>
