@@ -4,74 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
-
-const COUNTRY_NAMES: Record<string, string> = {
-  'AU': 'Australia', 'BE': 'Belgium', 'CA': 'Canada', 'CZ': 'Czech Republic',
-  'EG': 'Egypt', 'GB-ENG': 'England', 'DE': 'Germany', 'HK': 'Hong Kong',
-  'IE': 'Ireland', 'LV': 'Latvia', 'MX': 'Mexico', 'NZ': 'New Zealand',
-  'NO': 'Norway', 'PT': 'Portugal', 'GB-SCT': 'Scotland', 'ZA': 'South Africa',
-  'ES': 'Spain', 'SE': 'Sweden', 'CH': 'Switzerland', 'US': 'USA', 'GB-WLS': 'Wales',
-  'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra',
-  'AO': 'Angola', 'AR': 'Argentina', 'AM': 'Armenia', 'AT': 'Austria',
-  'AZ': 'Azerbaijan', 'BS': 'Bahamas', 'BH': 'Bahrain', 'BD': 'Bangladesh',
-  'BB': 'Barbados', 'BY': 'Belarus', 'BZ': 'Belize', 'BJ': 'Benin',
-  'BT': 'Bhutan', 'BO': 'Bolivia', 'BA': 'Bosnia and Herzegovina', 'BW': 'Botswana',
-  'BR': 'Brazil', 'BN': 'Brunei', 'BG': 'Bulgaria', 'BF': 'Burkina Faso',
-  'BI': 'Burundi', 'CV': 'Cabo Verde', 'KH': 'Cambodia', 'CM': 'Cameroon',
-  'CF': 'Central African Republic', 'TD': 'Chad', 'CL': 'Chile', 'CN': 'China',
-  'CO': 'Colombia', 'KM': 'Comoros', 'CG': 'Congo', 'CR': 'Costa Rica',
-  'HR': 'Croatia', 'CU': 'Cuba', 'CY': 'Cyprus', 'DK': 'Denmark',
-  'DJ': 'Djibouti', 'DM': 'Dominica', 'DO': 'Dominican Republic', 'EC': 'Ecuador',
-  'SV': 'El Salvador', 'GQ': 'Equatorial Guinea', 'ER': 'Eritrea', 'EE': 'Estonia',
-  'SZ': 'Eswatini', 'ET': 'Ethiopia', 'FJ': 'Fiji', 'FI': 'Finland',
-  'FR': 'France', 'GA': 'Gabon', 'GM': 'Gambia', 'GE': 'Georgia',
-  'GH': 'Ghana', 'GR': 'Greece', 'GD': 'Grenada', 'GT': 'Guatemala',
-  'GN': 'Guinea', 'GW': 'Guinea-Bissau', 'GY': 'Guyana', 'HT': 'Haiti',
-  'HN': 'Honduras', 'HU': 'Hungary', 'IS': 'Iceland', 'IN': 'India',
-  'ID': 'Indonesia', 'IR': 'Iran', 'IQ': 'Iraq', 'IL': 'Israel',
-  'IT': 'Italy', 'JM': 'Jamaica', 'JP': 'Japan', 'JO': 'Jordan',
-  'KZ': 'Kazakhstan', 'KE': 'Kenya', 'KI': 'Kiribati', 'KW': 'Kuwait',
-  'KG': 'Kyrgyzstan', 'LA': 'Laos', 'LB': 'Lebanon', 'LS': 'Lesotho',
-  'LR': 'Liberia', 'LY': 'Libya', 'LI': 'Liechtenstein', 'LT': 'Lithuania',
-  'LU': 'Luxembourg', 'MG': 'Madagascar', 'MW': 'Malawi', 'MY': 'Malaysia',
-  'MV': 'Maldives', 'ML': 'Mali', 'MT': 'Malta', 'MH': 'Marshall Islands',
-  'MR': 'Mauritania', 'MU': 'Mauritius', 'FM': 'Micronesia', 'MD': 'Moldova',
-  'MC': 'Monaco', 'MN': 'Mongolia', 'ME': 'Montenegro', 'MA': 'Morocco',
-  'MZ': 'Mozambique', 'MM': 'Myanmar', 'NA': 'Namibia', 'NR': 'Nauru',
-  'NP': 'Nepal', 'NL': 'Netherlands', 'NI': 'Nicaragua', 'NE': 'Niger',
-  'NG': 'Nigeria', 'MK': 'North Macedonia', 'PK': 'Pakistan', 'PW': 'Palau',
-  'PA': 'Panama', 'PG': 'Papua New Guinea', 'PY': 'Paraguay', 'PE': 'Peru',
-  'PH': 'Philippines', 'PL': 'Poland', 'QA': 'Qatar', 'RO': 'Romania',
-  'RU': 'Russia', 'RW': 'Rwanda', 'KN': 'Saint Kitts and Nevis', 'LC': 'Saint Lucia',
-  'VC': 'Saint Vincent', 'WS': 'Samoa', 'SM': 'San Marino', 'ST': 'Sao Tome and Principe',
-  'SA': 'Saudi Arabia', 'SN': 'Senegal', 'RS': 'Serbia', 'SL': 'Sierra Leone',
-  'SG': 'Singapore', 'SK': 'Slovakia', 'SI': 'Slovenia', 'SB': 'Solomon Islands',
-  'SO': 'Somalia', 'SS': 'South Sudan', 'LK': 'Sri Lanka', 'SD': 'Sudan',
-  'SR': 'Suriname', 'SY': 'Syria', 'TW': 'Taiwan', 'TJ': 'Tajikistan',
-  'TZ': 'Tanzania', 'TH': 'Thailand', 'TL': 'Timor-Leste', 'TG': 'Togo',
-  'TO': 'Tonga', 'TT': 'Trinidad and Tobago', 'TN': 'Tunisia', 'TR': 'Turkey',
-  'TM': 'Turkmenistan', 'TV': 'Tuvalu', 'UG': 'Uganda', 'UA': 'Ukraine',
-  'AE': 'United Arab Emirates', 'UY': 'Uruguay', 'UZ': 'Uzbekistan',
-  'VU': 'Vanuatu', 'VE': 'Venezuela', 'VN': 'Vietnam', 'YE': 'Yemen',
-  'ZM': 'Zambia', 'ZW': 'Zimbabwe',
-}
-
-function getCountryName(code: string): string {
-  return COUNTRY_NAMES[code] || code
-}
-
-function getFlag(code: string): string {
-  if (!code) return ''
-  if (code === 'GB-ENG') return '🏴󠁧󠁢󠁥󠁮󠁧󠁿'
-  if (code === 'GB-SCT') return '🏴󠁧󠁢󠁳󠁣󠁴󠁿'
-  if (code === 'GB-WLS') return '🏴󠁧󠁢󠁷󠁬󠁳󠁿'
-  if (code.length !== 2) return ''
-  return code
-    .toUpperCase()
-    .split('')
-    .map(c => String.fromCodePoint(c.charCodeAt(0) + 127397))
-    .join('')
-}
+import { getFlag, countryName as getCountryName } from '@/lib/countries'
 
 const TABS = ['Rankings', 'Movers', 'New Players', 'Country Stats', 'Historical Rankings']
 const MOVER_PERIODS = [
@@ -168,7 +101,6 @@ export default function RankingsPage() {
           setUserRole(data.role || '')
         }
       }
-      // Fetch last successful sync date
       const { data: syncLog } = await supabase
         .from('sync_log')
         .select('completed_at')
@@ -178,7 +110,6 @@ export default function RankingsPage() {
         .single()
       if (syncLog?.completed_at) setLastSyncDate(syncLog.completed_at)
 
-      // Fetch import progress counts (super_admin only — fetched for all but only shown to super_admin)
       const { count: imported } = await supabase
         .from('wcf_players')
         .select('id', { count: 'exact', head: true })
@@ -206,10 +137,7 @@ export default function RankingsPage() {
 
   const handleRankingSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else {
-      setSortKey(key)
-      setSortDir(key === 'wcf_last_name' ? 'asc' : 'desc')
-    }
+    else { setSortKey(key); setSortDir(key === 'wcf_last_name' ? 'asc' : 'desc') }
     setRankingsPage(0)
   }
 
@@ -232,21 +160,16 @@ export default function RankingsPage() {
   const downloadCountryCSV = () => {
     const headers = ['Rank', 'Country', 'Total Players', 'Active (12mo)', 'Top 6 Active Avg dGrade', 'Top 6 All Time Avg dGrade']
     const rows = countryStats.map((row, i) => [
-      i + 1,
-      getCountryName(row.country),
-      row.total_players,
-      row.active_players,
+      i + 1, getCountryName(row.country), row.total_players, row.active_players,
       row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '',
       row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '',
     ])
     const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
+    const a = document.createElement('a'); a.href = url
     a.download = `gclab-country-stats-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    a.click(); URL.revokeObjectURL(url)
   }
 
   const loadRankings = async () => {
@@ -267,25 +190,17 @@ export default function RankingsPage() {
     const headers = ['Active Rank', 'All Time Rank', 'First Name', 'Last Name', 'Country', 'dGrade', 'eGrade', 'Games (12mo)', 'Win% (12mo)', 'Last Active', 'WCF Profile']
     const rows = rankings.map((player, i) => [
       activeOnly ? rankingsPage * pageSize + i + 1 : '—',
-      player.world_ranking,
-      player.wcf_first_name,
-      player.wcf_last_name,
-      getCountryName(player.country),
-      player.dgrade,
-      player.egrade || '',
-      player.games || '',
-      player.win_percentage ? `${player.win_percentage}%` : '',
-      player.last_active_year || '',
-      player.wcf_profile_url,
+      player.world_ranking, player.wcf_first_name, player.wcf_last_name,
+      getCountryName(player.country), player.dgrade, player.egrade || '',
+      player.games || '', player.win_percentage ? `${player.win_percentage}%` : '',
+      player.last_active_year || '', player.wcf_profile_url,
     ])
     const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
+    const a = document.createElement('a'); a.href = url
     a.download = `gclab-rankings-${activeOnly ? 'active' : 'alltime'}-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    a.click(); URL.revokeObjectURL(url)
   }
 
   const loadMovers = async () => {
@@ -377,16 +292,10 @@ export default function RankingsPage() {
     const { data } = await query
     if (!data) { setPlayerHistory([]); return }
 
-    // Filter: keep all imported/event points, but for daily syncs keep only if dgrade changed
-    // Also deduplicate: if multiple daily syncs on same day, keep only last
     const MARCH_2026 = new Date('2026-03-01')
     const filtered: any[] = []
-    // Ensure data is sorted chronologically
     const sorted = [...data].sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
-
-    // Find the most recent non-imported record — always show this in chart + table
     const lastSyncRecord = [...sorted].reverse().find(h => !h.is_imported)
-
     let lastDgrade: number | null = null
     let lastRank: number | null = null
     let lastDailyDate: string | null = null
@@ -395,32 +304,22 @@ export default function RankingsPage() {
       const isEvent = h.is_imported || (h.event_name && h.event_name !== 'Daily sync')
       const dateStr = h.recorded_at.slice(0, 10)
       const isLastSync = lastSyncRecord && h.recorded_at === lastSyncRecord.recorded_at
-
       if (isEvent) {
-        filtered.push(h)
-        lastDgrade = h.dgrade_value
-        lastRank = h.world_ranking
-        lastDailyDate = null
+        filtered.push(h); lastDgrade = h.dgrade_value; lastRank = h.world_ranking; lastDailyDate = null
       } else if (isLastSync || h.dgrade_value !== lastDgrade || h.world_ranking !== lastRank) {
-        // Replace same-day duplicate but never remove the lastSync point
         if (lastDailyDate === dateStr && filtered.length > 0 && !filtered[filtered.length - 1].is_imported) {
           const last = filtered[filtered.length - 1]
           const lastIsLastSync = lastSyncRecord && last.recorded_at === lastSyncRecord.recorded_at
           if (!lastIsLastSync) filtered.pop()
         }
-        filtered.push(h)
-        lastDgrade = h.dgrade_value
-        lastRank = h.world_ranking
-        lastDailyDate = dateStr
+        filtered.push(h); lastDgrade = h.dgrade_value; lastRank = h.world_ranking; lastDailyDate = dateStr
       }
     }
 
-    // Null out world_ranking for points before March 2026
     const processed = filtered.map(h => ({
       ...h,
       world_ranking: new Date(h.recorded_at) >= MARCH_2026 ? h.world_ranking : null,
     }))
-
     setPlayerHistory(processed)
   }
 
@@ -445,9 +344,7 @@ export default function RankingsPage() {
         .order('world_ranking', { ascending: true })
         .limit(8)
       if (parts.length >= 2 && parts[1]) {
-        query = query
-          .ilike('wcf_first_name', `%${parts[0]}%`)
-          .ilike('wcf_last_name', `%${parts[1]}%`)
+        query = query.ilike('wcf_first_name', `%${parts[0]}%`).ilike('wcf_last_name', `%${parts[1]}%`)
       } else {
         query = query.or(`wcf_last_name.ilike.%${value}%,wcf_first_name.ilike.%${value}%`)
       }
@@ -458,17 +355,14 @@ export default function RankingsPage() {
 
   const handleShowMyHistory = () => {
     if (currentUserProfile?.wcf_player_id) {
-      setSearchQuery('')
-      setSearchSuggestions([])
-      setLookupResults([])
+      setSearchQuery(''); setSearchSuggestions([]); setLookupResults([])
       loadPlayerHistory(currentUserProfile.wcf_player_id)
     }
   }
 
   const handleManualImport = async (player: any) => {
     if (!player?.id) return
-    setManualImporting(true)
-    setManualImportLog([])
+    setManualImporting(true); setManualImportLog([])
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
@@ -490,20 +384,14 @@ export default function RankingsPage() {
           try {
             const event = JSON.parse(line.replace('data: ', ''))
             setManualImportLog(prev => [...prev, event.message])
-            if (event.step === 'complete') {
-              setImportedCount(prev => (prev || 0) + 1)
-              await fetchHistory(player.id)
-            }
+            if (event.step === 'complete') { setImportedCount(prev => (prev || 0) + 1); await fetchHistory(player.id) }
           } catch {}
         }
       }
-    } finally {
-      setManualImporting(false)
-    }
+    } finally { setManualImporting(false) }
   }
 
   const formatDate = (str: string) => new Date(str).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-
   const getCompareRow = (country: string) => compareStats.find((r: any) => r.country === country)
 
   const renderDiff = (current: number, compare: number | undefined) => {
@@ -531,12 +419,9 @@ export default function RankingsPage() {
     const gradeMax = Math.max(...allGrades) + Math.max(50, gradeSpread * 0.15)
 
     const hasRank = showRanking && wranks.length > 0
-    // rankBest = lowest number (e.g. #1), rankWorst = highest number (e.g. #100)
-    // On chart: #1 at TOP, higher numbers lower down
     const rankBest = hasRank ? Math.max(1, Math.min(...wranks) - Math.max(2, (Math.max(...wranks) - Math.min(...wranks)) * 0.2)) : 1
     const rankWorst = hasRank ? Math.max(...wranks) + Math.max(2, (Math.max(...wranks) - Math.min(...wranks)) * 0.2) : 100
 
-    // X scale based on actual dates
     const dates = playerHistory.map(h => new Date(h.recorded_at).getTime())
     const dateMin = Math.min(...dates)
     const dateMax = Math.max(...dates)
@@ -546,49 +431,29 @@ export default function RankingsPage() {
       if (playerHistory.length === 1) return padL + chartW / 2
       return padL + ((dates[i] - dateMin) / dateRange) * chartW
     }
-
     const yGrade = (v: number) => {
       if (gradeMax === gradeMin) return padT + chartH / 2
       return padT + chartH - ((v - gradeMin) / (gradeMax - gradeMin)) * chartH
     }
-
-    // Lower rank number = better = higher on chart
     const yRank = (v: number) => {
       if (rankWorst === rankBest) return padT + chartH / 2
       return padT + ((v - rankBest) / (rankWorst - rankBest)) * chartH
     }
 
-    // Year tick marks on x-axis
     const startYear = new Date(dateMin).getFullYear()
     const endYear = new Date(dateMax).getFullYear()
     const yearTicks: { year: number, x: number }[] = []
     for (let y = startYear; y <= endYear; y++) {
       const ts = new Date(`${y}-01-01`).getTime()
-      if (ts >= dateMin && ts <= dateMax) {
-        yearTicks.push({ year: y, x: padL + ((ts - dateMin) / dateRange) * chartW })
-      }
+      if (ts >= dateMin && ts <= dateMax) yearTicks.push({ year: y, x: padL + ((ts - dateMin) / dateRange) * chartW })
     }
-    // Always show start and end year
     const startX = padL
     const endX = padL + chartW
-
     const gridLines = 5
-
-    // Grade change table: compute diffs
-    const historyWithDiff = playerHistory.map((h, i) => ({
-      ...h,
-      gradeDiff: i === 0 ? null : h.dgrade_value - playerHistory[i - 1].dgrade_value,
-    }))
 
     return (
       <div className="relative" onMouseLeave={() => setChartTooltip(null)}>
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          className="w-full"
-          style={{ minWidth: 400 }}
-          onMouseLeave={() => setChartTooltip(null)}
-        >
-          {/* Grid */}
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 400 }} onMouseLeave={() => setChartTooltip(null)}>
           {Array.from({ length: gridLines + 1 }).map((_, i) => {
             const y = padT + (i / gridLines) * chartH
             return <line key={i} x1={padL} y1={y} x2={W - padR} y2={y} stroke="#e5e7eb" strokeWidth="1" />
@@ -597,26 +462,20 @@ export default function RankingsPage() {
           <line x1={W - padR} y1={padT} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
           <line x1={padL} y1={padT + chartH} x2={W - padR} y2={padT + chartH} stroke="#d1d5db" strokeWidth="1" />
 
-          {/* Grade Y axis labels */}
           {(showDgrade || showEgrade) && Array.from({ length: gridLines + 1 }).map((_, i) => {
             const val = Math.round(gradeMax - i * ((gradeMax - gradeMin) / gridLines))
             const y = padT + (i / gridLines) * chartH
             return <text key={i} x={padL - 8} y={y + 4} fontSize="10" fill="#16a34a" textAnchor="end">{val}</text>
           })}
-
-          {/* Rank Y axis labels — #1 at top, higher numbers lower */}
           {hasRank && Array.from({ length: gridLines + 1 }).map((_, i) => {
             const val = Math.round(rankBest + i * ((rankWorst - rankBest) / gridLines))
             const y = padT + (i / gridLines) * chartH
             return <text key={i} x={W - padR + 8} y={y + 4} fontSize="10" fill="#2563eb" textAnchor="start">#{val}</text>
           })}
 
-          {/* X axis — year ticks or monthly ticks for 1y view */}
           {historyRange === '1y' ? (() => {
             const months: { label: string, x: number }[] = []
-            const d = new Date(dateMin)
-            d.setDate(1)
-            d.setMonth(d.getMonth() + 1)
+            const d = new Date(dateMin); d.setDate(1); d.setMonth(d.getMonth() + 1)
             while (d.getTime() <= dateMax) {
               const x = padL + ((d.getTime() - dateMin) / dateRange) * chartW
               months.push({ label: d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }), x })
@@ -634,7 +493,6 @@ export default function RankingsPage() {
               <text x={x} y={H - 28} fontSize="10" fill="#6b7280" textAnchor="middle">{year}</text>
             </g>
           ))}
-          {/* Always label start/end date */}
           <text x={startX} y={H - 12} fontSize="9" fill="#9ca3af" textAnchor="start">
             {new Date(dateMin).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
           </text>
@@ -644,54 +502,32 @@ export default function RankingsPage() {
             </text>
           )}
 
-          {/* Legend */}
           {showDgrade && <text x={padL} y={padT - 12} fontSize="10" fill="#16a34a" fontWeight="500">dGrade</text>}
           {showEgrade && <text x={padL + 54} y={padT - 12} fontSize="10" fill="#d97706" fontWeight="500">eGrade</text>}
           {hasRank && (() => {
             const firstRankPoint = playerHistory.find(h => h.world_ranking)
-            const firstRankLabel = firstRankPoint
-              ? new Date(firstRankPoint.recorded_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
-              : 'Mar 2026'
+            const firstRankLabel = firstRankPoint ? new Date(firstRankPoint.recorded_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'Mar 2026'
             return <text x={W - padR} y={padT - 12} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank (from {firstRankLabel})</text>
           })()}
 
-          {/* dGrade line */}
           {showDgrade && playerHistory.length > 1 && (
-            <polyline
-              points={playerHistory.map((h, i) => `${xScale(i)},${yGrade(h.dgrade_value)}`).join(' ')}
-              fill="none" stroke="#16a34a" strokeWidth="2"
-            />
+            <polyline points={playerHistory.map((h, i) => `${xScale(i)},${yGrade(h.dgrade_value)}`).join(' ')} fill="none" stroke="#16a34a" strokeWidth="2" />
           )}
-
-          {/* eGrade line — only connect points that have egrade */}
           {showEgrade && (() => {
-            const epts = playerHistory
-              .map((h, i) => h.egrade_value && h.egrade_value > 0 ? `${xScale(i)},${yGrade(h.egrade_value)}` : null)
-              .filter(Boolean)
-            return epts.length > 1 ? (
-              <polyline points={epts.join(' ')} fill="none" stroke="#d97706" strokeWidth="2" strokeDasharray="4 2" />
-            ) : null
+            const epts = playerHistory.map((h, i) => h.egrade_value && h.egrade_value > 0 ? `${xScale(i)},${yGrade(h.egrade_value)}` : null).filter(Boolean)
+            return epts.length > 1 ? <polyline points={epts.join(' ')} fill="none" stroke="#d97706" strokeWidth="2" strokeDasharray="4 2" /> : null
           })()}
-
-          {/* World Rank line — only connect points that have rank */}
           {hasRank && (() => {
-            const rpts = playerHistory
-              .map((h, i) => h.world_ranking ? `${xScale(i)},${yRank(h.world_ranking)}` : null)
-              .filter(Boolean)
-            return rpts.length > 1 ? (
-              <polyline points={rpts.join(' ')} fill="none" stroke="#2563eb" strokeWidth="2" />
-            ) : null
+            const rpts = playerHistory.map((h, i) => h.world_ranking ? `${xScale(i)},${yRank(h.world_ranking)}` : null).filter(Boolean)
+            return rpts.length > 1 ? <polyline points={rpts.join(' ')} fill="none" stroke="#2563eb" strokeWidth="2" /> : null
           })()}
 
-          {/* Dots with hover — large invisible hit area */}
           {playerHistory.map((h, i) => {
             const cx = xScale(i)
             const label = `${new Date(h.recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}${h.event_name && h.event_name !== 'Daily sync' ? ` · ${h.event_name}` : ''}`
             return (
               <g key={i}
                 onMouseEnter={(e) => {
-                  const svg = (e.currentTarget as SVGElement).closest('svg')!
-                  const rect = svg.getBoundingClientRect()
                   const lines = [label]
                   if (showDgrade) lines.push(`dGrade: ${h.dgrade_value}`)
                   if (showEgrade && h.egrade_value && h.egrade_value > 0) lines.push(`eGrade: ${h.egrade_value}`)
@@ -701,31 +537,17 @@ export default function RankingsPage() {
                 onMouseLeave={() => setChartTooltip(null)}
                 style={{ cursor: 'pointer' }}
               >
-                {showDgrade && (
-                  <circle cx={cx} cy={yGrade(h.dgrade_value)} r={h.is_imported ? 3 : 4}
-                    fill={h.is_imported ? '#15803d' : '#16a34a'} opacity={h.is_imported ? 0.7 : 1} />
-                )}
-                {showEgrade && h.egrade_value && h.egrade_value > 0 && (
-                  <circle cx={cx} cy={yGrade(h.egrade_value)} r={h.is_imported ? 3 : 4}
-                    fill={h.is_imported ? '#b45309' : '#d97706'} opacity={h.is_imported ? 0.7 : 1} />
-                )}
-                {h.world_ranking && (
-                  <circle cx={cx} cy={yRank(h.world_ranking)} r={4}
-                    fill="#2563eb" opacity={0.9} />
-                )}
-                {/* Large invisible hit area */}
+                {showDgrade && <circle cx={cx} cy={yGrade(h.dgrade_value)} r={h.is_imported ? 3 : 4} fill={h.is_imported ? '#15803d' : '#16a34a'} opacity={h.is_imported ? 0.7 : 1} />}
+                {showEgrade && h.egrade_value && h.egrade_value > 0 && <circle cx={cx} cy={yGrade(h.egrade_value)} r={h.is_imported ? 3 : 4} fill={h.is_imported ? '#b45309' : '#d97706'} opacity={h.is_imported ? 0.7 : 1} />}
+                {h.world_ranking && <circle cx={cx} cy={yRank(h.world_ranking)} r={4} fill="#2563eb" opacity={0.9} />}
                 <circle cx={cx} cy={yGrade(h.dgrade_value)} r={12} fill="transparent" />
               </g>
             )
           })}
         </svg>
-
-        {/* Floating tooltip */}
         {chartTooltip && (
-          <div
-            className="absolute z-10 bg-gray-900 text-white text-xs rounded-md px-2 py-1.5 pointer-events-none shadow-lg whitespace-pre"
-            style={{ left: `${Math.min(chartTooltip.x, 80)}%`, top: `${Math.max(chartTooltip.y - 10, 2)}%`, transform: 'translate(-50%, -100%)' }}
-          >
+          <div className="absolute z-10 bg-gray-900 text-white text-xs rounded-md px-2 py-1.5 pointer-events-none shadow-lg whitespace-pre"
+            style={{ left: `${Math.min(chartTooltip.x, 80)}%`, top: `${Math.max(chartTooltip.y - 10, 2)}%`, transform: 'translate(-50%, -100%)' }}>
             {chartTooltip.label}
           </div>
         )}
@@ -986,8 +808,6 @@ export default function RankingsPage() {
                     <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400 text-sm">No data available.</td></tr>
                   ) : countryStats.map((row, i) => {
                     const comp = compareMode ? getCompareRow(row.country) : null
-                    const activeKey = `${row.country}-active`
-                    const alltimeKey = `${row.country}-alltime`
                     return (
                       <tr key={row.country} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-4 py-2 text-gray-500 text-xs">{i + 1}</td>
@@ -1001,10 +821,7 @@ export default function RankingsPage() {
                           {row.active_players}{comp && renderDiff(row.active_players, comp.active_players)}
                         </td>
                         <td className="px-4 py-2 text-right font-semibold text-gray-900 relative">
-                          <button
-                            onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'active' ? null : { country: row.country, type: 'active' })}
-                            className="hover:text-green-600 transition"
-                          >
+                          <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'active' ? null : { country: row.country, type: 'active' })} className="hover:text-green-600 transition">
                             {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
                             {comp && comp.avg_top6_dgrade && renderDiff(Math.round(row.avg_top6_dgrade), Math.round(comp.avg_top6_dgrade))}
                             {row.top6_active && <span className="ml-1 text-gray-400 text-xs">▾</span>}
@@ -1022,10 +839,7 @@ export default function RankingsPage() {
                           )}
                         </td>
                         <td className="px-4 py-2 text-right font-semibold text-gray-700 relative">
-                          <button
-                            onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'alltime' ? null : { country: row.country, type: 'alltime' })}
-                            className="hover:text-green-600 transition"
-                          >
+                          <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'alltime' ? null : { country: row.country, type: 'alltime' })} className="hover:text-green-600 transition">
                             {row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '—'}
                             {row.top6_alltime && <span className="ml-1 text-gray-400 text-xs">▾</span>}
                           </button>
@@ -1062,21 +876,13 @@ export default function RankingsPage() {
               <h3 className="font-semibold text-gray-900 mb-3">Search any player</h3>
               <div className="flex gap-2 flex-wrap items-start">
                 <div className="relative flex-1 min-w-48">
-                  <input
-                    type="text"
-                    placeholder="Type a name..."
-                    value={searchQuery}
-                    onChange={(e) => handleSearchQueryChange(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
+                  <input type="text" placeholder="Type a name..." value={searchQuery} onChange={(e) => handleSearchQueryChange(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500" />
                   {searchSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-10 bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
                       {searchSuggestions.map((player) => (
-                        <button
-                          key={player.id}
-                          onClick={() => handleSelectPlayer(player)}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex justify-between items-center"
-                        >
+                        <button key={player.id} onClick={() => handleSelectPlayer(player)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex justify-between items-center">
                           <span className="text-gray-900">{player.wcf_first_name} {player.wcf_last_name}</span>
                           <span className="text-gray-400 text-xs">{getFlag(player.country)} #{player.world_ranking} · {player.dgrade}</span>
                         </button>
@@ -1085,10 +891,8 @@ export default function RankingsPage() {
                   )}
                 </div>
                 {currentUserProfile?.wcf_player_id && (
-                  <button
-                    onClick={handleShowMyHistory}
-                    className="px-4 py-2 rounded-md text-sm font-medium bg-green-50 border border-green-300 text-green-700 hover:bg-green-100 transition whitespace-nowrap"
-                  >
+                  <button onClick={handleShowMyHistory}
+                    className="px-4 py-2 rounded-md text-sm font-medium bg-green-50 border border-green-300 text-green-700 hover:bg-green-100 transition whitespace-nowrap">
                     Show My History
                   </button>
                 )}
@@ -1106,11 +910,8 @@ export default function RankingsPage() {
                   </span>
                   <div className="flex items-center gap-3 ml-auto">
                     {userRole === 'super_admin' && (
-                      <button
-                        onClick={() => handleManualImport(selectedPlayer)}
-                        disabled={manualImporting}
-                        className="text-xs px-3 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50 disabled:opacity-50 transition"
-                      >
+                      <button onClick={() => handleManualImport(selectedPlayer)} disabled={manualImporting}
+                        className="text-xs px-3 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50 disabled:opacity-50 transition">
                         {manualImporting ? 'Importing...' : '↻ Re-import History'}
                       </button>
                     )}
@@ -1134,32 +935,27 @@ export default function RankingsPage() {
                   </div>
                   {historyRange === 'custom' && (
                     <div className="flex items-center gap-2">
-                      <input type="date" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)}
-                        className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-800" />
+                      <input type="date" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-800" />
                       <span className="text-gray-500 text-xs">to</span>
-                      <input type="date" value={historyTo} onChange={(e) => setHistoryTo(e.target.value)}
-                        className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-800" />
+                      <input type="date" value={historyTo} onChange={(e) => setHistoryTo(e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-800" />
                     </div>
                   )}
                   <div className="flex gap-2 ml-auto flex-wrap">
-                    <button onClick={() => setShowDgrade(!showDgrade)}
-                      className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${showDgrade ? 'bg-green-50 border-green-400 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
-                      <span className="w-4 h-1 bg-green-500 inline-block rounded" /> dGrade
-                    </button>
-                    <button onClick={() => setShowEgrade(!showEgrade)}
-                      className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${showEgrade ? 'bg-amber-50 border-amber-400 text-amber-700' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
-                      <span className="w-4 h-1 bg-amber-500 inline-block rounded" /> eGrade
-                    </button>
-                    <button onClick={() => setShowRanking(!showRanking)}
-                      className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${showRanking ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
-                      <span className="w-4 h-1 bg-blue-500 inline-block rounded" /> World Ranking
-                    </button>
+                    {[
+                      { key: 'showDgrade', label: 'dGrade', color: 'green', state: showDgrade, set: setShowDgrade },
+                      { key: 'showEgrade', label: 'eGrade', color: 'amber', state: showEgrade, set: setShowEgrade },
+                      { key: 'showRanking', label: 'World Ranking', color: 'blue', state: showRanking, set: setShowRanking },
+                    ].map(({ key, label, color, state, set }) => (
+                      <button key={key} onClick={() => set(!state)}
+                        className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${state ? `bg-${color}-50 border-${color}-400 text-${color}-700` : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
+                        <span className={`w-4 h-1 bg-${color}-500 inline-block rounded`} /> {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <p className="text-xs text-gray-400 mb-3">
-                  {playerHistory.length <= 1
-                    ? 'No history recorded yet.'
+                  {playerHistory.length <= 1 ? 'No history recorded yet.'
                     : `${playerHistory.filter((h: any) => h.is_imported).length} imported events + ${playerHistory.filter((h: any) => !h.is_imported).length} GCLab tracked points`}
                   {showRanking && playerHistory.some(h => h.world_ranking) && (() => {
                     const firstRank = playerHistory.find(h => h.world_ranking)
@@ -1171,14 +967,12 @@ export default function RankingsPage() {
                 <div className="bg-white rounded-lg shadow-sm p-4 mb-4">{renderChart()}</div>
 
                 {playerHistory.length > 0 && (() => {
-                  // Only show events + most recent sync (last non-imported point)
                   const eventPoints = playerHistory.filter((h: any) => h.is_imported || (h.event_name && h.event_name !== 'Daily sync'))
                   const syncPoints = playerHistory.filter((h: any) => !h.is_imported && (!h.event_name || h.event_name === 'Daily sync'))
                   const lastSync = syncPoints.length > 0 ? syncPoints[syncPoints.length - 1] : null
                   const tableRows = [...eventPoints, ...(lastSync ? [lastSync] : [])].sort(
                     (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
                   )
-                  // Compute grade diffs vs previous entry in original chronological order
                   const chronological = [...playerHistory]
                   const getDiff = (h: any) => {
                     const idx = chronological.findIndex(x => x.recorded_at === h.recorded_at)
