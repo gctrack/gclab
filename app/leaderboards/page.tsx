@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
+import { getFlag, countryName } from '@/lib/countries'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type HeroStat = {
@@ -40,42 +41,6 @@ const BALL_BLACK  = '#1a1a1a'
 const BALL_PINK   = '#f472b6'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const COUNTRY_NAMES: Record<string, string> = {
-  'AU':'Australia','AT':'Austria','BE':'Belgium','CA':'Canada','CZ':'Czech Republic',
-  'EG':'Egypt','GB-ENG':'England','FR':'France','DE':'Germany','HK':'Hong Kong',
-  'IE':'Ireland','IN':'India','IT':'Italy','JP':'Japan','LV':'Latvia',
-  'MX':'Mexico','NL':'Netherlands','NZ':'New Zealand','NO':'Norway','PL':'Poland',
-  'PT':'Portugal','GB-SCT':'Scotland','ZA':'South Africa','ES':'Spain','SE':'Sweden',
-  'CH':'Switzerland','US':'USA','GB-WLS':'Wales','AR':'Argentina','BR':'Brazil',
-  'CN':'China',
-}
-
-// Reverse lookup: full name → country code
-// Also includes alternate spellings stored in wcf_player_country_stats
-const COUNTRY_NAME_TO_CODE: Record<string, string> = {
-  ...Object.fromEntries(Object.entries(COUNTRY_NAMES).map(([code, name]) => [name, code])),
-  // Alternate spellings from DB
-  'Czech Rep': 'CZ',
-  'Austria': 'AT',
-  'England': 'GB-ENG',
-  'Scotland': 'GB-SCT',
-  'Wales': 'GB-WLS',
-  'USA': 'US',
-}
-
-const countryName = (c: string) => COUNTRY_NAMES[c] || c
-
-// Accepts either a code (AU) or full name (Australia) or DB alias (Czech Rep)
-function getFlag(input: string): string {
-  if (!input) return ''
-  const resolved = COUNTRY_NAME_TO_CODE[input] || input
-  if (resolved === 'GB-ENG') return '🏴󠁧󠁢󠁥󠁮󠁧󠁿'
-  if (resolved === 'GB-SCT') return '🏴󠁧󠁢󠁳󠁣󠁴󠁿'
-  if (resolved === 'GB-WLS') return '🏴󠁧󠁢󠁷󠁬󠁳󠁿'
-  if (resolved.length !== 2) return ''
-  return resolved.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('')
-}
-
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-CA', { year: 'numeric', month: 'short' })
 }
@@ -163,7 +128,7 @@ function HeroCard({ stat }: { stat: HeroStat }) {
             {player.countriesPlayed && player.countriesPlayed.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
                 {player.countriesPlayed.map(c => (
-                  <span key={c} title={c} style={{ fontSize: 18, lineHeight: 1 }}>{getFlag(c)}</span>
+                  <span key={c} title={countryName(c)} style={{ fontSize: 18, lineHeight: 1 }}>{getFlag(c)}</span>
                 ))}
               </div>
             )}
@@ -306,9 +271,7 @@ function UpsetTable({ rows, loading }: { rows: any[]; loading: boolean }) {
                   <span className="gsans" style={{ fontSize: 11, color: '#6b7280' }}>{row.event_name}</span>
                   {row.score && <span className="gmono" style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>{row.score}</span>}
                   {row.event_date && (
-                    <span className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>
-                      {formatDate(row.event_date)}
-                    </span>
+                    <span className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>{formatDate(row.event_date)}</span>
                   )}
                 </div>
               )}
@@ -431,83 +394,24 @@ export default function LeaderboardsPage() {
   }
 
   const loadHeroStats = async () => {
-    // 0 — Most Games
-    {
-      const { data } = await supabase.rpc('get_most_games_player')
-      const r = data?.[0]
-      if (r) updateHero(0, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
-        value: Number(r.game_count).toLocaleString(),
-        detail: 'career games played',
-        detail2: `${Number(r.opponent_count).toLocaleString()} unique opponents`,
-      })
-      else updateHero(0, undefined)
-    }
-    // 1 — Best Win Rate
-    {
-      const { data } = await supabase.rpc('get_best_win_rate')
-      const r = data?.[0]
-      if (r) updateHero(1, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
-        value: `${r.win_rate}%`,
-        detail: `${Number(r.win_count).toLocaleString()} wins from ${Number(r.game_count).toLocaleString()} games`,
-      })
-      else updateHero(1, undefined)
-    }
-    // 2 — Most Travelled
-    {
-      const { data } = await supabase.rpc('get_most_travelled')
-      const r = data?.[0]
-      if (r) updateHero(2, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
-        value: `${r.country_count}`,
-        detail: 'countries played in',
-        countriesPlayed: r.countries_played || [],
-      })
-      else updateHero(2, undefined)
-    }
-    // 3 — Longest Win Streak
-    {
-      const { data } = await supabase.rpc('get_longest_win_streak')
-      const r = data?.[0]
-      if (r) updateHero(3, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
-        value: `${r.streak}`,
-        detail: 'consecutive wins',
-        streakStart: r.streak_start,
-        streakEnd: r.streak_end,
-      })
-      else updateHero(3, undefined)
-    }
-    // 4 — Biggest Career Rise
-    {
-      const { data } = await supabase.rpc('get_biggest_career_rise')
-      const r = data?.[0]
-      if (r) updateHero(4, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
-        value: `+${r.gain}`,
-        detail: `${r.min_dgrade} → ${r.max_dgrade} dGrade`,
-        detail2: `${Number(r.game_count).toLocaleString()} games · ${r.win_rate}% win rate`,
-      })
-      else updateHero(4, undefined)
-    }
-    // 5 — Biggest Upset Win
-    {
-      const { data } = await supabase.rpc('get_biggest_upset_win')
-      const r = data?.[0]
-      if (r) updateHero(5, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
-        value: `+${r.gap}`,
-        winnerDgrade: `${r.winner_dgrade}`,
-        oppDgrade: `${r.opp_dgrade}`,
-        opponentName: r.opponent_name,
-        opponentCountry: r.opponent_country || '',
-        event: r.event_name,
-        score: r.score,
-        date: r.event_date ? formatFullDate(r.event_date) : '',
-      })
-      else updateHero(5, undefined)
-    }
+    { const { data } = await supabase.rpc('get_most_games_player'); const r = data?.[0]
+      if (r) updateHero(0, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: Number(r.game_count).toLocaleString(), detail: 'career games played', detail2: `${Number(r.opponent_count).toLocaleString()} unique opponents` })
+      else updateHero(0, undefined) }
+    { const { data } = await supabase.rpc('get_best_win_rate'); const r = data?.[0]
+      if (r) updateHero(1, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: `${r.win_rate}%`, detail: `${Number(r.win_count).toLocaleString()} wins from ${Number(r.game_count).toLocaleString()} games` })
+      else updateHero(1, undefined) }
+    { const { data } = await supabase.rpc('get_most_travelled'); const r = data?.[0]
+      if (r) updateHero(2, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: `${r.country_count}`, detail: 'countries played in', countriesPlayed: r.countries_played || [] })
+      else updateHero(2, undefined) }
+    { const { data } = await supabase.rpc('get_longest_win_streak'); const r = data?.[0]
+      if (r) updateHero(3, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: `${r.streak}`, detail: 'consecutive wins', streakStart: r.streak_start, streakEnd: r.streak_end })
+      else updateHero(3, undefined) }
+    { const { data } = await supabase.rpc('get_biggest_career_rise'); const r = data?.[0]
+      if (r) updateHero(4, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: `+${r.gain}`, detail: `${r.min_dgrade} → ${r.max_dgrade} dGrade`, detail2: `${Number(r.game_count).toLocaleString()} games · ${r.win_rate}% win rate` })
+      else updateHero(4, undefined) }
+    { const { data } = await supabase.rpc('get_biggest_upset_win'); const r = data?.[0]
+      if (r) updateHero(5, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: `+${r.gap}`, winnerDgrade: `${r.winner_dgrade}`, oppDgrade: `${r.opp_dgrade}`, opponentName: r.opponent_name, opponentCountry: r.opponent_country || '', event: r.event_name, score: r.score, date: r.event_date ? formatFullDate(r.event_date) : '' })
+      else updateHero(5, undefined) }
   }
 
   const loadTop10Tables = async () => {
@@ -516,23 +420,15 @@ export default function LeaderboardsPage() {
       { data: games }, { data: winRate }, { data: travelled }, { data: opponents },
       { data: careerRise }, { data: streak }, { data: eventJump }, { data: upsets },
     ] = await Promise.all([
-      supabase.rpc('get_top10_most_games'),
-      supabase.rpc('get_top10_win_rate'),
-      supabase.rpc('get_top10_most_travelled'),
-      supabase.rpc('get_top10_most_opponents'),
-      supabase.rpc('get_top10_career_rise'),
-      supabase.rpc('get_top10_longest_win_streak'),
-      supabase.rpc('get_top10_single_event_jump'),
-      supabase.rpc('get_top10_upset_wins'),
+      supabase.rpc('get_top10_most_games'),      supabase.rpc('get_top10_win_rate'),
+      supabase.rpc('get_top10_most_travelled'),  supabase.rpc('get_top10_most_opponents'),
+      supabase.rpc('get_top10_career_rise'),     supabase.rpc('get_top10_longest_win_streak'),
+      supabase.rpc('get_top10_single_event_jump'), supabase.rpc('get_top10_upset_wins'),
     ])
-    setTop10Games(games || [])
-    setTop10WinRate(winRate || [])
-    setTop10Travelled(travelled || [])
-    setTop10Opponents(opponents || [])
-    setTop10CareerRise(careerRise || [])
-    setTop10Streak(streak || [])
-    setTop10EventJump(eventJump || [])
-    setTop10Upsets(upsets || [])
+    setTop10Games(games || []);      setTop10WinRate(winRate || [])
+    setTop10Travelled(travelled || []); setTop10Opponents(opponents || [])
+    setTop10CareerRise(careerRise || []); setTop10Streak(streak || [])
+    setTop10EventJump(eventJump || []); setTop10Upsets(upsets || [])
     setTablesLoading(false)
   }
 
@@ -545,12 +441,8 @@ export default function LeaderboardsPage() {
 
   const loadNewPlayers = async () => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 60)
-    const { data } = await supabase
-      .from('wcf_players')
-      .select('id, wcf_first_name, wcf_last_name, country, dgrade, created_at')
-      .gte('created_at', cutoff.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(30)
+    const { data } = await supabase.from('wcf_players').select('id, wcf_first_name, wcf_last_name, country, dgrade, created_at')
+      .gte('created_at', cutoff.toISOString()).order('created_at', { ascending: false }).limit(30)
     setNewPlayers(data || [])
   }
 
@@ -583,15 +475,12 @@ export default function LeaderboardsPage() {
               color: tab === t.id ? DARK_GREEN : '#9ca3af',
               borderBottom: tab === t.id ? `2px solid ${DARK_GREEN}` : '2px solid transparent',
               marginBottom: -1,
-            }}>
-              {t.label}
-            </button>
+            }}>{t.label}</button>
           ))}
         </div>
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px 80px' }}>
-
         {tab === 'records' && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
@@ -601,11 +490,9 @@ export default function LeaderboardsPage() {
             <SectionHeader title="Volume & Games" subtitle="Who has played the most — and who went on the longest winning tear" />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(460px, 1fr))', gap: 20 }}>
               <LeaderTable title="Most Games Played" icon="🎮" accentColor={BALL_BLUE} rows={top10Games} loading={tablesLoading}
-                renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_BLUE, flexShrink: 0 }}>{Number(row.game_count).toLocaleString()}</span>}
-              />
+                renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_BLUE, flexShrink: 0 }}>{Number(row.game_count).toLocaleString()}</span>}/>
               <LeaderTable title="Longest Win Streak" icon="🔥" accentColor={BALL_RED} rows={top10Streak} loading={tablesLoading}
-                renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_RED, flexShrink: 0 }}>{row.streak} wins</span>}
-              />
+                renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_RED, flexShrink: 0 }}>{row.streak} wins</span>}/>
             </div>
 
             <SectionHeader title="Reach & Opponents" subtitle="Who has travelled furthest and faced the widest field" />
@@ -614,15 +501,11 @@ export default function LeaderboardsPage() {
                 renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_GREEN, flexShrink: 0 }}>{row.country_count} countries</span>}
                 renderExtra={(row) => row.countries_played?.length > 0 ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, paddingLeft: 30, paddingBottom: 6, marginTop: 4 }}>
-                    {row.countries_played.map((c: string) => (
-                      <span key={c} title={c} style={{ fontSize: 14, lineHeight: 1 }}>{getFlag(c)}</span>
-                    ))}
+                    {row.countries_played.map((c: string) => <span key={c} title={countryName(c)} style={{ fontSize: 14, lineHeight: 1 }}>{getFlag(c)}</span>)}
                   </div>
-                ) : null}
-              />
+                ) : null}/>
               <LeaderTable title="Most Unique Opponents" icon="🤝" accentColor="#6b7280" rows={top10Opponents} loading={tablesLoading}
-                renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#374151', flexShrink: 0 }}>{Number(row.opponent_count).toLocaleString()}</span>}
-              />
+                renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#374151', flexShrink: 0 }}>{Number(row.opponent_count).toLocaleString()}</span>}/>
             </div>
 
             <SectionHeader title="Grade Achievements" subtitle="The biggest dGrade rises over a career and within a single event" />
@@ -633,19 +516,15 @@ export default function LeaderboardsPage() {
                     <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_BLACK }}>+{row.gain}</span>
                     <span className="gmono" style={{ fontSize: 10, color: '#9ca3af' }}>{row.min_dgrade}→{row.max_dgrade}</span>
                   </div>
-                )}
-              />
+                )}/>
               <LeaderTable title="Biggest Single-Event Jump" icon="🚀" accentColor="#0284c7" rows={top10EventJump} loading={tablesLoading}
-                subText={(row) => row.event_name && row.event_date
-                  ? `${row.event_name} · ${formatFullDate(row.event_date)}`
-                  : row.event_name || null}
+                subText={(row) => row.event_name && row.event_date ? `${row.event_name} · ${formatFullDate(row.event_date)}` : row.event_name || null}
                 renderValue={(row) => (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
                     <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#0284c7' }}>+{row.jump}</span>
                     <span className="gmono" style={{ fontSize: 10, color: '#9ca3af' }}>{row.grade_before}→{row.grade_after}</span>
                   </div>
-                )}
-              />
+                )}/>
             </div>
 
             <SectionHeader title="Best Win Rate" subtitle="Career win percentage — minimum 100 games" />
@@ -656,8 +535,7 @@ export default function LeaderboardsPage() {
                     <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_YELLOW }}>{row.win_rate}%</span>
                     <span className="gmono" style={{ fontSize: 10, color: '#9ca3af' }}>{Number(row.win_count).toLocaleString()}/{Number(row.game_count).toLocaleString()}</span>
                   </div>
-                )}
-              />
+                )}/>
             </div>
 
             <SectionHeader title="Biggest Upsets" subtitle="The largest grade-gap victories ever recorded in imported data" />
