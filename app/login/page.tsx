@@ -121,11 +121,17 @@ export default function LoginPage() {
             <div className="fade-up" style={{ textAlign: 'center', marginBottom: 40 }}>
               <div className="logo-pulse" style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 64, height: 64, borderRadius: '50%',
-                background: 'rgba(74,222,128,0.12)',
+                width: 72, height: 72, borderRadius: '50%',
+                background: 'rgba(74,222,128,0.1)',
                 marginBottom: 20,
               }}>
-                <span style={{ fontSize: 30 }}>⚗️</span>
+                <svg width="38" height="46" viewBox="0 0 44 52" fill="none">
+                  <rect x="13" y="2" width="18" height="8" rx="2" fill="rgba(74,222,128,0.15)" stroke="#4ade80" strokeWidth="1.6"/>
+                  <path d="M13 10 L2 44 Q0 50 4 51 L40 51 Q44 50 42 44 L31 10 Z" fill="rgba(74,222,128,0.08)" stroke="#4ade80" strokeWidth="1.6" strokeLinejoin="round"/>
+                  <circle cx="14" cy="40" r="6.5" fill="#ef4444"/>
+                  <circle cx="30" cy="40" r="6.5" fill="#3b82f6"/>
+                  <circle cx="22" cy="29" r="6.5" fill="#eab308"/>
+                </svg>
               </div>
               <h1 className="ghl" style={{ color: CREAM, fontSize: 34, margin: '0 0 8px', lineHeight: 1.1 }}>
                 GCLab
@@ -197,18 +203,11 @@ export default function LoginPage() {
             </div>
 
             {/* Footer note */}
-            <p className="gsans fade-up fade-up-d4" style={{ textAlign: 'center', color: 'rgba(232,224,208,0.28)', fontSize: 12, marginTop: 24 }}>
-              Access is by invitation. Contact your administrator for access.
-            </p>
+
           </div>
         </div>
 
-        {/* Bottom tagline */}
-        <div style={{ padding: '20px 32px', textAlign: 'center' }}>
-          <p className="gmono" style={{ color: 'rgba(232,224,208,0.2)', fontSize: 11, margin: 0 }}>
-            GCLab · World Croquet Federation data
-          </p>
-        </div>
+
       </div>
     </>
   )
