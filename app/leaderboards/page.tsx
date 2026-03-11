@@ -41,24 +41,34 @@ const BALL_PINK   = '#f472b6'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const COUNTRY_NAMES: Record<string, string> = {
-  'AU':'Australia','BE':'Belgium','CA':'Canada','CZ':'Czech Republic','EG':'Egypt',
-  'GB-ENG':'England','DE':'Germany','HK':'Hong Kong','IE':'Ireland','LV':'Latvia',
-  'MX':'Mexico','NZ':'New Zealand','NO':'Norway','PT':'Portugal','GB-SCT':'Scotland',
-  'ZA':'South Africa','ES':'Spain','SE':'Sweden','CH':'Switzerland','US':'USA',
-  'GB-WLS':'Wales','FR':'France','IT':'Italy','NL':'Netherlands','PL':'Poland',
-  'AR':'Argentina','BR':'Brazil','CN':'China','JP':'Japan','IN':'India',
+  'AU':'Australia','AT':'Austria','BE':'Belgium','CA':'Canada','CZ':'Czech Republic',
+  'EG':'Egypt','GB-ENG':'England','FR':'France','DE':'Germany','HK':'Hong Kong',
+  'IE':'Ireland','IN':'India','IT':'Italy','JP':'Japan','LV':'Latvia',
+  'MX':'Mexico','NL':'Netherlands','NZ':'New Zealand','NO':'Norway','PL':'Poland',
+  'PT':'Portugal','GB-SCT':'Scotland','ZA':'South Africa','ES':'Spain','SE':'Sweden',
+  'CH':'Switzerland','US':'USA','GB-WLS':'Wales','AR':'Argentina','BR':'Brazil',
+  'CN':'China',
 }
 
 // Reverse lookup: full name → country code
-const COUNTRY_NAME_TO_CODE: Record<string, string> = Object.fromEntries(
-  Object.entries(COUNTRY_NAMES).map(([code, name]) => [name, code])
-)
+// Also includes alternate spellings stored in wcf_player_country_stats
+const COUNTRY_NAME_TO_CODE: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(COUNTRY_NAMES).map(([code, name]) => [name, code])),
+  // Alternate spellings from DB
+  'Czech Rep': 'CZ',
+  'Austria': 'AT',
+  'England': 'GB-ENG',
+  'Scotland': 'GB-SCT',
+  'Wales': 'GB-WLS',
+  'USA': 'US',
+}
 
 const countryName = (c: string) => COUNTRY_NAMES[c] || c
 
-function getFlag(code: string): string {
-  if (!code) return ''
-  const resolved = COUNTRY_NAME_TO_CODE[code] || code
+// Accepts either a code (AU) or full name (Australia) or DB alias (Czech Rep)
+function getFlag(input: string): string {
+  if (!input) return ''
+  const resolved = COUNTRY_NAME_TO_CODE[input] || input
   if (resolved === 'GB-ENG') return '🏴󠁧󠁢󠁥󠁮󠁧󠁿'
   if (resolved === 'GB-SCT') return '🏴󠁧󠁢󠁳󠁣󠁴󠁿'
   if (resolved === 'GB-WLS') return '🏴󠁧󠁢󠁷󠁬󠁳󠁿'
@@ -68,6 +78,10 @@ function getFlag(code: string): string {
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-CA', { year: 'numeric', month: 'short' })
+}
+
+function formatFullDate(d: string) {
+  return new Date(d).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 const ML = `
@@ -121,9 +135,7 @@ function HeroCard({ stat }: { stat: HeroStat }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 16 }}>{getFlag(player.country)}</span>
                   <span className="gsans" style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{player.name}</span>
-                  {player.winnerDgrade && (
-                    <span className="gmono" style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{player.winnerDgrade}</span>
-                  )}
+                  {player.winnerDgrade && <span className="gmono" style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{player.winnerDgrade}</span>}
                   <span className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>{countryName(player.country)}</span>
                 </div>
                 <div style={{ paddingLeft: 2, marginBottom: 6 }}>
@@ -132,9 +144,7 @@ function HeroCard({ stat }: { stat: HeroStat }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 16 }}>{getFlag(player.opponentCountry || '')}</span>
                   <span className="gsans" style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>{player.opponentName}</span>
-                  {player.oppDgrade && (
-                    <span className="gmono" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>{player.oppDgrade}</span>
-                  )}
+                  {player.oppDgrade && <span className="gmono" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>{player.oppDgrade}</span>}
                   <span className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>{countryName(player.opponentCountry || '')}</span>
                 </div>
               </div>
@@ -146,15 +156,9 @@ function HeroCard({ stat }: { stat: HeroStat }) {
               </div>
             )}
 
-            {player.detail && (
-              <p className="gsans" style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0', lineHeight: 1.5 }}>{player.detail}</p>
-            )}
-            {player.detail2 && (
-              <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0', lineHeight: 1.5 }}>{player.detail2}</p>
-            )}
-            {player.detail3 && (
-              <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0', lineHeight: 1.5 }}>{player.detail3}</p>
-            )}
+            {player.detail && <p className="gsans" style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0', lineHeight: 1.5 }}>{player.detail}</p>}
+            {player.detail2 && <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0', lineHeight: 1.5 }}>{player.detail2}</p>}
+            {player.detail3 && <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0', lineHeight: 1.5 }}>{player.detail3}</p>}
 
             {player.countriesPlayed && player.countriesPlayed.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
@@ -303,7 +307,7 @@ function UpsetTable({ rows, loading }: { rows: any[]; loading: boolean }) {
                   {row.score && <span className="gmono" style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>{row.score}</span>}
                   {row.event_date && (
                     <span className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>
-                      {new Date(row.event_date).toLocaleDateString('en-CA', { year: 'numeric', month: 'short' })}
+                      {formatDate(row.event_date)}
                     </span>
                   )}
                 </div>
@@ -379,12 +383,12 @@ export default function LeaderboardsPage() {
   const [tab, setTab]                 = useState<'records' | 'countries' | 'new'>('records')
 
   const [heroStats, setHeroStats] = useState<HeroStat[]>([
-    { label: 'Most Games Played',   sublabel: 'Career total',             icon: '🎮', accentColor: BALL_BLUE,   loading: true },
-    { label: 'Best Win Rate',       sublabel: 'Min 100 games · career %', icon: '🏆', accentColor: BALL_YELLOW, loading: true },
-    { label: 'Most Travelled',      sublabel: 'Countries played in',      icon: '✈️', accentColor: BALL_GREEN,  loading: true },
-    { label: 'Longest Win Streak',  sublabel: 'Consecutive wins',         icon: '🔥', accentColor: BALL_RED,    loading: true },
-    { label: 'Biggest Career Rise', sublabel: 'All-time dGrade gain',     icon: '📈', accentColor: BALL_BLACK,  loading: true },
-    { label: 'Biggest Upset Win',   sublabel: 'Winner vs opponent dGrade gap', icon: '⚡', accentColor: BALL_PINK, loading: true },
+    { label: 'Most Games Played',   sublabel: 'Career total',                  icon: '🎮', accentColor: BALL_BLUE,   loading: true },
+    { label: 'Best Win Rate',       sublabel: 'Min 100 games · career %',      icon: '🏆', accentColor: BALL_YELLOW, loading: true },
+    { label: 'Most Travelled',      sublabel: 'Countries played in',           icon: '✈️', accentColor: BALL_GREEN,  loading: true },
+    { label: 'Longest Win Streak',  sublabel: 'Consecutive wins',              icon: '🔥', accentColor: BALL_RED,    loading: true },
+    { label: 'Biggest Career Rise', sublabel: 'All-time dGrade gain',          icon: '📈', accentColor: BALL_BLACK,  loading: true },
+    { label: 'Biggest Upset Win',   sublabel: 'Winner vs opponent dGrade gap', icon: '⚡', accentColor: BALL_PINK,   loading: true },
   ])
 
   const [top10Games,      setTop10Games]      = useState<any[]>([])
@@ -427,54 +431,47 @@ export default function LeaderboardsPage() {
   }
 
   const loadHeroStats = async () => {
-    // 0 — Most Games + unique opponents
+    // 0 — Most Games
     {
       const { data } = await supabase.rpc('get_most_games_player')
       const r = data?.[0]
       if (r) updateHero(0, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
-        country: r.country,
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
         value: Number(r.game_count).toLocaleString(),
         detail: 'career games played',
         detail2: `${Number(r.opponent_count).toLocaleString()} unique opponents`,
       })
       else updateHero(0, undefined)
     }
-
     // 1 — Best Win Rate
     {
       const { data } = await supabase.rpc('get_best_win_rate')
       const r = data?.[0]
       if (r) updateHero(1, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
-        country: r.country,
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
         value: `${r.win_rate}%`,
         detail: `${Number(r.win_count).toLocaleString()} wins from ${Number(r.game_count).toLocaleString()} games`,
       })
       else updateHero(1, undefined)
     }
-
-    // 2 — Most Travelled (with country flags)
+    // 2 — Most Travelled
     {
       const { data } = await supabase.rpc('get_most_travelled')
       const r = data?.[0]
       if (r) updateHero(2, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
-        country: r.country,
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
         value: `${r.country_count}`,
         detail: 'countries played in',
         countriesPlayed: r.countries_played || [],
       })
       else updateHero(2, undefined)
     }
-
-    // 3 — Longest Win Streak (with date range)
+    // 3 — Longest Win Streak
     {
       const { data } = await supabase.rpc('get_longest_win_streak')
       const r = data?.[0]
       if (r) updateHero(3, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
-        country: r.country,
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
         value: `${r.streak}`,
         detail: 'consecutive wins',
         streakStart: r.streak_start,
@@ -482,28 +479,24 @@ export default function LeaderboardsPage() {
       })
       else updateHero(3, undefined)
     }
-
-    // 4 — Biggest Career Rise (with games + win rate)
+    // 4 — Biggest Career Rise
     {
       const { data } = await supabase.rpc('get_biggest_career_rise')
       const r = data?.[0]
       if (r) updateHero(4, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
-        country: r.country,
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
         value: `+${r.gain}`,
         detail: `${r.min_dgrade} → ${r.max_dgrade} dGrade`,
         detail2: `${Number(r.game_count).toLocaleString()} games · ${r.win_rate}% win rate`,
       })
       else updateHero(4, undefined)
     }
-
     // 5 — Biggest Upset Win
     {
       const { data } = await supabase.rpc('get_biggest_upset_win')
       const r = data?.[0]
       if (r) updateHero(5, {
-        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
-        country: r.country,
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country,
         value: `+${r.gap}`,
         winnerDgrade: `${r.winner_dgrade}`,
         oppDgrade: `${r.opp_dgrade}`,
@@ -511,7 +504,7 @@ export default function LeaderboardsPage() {
         opponentCountry: r.opponent_country || '',
         event: r.event_name,
         score: r.score,
-        date: r.event_date ? new Date(r.event_date).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }) : '',
+        date: r.event_date ? formatFullDate(r.event_date) : '',
       })
       else updateHero(5, undefined)
     }
@@ -520,14 +513,8 @@ export default function LeaderboardsPage() {
   const loadTop10Tables = async () => {
     setTablesLoading(true)
     const [
-      { data: games },
-      { data: winRate },
-      { data: travelled },
-      { data: opponents },
-      { data: careerRise },
-      { data: streak },
-      { data: eventJump },
-      { data: upsets },
+      { data: games }, { data: winRate }, { data: travelled }, { data: opponents },
+      { data: careerRise }, { data: streak }, { data: eventJump }, { data: upsets },
     ] = await Promise.all([
       supabase.rpc('get_top10_most_games'),
       supabase.rpc('get_top10_win_rate'),
@@ -576,9 +563,8 @@ export default function LeaderboardsPage() {
   return (
     <div style={{ minHeight: '100vh', background: CREAM, fontFamily: 'DM Sans, sans-serif' }}>
       <style dangerouslySetInnerHTML={{ __html: ML }}/>
-      <GCLabNav role={userProfile?.role} isSignedIn={!!signedIn} currentPath="/leaderboards"/>
+      <GCLabNav role={userProfile?.role} isSignedIn={signedIn ?? undefined} currentPath="/leaderboards"/>
 
-      {/* Header */}
       <div style={{ background: DARK_GREEN, padding: '48px 24px 40px' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ display: 'inline-block', background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 20, padding: '4px 14px', marginBottom: 16 }}>
@@ -589,13 +575,12 @@ export default function LeaderboardsPage() {
         </div>
       </div>
 
-      {/* Tab bar */}
       <div style={{ background: 'white', borderBottom: '1px solid #e5e1d8', position: 'sticky', top: 52, zIndex: 10 }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', padding: '0 24px' }}>
           {TABS.map(t => (
             <button key={t.id} className="tab-btn gsans" onClick={() => setTab(t.id)} style={{
-              padding: '14px 20px', fontSize: 13, fontWeight: 600,
-              background: 'none', color: tab === t.id ? DARK_GREEN : '#9ca3af',
+              padding: '14px 20px', fontSize: 13, fontWeight: 600, background: 'none',
+              color: tab === t.id ? DARK_GREEN : '#9ca3af',
               borderBottom: tab === t.id ? `2px solid ${DARK_GREEN}` : '2px solid transparent',
               marginBottom: -1,
             }}>
@@ -607,7 +592,6 @@ export default function LeaderboardsPage() {
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px 80px' }}>
 
-        {/* ── Record Holders ── */}
         {tab === 'records' && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
@@ -616,62 +600,34 @@ export default function LeaderboardsPage() {
 
             <SectionHeader title="Volume & Games" subtitle="Who has played the most — and who went on the longest winning tear" />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(460px, 1fr))', gap: 20 }}>
-              <LeaderTable
-                title="Most Games Played" icon="🎮" accentColor={BALL_BLUE}
-                rows={top10Games} loading={tablesLoading}
-                renderValue={(row) => (
-                  <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_BLUE, flexShrink: 0 }}>
-                    {Number(row.game_count).toLocaleString()}
-                  </span>
-                )}
+              <LeaderTable title="Most Games Played" icon="🎮" accentColor={BALL_BLUE} rows={top10Games} loading={tablesLoading}
+                renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_BLUE, flexShrink: 0 }}>{Number(row.game_count).toLocaleString()}</span>}
               />
-              <LeaderTable
-                title="Longest Win Streak" icon="🔥" accentColor={BALL_RED}
-                rows={top10Streak} loading={tablesLoading}
-                renderValue={(row) => (
-                  <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_RED, flexShrink: 0 }}>
-                    {row.streak} wins
-                  </span>
-                )}
+              <LeaderTable title="Longest Win Streak" icon="🔥" accentColor={BALL_RED} rows={top10Streak} loading={tablesLoading}
+                renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_RED, flexShrink: 0 }}>{row.streak} wins</span>}
               />
             </div>
 
             <SectionHeader title="Reach & Opponents" subtitle="Who has travelled furthest and faced the widest field" />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(460px, 1fr))', gap: 20 }}>
-              <LeaderTable
-                title="Most Travelled" icon="✈️" accentColor={BALL_GREEN}
-                rows={top10Travelled} loading={tablesLoading}
-                renderValue={(row) => (
-                  <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_GREEN, flexShrink: 0 }}>
-                    {row.country_count} countries
-                  </span>
-                )}
-                renderExtra={(row) =>
-                  row.countries_played && row.countries_played.length > 0 ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, paddingLeft: 30, paddingBottom: 6, marginTop: 4 }}>
-                      {row.countries_played.map((c: string) => (
-                        <span key={c} title={c} style={{ fontSize: 14, lineHeight: 1 }}>{getFlag(c)}</span>
-                      ))}
-                    </div>
-                  ) : null
-                }
+              <LeaderTable title="Most Travelled" icon="✈️" accentColor={BALL_GREEN} rows={top10Travelled} loading={tablesLoading}
+                renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_GREEN, flexShrink: 0 }}>{row.country_count} countries</span>}
+                renderExtra={(row) => row.countries_played?.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, paddingLeft: 30, paddingBottom: 6, marginTop: 4 }}>
+                    {row.countries_played.map((c: string) => (
+                      <span key={c} title={c} style={{ fontSize: 14, lineHeight: 1 }}>{getFlag(c)}</span>
+                    ))}
+                  </div>
+                ) : null}
               />
-              <LeaderTable
-                title="Most Unique Opponents" icon="🤝" accentColor="#6b7280"
-                rows={top10Opponents} loading={tablesLoading}
-                renderValue={(row) => (
-                  <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#374151', flexShrink: 0 }}>
-                    {Number(row.opponent_count).toLocaleString()}
-                  </span>
-                )}
+              <LeaderTable title="Most Unique Opponents" icon="🤝" accentColor="#6b7280" rows={top10Opponents} loading={tablesLoading}
+                renderValue={(row) => <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#374151', flexShrink: 0 }}>{Number(row.opponent_count).toLocaleString()}</span>}
               />
             </div>
 
             <SectionHeader title="Grade Achievements" subtitle="The biggest dGrade rises over a career and within a single event" />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(460px, 1fr))', gap: 20 }}>
-              <LeaderTable
-                title="Biggest Career Rise" icon="📈" accentColor={BALL_BLACK}
-                rows={top10CareerRise} loading={tablesLoading}
+              <LeaderTable title="Biggest Career Rise" icon="📈" accentColor={BALL_BLACK} rows={top10CareerRise} loading={tablesLoading}
                 renderValue={(row) => (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
                     <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_BLACK }}>+{row.gain}</span>
@@ -679,10 +635,10 @@ export default function LeaderboardsPage() {
                   </div>
                 )}
               />
-              <LeaderTable
-                title="Biggest Single-Event Jump" icon="🚀" accentColor="#0284c7"
-                rows={top10EventJump} loading={tablesLoading}
-                subText={(row) => row.event_name || null}
+              <LeaderTable title="Biggest Single-Event Jump" icon="🚀" accentColor="#0284c7" rows={top10EventJump} loading={tablesLoading}
+                subText={(row) => row.event_name && row.event_date
+                  ? `${row.event_name} · ${formatFullDate(row.event_date)}`
+                  : row.event_name || null}
                 renderValue={(row) => (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
                     <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: '#0284c7' }}>+{row.jump}</span>
@@ -694,15 +650,11 @@ export default function LeaderboardsPage() {
 
             <SectionHeader title="Best Win Rate" subtitle="Career win percentage — minimum 100 games" />
             <div style={{ maxWidth: 560 }}>
-              <LeaderTable
-                title="Best Career Win Rate" icon="🏆" accentColor={BALL_YELLOW}
-                rows={top10WinRate} loading={tablesLoading}
+              <LeaderTable title="Best Career Win Rate" icon="🏆" accentColor={BALL_YELLOW} rows={top10WinRate} loading={tablesLoading}
                 renderValue={(row) => (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
                     <span className="gmono" style={{ fontSize: 14, fontWeight: 700, color: BALL_YELLOW }}>{row.win_rate}%</span>
-                    <span className="gmono" style={{ fontSize: 10, color: '#9ca3af' }}>
-                      {Number(row.win_count).toLocaleString()}/{Number(row.game_count).toLocaleString()}
-                    </span>
+                    <span className="gmono" style={{ fontSize: 10, color: '#9ca3af' }}>{Number(row.win_count).toLocaleString()}/{Number(row.game_count).toLocaleString()}</span>
                   </div>
                 )}
               />
@@ -713,7 +665,6 @@ export default function LeaderboardsPage() {
           </>
         )}
 
-        {/* ── Players by Country ── */}
         {tab === 'countries' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
             <CountryTable title="🌍 Total Ranked Players by Country" data={totalByCountry} valueLabel="players"/>
@@ -721,7 +672,6 @@ export default function LeaderboardsPage() {
           </div>
         )}
 
-        {/* ── New Players ── */}
         {tab === 'new' && (
           <div style={{ maxWidth: 640 }}>
             <NewPlayersTable players={newPlayers}/>

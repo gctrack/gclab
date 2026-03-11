@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
@@ -55,10 +55,24 @@ const navStyles = `
   .gcnav-drop-item:hover { background: rgba(255,255,255,0.06) !important; color: ${CREAM} !important; }
 `
 
-export default function GCLabNav({ role, isSignedIn = false, currentPath = '' }: Props) {
+export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath = '' }: Props) {
   const [open, setOpen] = useState(false)
+  // Start as null (unknown) — resolve via internal auth check
+  const [authResolved, setAuthResolved] = useState<boolean | null>(null)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    // If prop is explicitly provided and already true, trust it immediately
+    if (isSignedInProp === true) {
+      setAuthResolved(true)
+      return
+    }
+    // Otherwise check auth ourselves so we don't lock links prematurely
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthResolved(!!session)
+    })
+  }, [isSignedInProp])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -72,6 +86,10 @@ export default function GCLabNav({ role, isSignedIn = false, currentPath = '' }:
     return currentPath === base || currentPath.startsWith(base + '/')
   }
 
+  // While auth is resolving (null), treat as signed-in so links aren't locked prematurely.
+  // The destination page will handle its own auth guard if the user truly isn't signed in.
+  const signedIn = authResolved === null ? true : authResolved
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: navStyles }}/>
@@ -83,7 +101,7 @@ export default function GCLabNav({ role, isSignedIn = false, currentPath = '' }:
         <div className="gcnav-desk">
           {DESKTOP_TABS.map(tab => {
             const active = isActive(tab.href)
-            const locked = !tab.public && !isSignedIn
+            const locked = !tab.public && !signedIn
             return (
               <a key={tab.href} href={locked ? '/login' : tab.href} title={locked ? `Sign in for ${tab.label}` : tab.label} className="gcnav-tab"
                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 8, fontSize: 12, fontWeight: 500, textDecoration: 'none', whiteSpace: 'nowrap',
@@ -122,7 +140,7 @@ export default function GCLabNav({ role, isSignedIn = false, currentPath = '' }:
               </a>
             </>)}
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }}/>
-            {isSignedIn ? (
+            {signedIn ? (
               <button onClick={handleSignOut} className="gcnav-tab" style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', fontSize: 14, color: 'rgba(248,113,113,0.75)', background: 'none', border: 'none', cursor: 'pointer' }}>
                 <span style={{ width: 18, textAlign: 'center' }}>↩</span><span>Sign Out</span>
               </button>
