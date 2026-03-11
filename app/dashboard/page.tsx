@@ -26,6 +26,20 @@ const ML = `
   .dash-stat-card:hover { border-color: rgba(74,222,128,0.25) !important; }
   .dash-light-card { background: white; border: 1px solid #e5e1d8; border-radius: 16px; overflow: hidden; }
   .dash-row:hover { background: rgba(13,40,24,0.03) !important; }
+  .gtab-dark {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.14);
+    color: rgba(232,224,208,0.45);
+    padding: 4px 12px; border-radius: 6px;
+    font-size: 12px; cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    transition: all 0.15s;
+  }
+  .gtab-dark.on {
+    background: rgba(74,222,128,0.15);
+    border-color: rgba(74,222,128,0.4);
+    color: #4ade80;
+  }
   @media (max-width: 900px) {
     .dash-hero-grid { grid-template-columns: repeat(3,1fr) !important; }
     .dash-cols { grid-template-columns: 1fr !important; }
@@ -57,16 +71,35 @@ function pctColor(p: number) {
 
 // ─── Career SVG Chart ────────────────────────────────────────────────────────
 
-function CareerChart({ history }: { history: any[] }) {
+type ChartFilter = '1Y' | '5Y' | 'All'
+
+function CareerChart({ history, currentDgrade, peakDgrade, yearsActive }: {
+  history: any[]
+  currentDgrade?: number | string
+  peakDgrade?: number
+  yearsActive?: number
+}) {
   const [tooltip, setTooltip] = React.useState<{ x: number; y: number; grade: number; date: string } | null>(null)
-  const valid = history.filter((h: any) => h.dgrade_value > 0)
+  const [filter, setFilter] = React.useState<ChartFilter>('All')
+
+  // Apply time filter
+  const now = Date.now()
+  const cutoff: Record<ChartFilter, number> = {
+    '1Y': now - 365 * 24 * 60 * 60 * 1000,
+    '5Y': now - 5 * 365 * 24 * 60 * 60 * 1000,
+    'All': 0,
+  }
+  const valid = history
+    .filter((h: any) => h.dgrade_value > 0)
+    .filter((h: any) => new Date(h.recorded_at).getTime() >= cutoff[filter])
+
   if (!valid.length) return (
-    <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: CREAM25, fontSize: 13 }} className="gsans">
-      No grade history yet
+    <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: CREAM25, fontSize: 13 }} className="gsans">
+      No grade history for this period
     </div>
   )
 
-  const W = 880, H = 210
+  const W = 880, H = 200
   const PL = 50, PR = 20, PT = 16, PB = 28
   const CW = W - PL - PR, CH = H - PT - PB
 
@@ -132,48 +165,98 @@ function CareerChart({ history }: { history: any[] }) {
   }
 
   return (
-    <svg ref={svgRef} width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
-      onMouseMove={handleMouseMove} onMouseLeave={() => setTooltip(null)} style={{ cursor: 'crosshair' }}>
-      <defs>
-        <linearGradient id="cgrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={LIME} stopOpacity="0.2"/>
-          <stop offset="100%" stopColor={LIME} stopOpacity="0.01"/>
-        </linearGradient>
-      </defs>
-      {yTicks.map(g => (
-        <g key={g}>
-          <line x1={PL} y1={yf(g)} x2={W - PR} y2={yf(g)} stroke="rgba(255,255,255,0.048)" strokeWidth="1"/>
-          <text x={PL - 6} y={yf(g) + 4} fill="rgba(255,255,255,0.22)" fontSize="9" fontFamily="DM Mono,monospace" textAnchor="end">{g}</text>
-        </g>
-      ))}
-      <path d={areaD} fill="url(#cgrad)"/>
-      <path d={lineD} fill="none" stroke={LIME} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
-      <line x1={peakX} y1={peakY} x2={peakX} y2={botY} stroke="rgba(74,222,128,0.14)" strokeWidth="1" strokeDasharray="3 3"/>
-      <circle cx={peakX} cy={peakY} r="5" fill={LIME}/>
-      <circle cx={peakX} cy={peakY} r="9" fill="none" stroke={LIME} strokeWidth="1.5" strokeOpacity="0.4"/>
-      <rect x={labelX} y={peakY - 14} width={70} height={20} rx={4} fill="rgba(13,40,24,0.92)" stroke="rgba(74,222,128,0.3)" strokeWidth="1"/>
-      <text x={labelX + 35} y={peakY + 1} fill={LIME} fontSize="10" fontFamily="DM Mono,monospace" textAnchor="middle" fontWeight="500">Peak {peakG}</text>
-      <circle cx={lastX} cy={yf(grades[grades.length - 1])} r="4.5" fill={LIME}/>
-      <circle cx={lastX} cy={yf(grades[grades.length - 1])} r="8" fill="none" stroke={LIME} strokeWidth="1.5" strokeOpacity="0.35"/>
-      {tooltip && (() => {
-        const tx = Math.min(tooltip.x + 10, W - 110)
-        const ty = Math.max(tooltip.y - 32, 4)
-        return (
-          <g>
-            <line x1={tooltip.x} y1={PT} x2={tooltip.x} y2={PT + CH} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3 3"/>
-            <circle cx={tooltip.x} cy={tooltip.y} r="4" fill={LIME} stroke="rgba(13,40,24,0.8)" strokeWidth="1.5"/>
-            <rect x={tx} y={ty} width={100} height={28} rx={4} fill="rgba(13,40,24,0.92)" stroke="rgba(74,222,128,0.3)" strokeWidth="1"/>
-            <text x={tx + 8} y={ty + 11} fill={LIME} fontSize="10" fontFamily="DM Mono,monospace" fontWeight="600">{tooltip.grade}</text>
-            <text x={tx + 8} y={ty + 22} fill="rgba(255,255,255,0.5)" fontSize="8" fontFamily="DM Sans,sans-serif">{tooltip.date}</text>
-          </g>
-        )
-      })()}
-      {allYears.filter((_, i) => i % skip === 0).map(y => {
-        const x = xf(new Date(y, 6, 1).getTime())
-        if (x < PL || x > W - PR + 10) return null
-        return <text key={y} x={x} y={H - 4} fill="rgba(255,255,255,0.22)" fontSize="10" fontFamily="DM Sans,sans-serif" textAnchor="middle">{y}</text>
-      })}
-    </svg>
+    <div>
+      {/* Header row: stats + filter buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 28 }}>
+          {[
+            { label: 'Current', val: currentDgrade, highlight: false },
+            { label: 'Peak',    val: peakDgrade || '—', highlight: true },
+            { label: 'Years',   val: yearsActive,       highlight: false },
+          ].map(({ label, val, highlight }) => (
+            <div key={label} style={{ textAlign: 'center' }}>
+              <div className="gmono" style={{ fontSize: 20, fontWeight: 500, color: highlight ? LIME : CREAM, lineHeight: 1 }}>{val || '—'}</div>
+              <div className="gsans" style={{ fontSize: 10, color: CREAM25, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['1Y', '5Y', 'All'] as ChartFilter[]).map(f => (
+            <button key={f} onClick={() => setFilter(f)} className={`gtab-dark${filter === f ? ' on' : ''}`}>{f === 'All' ? 'All Time' : f}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div style={{ padding: '16px 12px 8px', maxWidth: 900, margin: '0 auto' }}>
+        <svg ref={svgRef} width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
+          onMouseMove={handleMouseMove} onMouseLeave={() => setTooltip(null)} style={{ cursor: 'crosshair', display: 'block' }}>
+          <defs>
+            <linearGradient id="cgrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={LIME} stopOpacity="0.2"/>
+              <stop offset="100%" stopColor={LIME} stopOpacity="0.01"/>
+            </linearGradient>
+          </defs>
+
+          {yTicks.map(g => (
+            <g key={g}>
+              <line x1={PL} y1={yf(g)} x2={W - PR} y2={yf(g)} stroke="rgba(255,255,255,0.048)" strokeWidth="1"/>
+              <text x={PL - 6} y={yf(g) + 4} fill="rgba(255,255,255,0.22)" fontSize="9" fontFamily="DM Mono,monospace" textAnchor="end">{g}</text>
+            </g>
+          ))}
+
+          <path d={areaD} fill="url(#cgrad)"/>
+          <path d={lineD} fill="none" stroke={LIME} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
+
+          {/* Peak marker */}
+          <line x1={peakX} y1={peakY} x2={peakX} y2={botY} stroke="rgba(74,222,128,0.14)" strokeWidth="1" strokeDasharray="3 3"/>
+          <circle cx={peakX} cy={peakY} r="5" fill={LIME}/>
+          <circle cx={peakX} cy={peakY} r="9" fill="none" stroke={LIME} strokeWidth="1.5" strokeOpacity="0.4"/>
+          <rect x={labelX} y={peakY - 14} width={70} height={20} rx={4} fill="rgba(13,40,24,0.92)" stroke="rgba(74,222,128,0.3)" strokeWidth="1"/>
+          <text x={labelX + 35} y={peakY + 1} fill={LIME} fontSize="10" fontFamily="DM Mono,monospace" textAnchor="middle" fontWeight="500">Peak {peakG}</text>
+
+          {/* Current grade dot */}
+          <circle cx={lastX} cy={yf(grades[grades.length - 1])} r="4.5" fill={LIME}/>
+          <circle cx={lastX} cy={yf(grades[grades.length - 1])} r="8" fill="none" stroke={LIME} strokeWidth="1.5" strokeOpacity="0.35"/>
+
+          {/* Tooltip */}
+          {tooltip && (() => {
+            const tx = Math.min(tooltip.x + 10, W - 110)
+            const ty = Math.max(tooltip.y - 32, 4)
+            return (
+              <g>
+                <line x1={tooltip.x} y1={PT} x2={tooltip.x} y2={PT + CH} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3 3"/>
+                <circle cx={tooltip.x} cy={tooltip.y} r="4" fill={LIME} stroke="rgba(13,40,24,0.8)" strokeWidth="1.5"/>
+                <rect x={tx} y={ty} width={100} height={28} rx={4} fill="rgba(13,40,24,0.92)" stroke="rgba(74,222,128,0.3)" strokeWidth="1"/>
+                <text x={tx + 8} y={ty + 11} fill={LIME} fontSize="10" fontFamily="DM Mono,monospace" fontWeight="600">{tooltip.grade}</text>
+                <text x={tx + 8} y={ty + 22} fill="rgba(255,255,255,0.5)" fontSize="8" fontFamily="DM Sans,sans-serif">{tooltip.date}</text>
+              </g>
+            )
+          })()}
+
+          {/* Year labels */}
+          {allYears.filter((_, i) => i % skip === 0).map(y => {
+            const x = xf(new Date(y, 6, 1).getTime())
+            if (x < PL || x > W - PR + 10) return null
+            return <text key={y} x={x} y={H - 4} fill="rgba(255,255,255,0.22)" fontSize="10" fontFamily="DM Sans,sans-serif" textAnchor="middle">{y}</text>
+          })}
+        </svg>
+      </div>
+
+      {/* Legend */}
+      <div style={{ padding: '6px 24px 16px', display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+        {[{ label: 'dGrade', color: LIME, dot: false }, { label: 'Peak grade', color: LIME, dot: true }].map(({ label, color, dot }) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: CREAM25 }} className="gsans">
+            {dot
+              ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }}/>
+              : <span style={{ width: 18, height: 2, background: color, display: 'inline-block', borderRadius: 1 }}/>
+            }
+            {label}
+          </div>
+        ))}
+        <a href="/rankings?tab=Historical+Rankings" style={{ marginLeft: 'auto', fontSize: 11, color: LIME, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif' }}>Full historical chart →</a>
+      </div>
+    </div>
   )
 }
 
@@ -515,37 +598,20 @@ export default function DashboardPage() {
           {heroStats.map(s => <StatCard key={s.label} label={s.label} value={s.value} accent={s.accent}/>)}
         </div>
 
+        {/* Grade History Chart */}
         {hasHistory && history.length > 1 && (
           <div className="dash-pad" style={{ padding: '0 48px 0', position: 'relative', zIndex: 1 }}>
-            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, overflow: 'hidden', maxWidth: 1200 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                  <div className="ghl" style={{ fontSize: 16, color: CREAM, fontWeight: 700 }}>Grade History</div>
-                  <div className="gsans" style={{ fontSize: 11, color: CREAM25, marginTop: 2 }}>Your complete career arc</div>
-                </div>
-                <div style={{ display: 'flex', gap: 20 }}>
-                  {[
-                    { label: 'Current', val: wcfPlayer?.dgrade, highlight: false },
-                    { label: 'Peak',    val: peakDgrade || '—',  highlight: true  },
-                    { label: 'Years',   val: yearsActive,        highlight: false },
-                  ].map(({ label, val, highlight }) => (
-                    <div key={label} style={{ textAlign: 'center' }}>
-                      <div className="gmono" style={{ fontSize: 18, fontWeight: 500, color: highlight ? LIME : CREAM, lineHeight: 1 }}>{val || '—'}</div>
-                      <div className="gsans" style={{ fontSize: 10, color: CREAM25, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-                    </div>
-                  ))}
-                </div>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, overflow: 'hidden', maxWidth: 960 }}>
+              <div style={{ padding: '18px 24px 0', borderBottom: 'none' }}>
+                <div className="ghl" style={{ fontSize: 16, color: CREAM, fontWeight: 700 }}>Grade History</div>
+                <div className="gsans" style={{ fontSize: 11, color: CREAM25, marginTop: 2 }}>Your complete career arc</div>
               </div>
-              <div style={{ padding: '16px 16px 8px' }}><CareerChart history={history}/></div>
-              <div style={{ padding: '8px 24px 16px', display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-                {[{ label: 'dGrade', color: LIME, dot: false }, { label: 'Peak grade', color: LIME, dot: true }].map(({ label, color, dot }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: CREAM25 }} className="gsans">
-                    {dot ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }}/> : <span style={{ width: 18, height: 2, background: color, display: 'inline-block', borderRadius: 1 }}/>}
-                    {label}
-                  </div>
-                ))}
-                <a href="/rankings?tab=Historical+Rankings" style={{ marginLeft: 'auto', fontSize: 11, color: LIME, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif' }}>Full historical chart →</a>
-              </div>
+              <CareerChart
+                history={history}
+                currentDgrade={wcfPlayer?.dgrade}
+                peakDgrade={peakDgrade || undefined}
+                yearsActive={yearsActive}
+              />
             </div>
           </div>
         )}
