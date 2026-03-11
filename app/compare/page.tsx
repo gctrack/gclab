@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
+import { getFlag, countryName as countryFullName } from '@/lib/countries'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Legend
@@ -58,31 +59,6 @@ const GRADE_BANDS = [
   { label: '2400+',    min: 2401, max: 99999 },
 ]
 
-const COUNTRY_NAMES: Record<string, string> = {
-  'AF':'Afghanistan','AL':'Albania','DZ':'Algeria','AR':'Argentina','AU':'Australia',
-  'AT':'Austria','BE':'Belgium','BR':'Brazil','CA':'Canada','CL':'Chile','CN':'China',
-  'CO':'Colombia','HR':'Croatia','CZ':'Czech Republic','DK':'Denmark','EG':'Egypt',
-  'FI':'Finland','FR':'France','DE':'Germany','GH':'Ghana','GR':'Greece','HU':'Hungary',
-  'IN':'India','ID':'Indonesia','IE':'Ireland','IL':'Israel','IT':'Italy','JP':'Japan',
-  'KE':'Kenya','MY':'Malaysia','MX':'Mexico','MA':'Morocco','NL':'Netherlands',
-  'NZ':'New Zealand','NG':'Nigeria','NO':'Norway','PK':'Pakistan','PH':'Philippines',
-  'PL':'Poland','PT':'Portugal','RO':'Romania','RU':'Russia','ZA':'South Africa',
-  'ES':'Spain','SE':'Sweden','CH':'Switzerland','TZ':'Tanzania','TH':'Thailand',
-  'TN':'Tunisia','TR':'Turkey','UG':'Uganda','UA':'Ukraine','AE':'United Arab Emirates',
-  'US':'United States','GB':'United Kingdom','GB-ENG':'England','GB-SCT':'Scotland',
-  'GB-WLS':'Wales','UY':'Uruguay','VN':'Vietnam','ZW':'Zimbabwe',
-}
-const countryFullName = (code: string) => COUNTRY_NAMES[code] || code
-
-function getFlag(code: string): string {
-  if (!code) return ''
-  if (code === 'GB-ENG') return '🏴󠁧󠁢󠁥󠁮󠁧󠁿'
-  if (code === 'GB-SCT') return '🏴󠁧󠁢󠁳󠁣󠁴󠁿'
-  if (code === 'GB-WLS') return '🏴󠁧󠁢󠁷󠁬󠁳󠁿'
-  if (code.length !== 2) return ''
-  return code.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('')
-}
-
 const pct = (wins: number, total: number) =>
   total === 0 ? '—' : `${Math.round((wins / total) * 100)}%`
 
@@ -125,18 +101,10 @@ function BandRow({ label, a, b }: { label: string; a: { w: number; t: number }; 
             {pct(a.w, a.t)}
           </span>
           <div className="flex-1 relative h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="absolute left-0 top-0 h-full bg-green-400 rounded-full transition-all"
-              style={{ width: `${(aPct / total) * 50}%` }}
-            />
-            <div
-              className="absolute right-0 top-0 h-full bg-blue-400 rounded-full transition-all"
-              style={{ width: `${(bPct / total) * 50}%` }}
-            />
+            <div className="absolute left-0 top-0 h-full bg-green-400 rounded-full transition-all" style={{ width: `${(aPct / total) * 50}%` }}/>
+            <div className="absolute right-0 top-0 h-full bg-blue-400 rounded-full transition-all" style={{ width: `${(bPct / total) * 50}%` }}/>
           </div>
-          <span className="text-sm font-semibold w-10 text-blue-600">
-            {pct(b.w, b.t)}
-          </span>
+          <span className="text-sm font-semibold w-10 text-blue-600">{pct(b.w, b.t)}</span>
         </div>
       </div>
       <div className="flex items-center justify-between">
@@ -203,9 +171,6 @@ function PlayerSearch({ label, color, onSelect, selected, exclude, recentPlayers
     onSelect(null as any)
   }
 
-
-  const badge = color === 'green' ? 'bg-green-600' : 'bg-blue-600'
-
   return (
     <div className="relative">
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 8, color: color === 'green' ? '#156b3a' : '#1d4ed8' }} className="gsans">
@@ -219,13 +184,11 @@ function PlayerSearch({ label, color, onSelect, selected, exclude, recentPlayers
           onBlur={() => setTimeout(() => setFocused(false), 150)}
           placeholder="Search player..."
           style={{ background: '#fafaf8', border: `1.5px solid ${selected ? (color === 'green' ? '#15803d' : '#1d4ed8') : '#ddd8d0'}`, borderRadius: 10, padding: '10px 36px 10px 12px', fontSize: 14, color: '#1a2e1a', width: '100%', outline: 'none', fontFamily: 'DM Sans, sans-serif' }}
-          className=""
         />
         {selected && (
           <button onClick={handleClear} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
         )}
       </div>
-      {/* Recent players shown when focused with empty query */}
       {focused && !query && !selected && recentPlayers.length > 0 && (
         <div className="absolute top-full left-0 right-0 z-20 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 overflow-hidden">
           <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
@@ -296,7 +259,6 @@ function ChartTooltip({ active, payload, label, nameA, nameB }: any) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-
 const ML_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
   .ghl  { font-family: 'Playfair Display', serif; }
@@ -324,7 +286,6 @@ export default function ComparePage() {
   const [winsSortB, setWinsSortB] = useState<'grade' | 'diff'>('grade')
   const [recentPlayers, setRecentPlayers] = useState<Player[]>([])
 
-  // Load recent players from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem('gclab_recent_compare_players')
@@ -340,17 +301,16 @@ export default function ComparePage() {
       return updated
     })
   }
+
   const router = useRouter()
   const supabase = createClient()
 
-  // ── Stable game sort: date → event_name → dgrade_after ──────────────────
   const sortGames = (games: Game[]) => [...games].sort((a, b) => {
     const da = a.event_date || '', db = b.event_date || ''
     if (da !== db) return da < db ? -1 : 1
     const ea = a.event_name || '', eb = b.event_name || ''
     return ea < eb ? -1 : ea > eb ? 1 : 0
   })
-
 
   useEffect(() => {
     const init = async () => {
@@ -400,7 +360,6 @@ export default function ComparePage() {
     Promise.all(promises).then(() => setLoadingData(false))
   }, [playerA, playerB])
 
-  // Compute opponent country stats whenever games change
   useEffect(() => {
     const supabase = createClient()
     const buildOppStats = async (games: Game[], setter: (v: any[]) => void) => {
@@ -429,17 +388,12 @@ export default function ComparePage() {
 
   // ── Derived stats ────────────────────────────────────────────────────────
 
-  // Head to head
   const h2hGames = gamesA
-    .filter(g =>
-      g.opponent_first_name === playerB?.wcf_first_name &&
-      g.opponent_last_name === playerB?.wcf_last_name
-    )
+    .filter(g => g.opponent_first_name === playerB?.wcf_first_name && g.opponent_last_name === playerB?.wcf_last_name)
     .sort((a, b) => (b.event_date || '').localeCompare(a.event_date || ''))
   const h2hWins = h2hGames.filter(g => g.result === 'win').length
   const h2hLosses = h2hGames.filter(g => g.result === 'loss').length
 
-  // Win % by year
   const yearStats = (games: Game[]) => {
     const map: Record<number, { w: number; t: number }> = {}
     for (const g of games) {
@@ -462,7 +416,6 @@ export default function ComparePage() {
     b: yearB[y] ? winPctNum(yearB[y].w, yearB[y].t) : null,
   }))
 
-  // Performance vs grade bands
   const bandStats = (games: Game[]) => GRADE_BANDS.map(band => {
     const relevant = games.filter(g => g.opp_dgrade_after >= band.min && g.opp_dgrade_after <= band.max)
     const wins = relevant.filter(g => g.result === 'win').length
@@ -471,7 +424,6 @@ export default function ComparePage() {
   const bandsA = bandStats(gamesA)
   const bandsB = bandStats(gamesB)
 
-  // Recent form (last 10/20/50) — sorted by date
   const recentForm = (games: Game[], n: number) => {
     const sorted = sortGames(games)
     const last = sorted.slice(-n)
@@ -479,11 +431,9 @@ export default function ComparePage() {
     return { w: wins, t: last.length }
   }
 
-  // Peak dGrade
   const peakGrade = (games: Game[]) =>
     games.length ? Math.max(...games.map(g => g.dgrade_after)) : null
 
-  // Streaks
   const streaks = (games: Game[]) => {
     const sorted = sortGames(games)
     let maxWin = 0, maxLoss = 0, curWin = 0, curLoss = 0
@@ -496,26 +446,24 @@ export default function ComparePage() {
   const streakA = streaks(gamesA)
   const streakB = streaks(gamesB)
 
-  // Best wins — with pre-game grades (same logic as dashboard)
   const withBefore = (games: Game[]) => sortGames(games).map((g, i) => {
     const prev = i > 0 ? games[i - 1] : null
     const myGradeBefore = prev?.dgrade_after || g.dgrade_after
     const prevOpp = games.slice(0, i).reverse().find(pg =>
-      pg.opponent_first_name === g.opponent_first_name &&
-      pg.opponent_last_name === g.opponent_last_name
+      pg.opponent_first_name === g.opponent_first_name && pg.opponent_last_name === g.opponent_last_name
     )
     const oppGradeBefore = prevOpp?.opp_dgrade_after || g.opp_dgrade_after
     return { ...g, myGradeBefore, oppGradeBefore, diff: (oppGradeBefore || 0) - (myGradeBefore || 0) }
   })
   const gamesAWithBefore = withBefore(gamesA)
   const gamesBWithBefore = withBefore(gamesB)
+
   const topWins = (enriched: typeof gamesAWithBefore, sortBy: 'grade' | 'diff') => {
     const wins = enriched.filter(g => g.result === 'win' && g.oppGradeBefore)
     if (sortBy === 'grade') return [...wins].sort((a, b) => (b.oppGradeBefore || 0) - (a.oppGradeBefore || 0)).slice(0, 5)
     return [...wins].filter(g => g.diff > 0).sort((a, b) => b.diff - a.diff).slice(0, 5)
   }
 
-  // Common opponents
   const commonOpponents = () => {
     if (!gamesA.length || !gamesB.length) return []
     const oppMapA: Record<string, { w: number; t: number }> = {}
@@ -540,7 +488,6 @@ export default function ComparePage() {
   }
   const commonOpps = commonOpponents()
 
-  // dGrade chart overlay
   const gradeChartData = (() => {
     if (!historyA.length && !historyB.length) return []
     const allDates = new Set([
@@ -562,7 +509,11 @@ export default function ComparePage() {
   const nameA = playerA ? `${playerA.wcf_first_name} ${playerA.wcf_last_name}` : 'Player A'
   const nameB = playerB ? `${playerB.wcf_first_name} ${playerB.wcf_last_name}` : 'Player B'
 
-  if (loading || signedIn === null) return <div style={{ minHeight: "100vh", background: "#0d2818", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(232,224,208,0.3)" }}><style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>Loading…</div>
+  if (loading || signedIn === null) return (
+    <div style={{ minHeight: "100vh", background: "#0d2818", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(232,224,208,0.3)" }}>
+      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>Loading…
+    </div>
+  )
 
   if (!signedIn) return (
     <div style={{ minHeight: "100vh", background: "#f5f2ec", display: "flex", flexDirection: "column" }}>
@@ -619,7 +570,6 @@ export default function ComparePage() {
       <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
       <GCLabNav role={userProfile?.role} isSignedIn={true} currentPath="/compare" />
 
-      {/* Dark header — title only */}
       <div style={{ background: "#0d2818", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)" }}/>
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backgroundImage: "linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)", backgroundSize: "44px 44px" }}/>
@@ -632,7 +582,6 @@ export default function ComparePage() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
 
-        {/* ── Player selection ─────────────────────────────────────────── */}
         <div style={{ background: "white", border: "1px solid #e8e4de", borderRadius: 16, padding: 24, marginBottom: 24, boxShadow: "0 1px 4px rgba(13,40,24,0.06)" }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <PlayerSearch label="Player 1" color="green" selected={playerA} recentPlayers={recentPlayers.filter(r => r.id !== playerB?.id)}
@@ -647,7 +596,6 @@ export default function ComparePage() {
           )}
         </div>
 
-        {/* Placeholder */}
         {!playerA && !playerB && (
           <div className="text-center py-20 text-gray-300">
             <p className="text-5xl mb-4">⚔️</p>
@@ -659,11 +607,9 @@ export default function ComparePage() {
         {(playerA || playerB) && (
           <div className="space-y-6">
 
-            {/* Overview cards */}
+            {/* Overview */}
             <section>
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Overview</h3>
-
-              {/* Player name headers */}
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="text-center">
                   <p className="font-semibold text-green-700 truncate">{nameA}</p>
@@ -674,7 +620,6 @@ export default function ComparePage() {
                   {playerB && <p className="text-xs text-gray-400">{getFlag(playerB.country)} {playerB.country}</p>}
                 </div>
               </div>
-
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 <StatCard label="World Ranking" a={playerA ? `#${playerA.world_ranking}` : '—'} b={playerB ? `#${playerB.world_ranking}` : '—'} higherIsBetter={false} />
                 <StatCard label="dGrade" a={playerA?.dgrade ?? '—'} b={playerB?.dgrade ?? '—'} />
@@ -696,28 +641,21 @@ export default function ComparePage() {
                     <p className="text-sm text-gray-400 text-center py-4">No direct matches found in imported data</p>
                   ) : (
                     <>
-                      {/* H2H summary */}
                       <div className="flex items-center justify-center gap-8 mb-6">
                         <div className="text-center">
                           <p className="text-4xl font-bold text-green-600">{h2hWins}</p>
                           <p className="text-xs text-gray-400 mt-1">{nameA.split(' ')[0]} wins</p>
                         </div>
-                        <div className="text-center">
-                          <p className="text-2xl font-semibold text-gray-300">—</p>
-                        </div>
+                        <div className="text-center"><p className="text-2xl font-semibold text-gray-300">—</p></div>
                         <div className="text-center">
                           <p className="text-4xl font-bold text-blue-600">{h2hLosses}</p>
                           <p className="text-xs text-gray-400 mt-1">{nameB.split(' ')[0]} wins</p>
                         </div>
                       </div>
-
-                      {/* H2H game log */}
                       <div className="space-y-1.5">
                         {(showAllH2H ? h2hGames : h2hGames.slice(0, 5)).map(g => (
                           <div key={g.id} className={`flex items-center justify-between text-xs px-3 py-2 rounded-lg ${g.result === 'win' ? 'bg-green-50' : 'bg-blue-50'}`}>
-                            <span className={`font-semibold w-8 ${g.result === 'win' ? 'text-green-700' : 'text-blue-700'}`}>
-                              {g.result === 'win' ? 'W' : 'L'}
-                            </span>
+                            <span className={`font-semibold w-8 ${g.result === 'win' ? 'text-green-700' : 'text-blue-700'}`}>{g.result === 'win' ? 'W' : 'L'}</span>
                             <span className="text-gray-600 flex-1">{g.event_name}</span>
                             <span className="text-gray-500 font-mono">{g.player_score}–{g.opponent_score}</span>
                             <span className="text-gray-400 ml-3 w-16 text-right">{g.event_date?.slice(0, 7)}</span>
@@ -725,8 +663,7 @@ export default function ComparePage() {
                         ))}
                       </div>
                       {h2hGames.length > 5 && (
-                        <button onClick={() => setShowAllH2H(p => !p)}
-                          className="mt-3 text-xs text-gray-400 hover:text-gray-600 w-full text-center">
+                        <button onClick={() => setShowAllH2H(p => !p)} className="mt-3 text-xs text-gray-400 hover:text-gray-600 w-full text-center">
                           {showAllH2H ? 'Show less' : `Show all ${h2hGames.length} matches`}
                         </button>
                       )}
@@ -792,7 +729,7 @@ export default function ComparePage() {
               </section>
             )}
 
-            {/* dGrade chart */}
+            {/* dGrade History */}
             {gradeChartData.length > 0 && (
               <section>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">dGrade History</h3>
@@ -800,10 +737,8 @@ export default function ComparePage() {
                   <ResponsiveContainer width="100%" height={260}>
                     <LineChart data={gradeChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
-                        interval={Math.floor(gradeChartData.length / 6)} />
-                      <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
-                        domain={['auto', 'auto']} width={45} />
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} interval={Math.floor(gradeChartData.length / 6)} />
+                      <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} domain={['auto', 'auto']} width={45} />
                       <Tooltip content={<ChartTooltip nameA={nameA} nameB={nameB} />} />
                       <Legend formatter={(v) => v === 'a' ? nameA : nameB} />
                       {playerA && <Line type="monotone" dataKey="a" stroke="#16a34a" strokeWidth={2} dot={false} connectNulls name="a" />}
@@ -814,7 +749,7 @@ export default function ComparePage() {
               </section>
             )}
 
-            {/* Win % by year */}
+            {/* Win % by Year */}
             {yearChartData.length > 0 && (
               <section>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Win % by Year</h3>
@@ -823,8 +758,7 @@ export default function ComparePage() {
                     <LineChart data={yearChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                       <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
-                        domain={[0, 100]} tickFormatter={v => `${v}%`} width={40} />
+                      <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} width={40} />
                       <ReferenceLine y={50} stroke="#e5e7eb" strokeDasharray="4 4" />
                       <Tooltip content={<ChartTooltip nameA={nameA} nameB={nameB} />} formatter={(v: any) => `${v}%`} />
                       <Legend formatter={(v) => v === 'a' ? nameA : nameB} />
@@ -832,7 +766,6 @@ export default function ComparePage() {
                       {gamesB.length > 0 && <Line type="monotone" dataKey="b" stroke="#2563eb" strokeWidth={2} dot={{ r: 3, fill: '#2563eb' }} connectNulls name="b" />}
                     </LineChart>
                   </ResponsiveContainer>
-                  {/* Year table */}
                   <div className="mt-4 overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
@@ -865,7 +798,7 @@ export default function ComparePage() {
               </section>
             )}
 
-            {/* Performance by opponent grade band */}
+            {/* Performance vs Opponent Grade */}
             {hasData && (
               <section>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Performance vs Opponent Grade</h3>
@@ -885,7 +818,7 @@ export default function ComparePage() {
               </section>
             )}
 
-            {/* Recent form */}
+            {/* Recent Form */}
             {hasData && (
               <section>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Recent Form</h3>
@@ -912,7 +845,7 @@ export default function ComparePage() {
               </section>
             )}
 
-            {/* Common opponents */}
+            {/* Common Opponents */}
             {commonOpps.length > 0 && (
               <section>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Common Opponents</h3>
@@ -931,13 +864,9 @@ export default function ComparePage() {
                       {commonOpps.map(opp => (
                         <tr key={opp.name} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
                           <td className="py-2.5 px-4 text-gray-700 font-medium">{opp.name}</td>
-                          <td className={`text-right px-3 font-semibold ${winPctNum(opp.a.w, opp.a.t) > winPctNum(opp.b.w, opp.b.t) ? 'text-green-600' : 'text-gray-500'}`}>
-                            {pct(opp.a.w, opp.a.t)}
-                          </td>
+                          <td className={`text-right px-3 font-semibold ${winPctNum(opp.a.w, opp.a.t) > winPctNum(opp.b.w, opp.b.t) ? 'text-green-600' : 'text-gray-500'}`}>{pct(opp.a.w, opp.a.t)}</td>
                           <td className="text-right px-3 text-gray-400 text-xs">{opp.a.t}</td>
-                          <td className={`text-right px-3 font-semibold ${winPctNum(opp.b.w, opp.b.t) > winPctNum(opp.a.w, opp.a.t) ? 'text-blue-600' : 'text-gray-500'}`}>
-                            {pct(opp.b.w, opp.b.t)}
-                          </td>
+                          <td className={`text-right px-3 font-semibold ${winPctNum(opp.b.w, opp.b.t) > winPctNum(opp.a.w, opp.a.t) ? 'text-blue-600' : 'text-gray-500'}`}>{pct(opp.b.w, opp.b.t)}</td>
                           <td className="text-right px-4 text-gray-400 text-xs">{opp.b.t}</td>
                         </tr>
                       ))}
@@ -947,7 +876,7 @@ export default function ComparePage() {
               </section>
             )}
 
-            {/* Opponents by Country */}
+            {/* Results by Opponent Country */}
             {(oppCountryStatsA.length > 0 || oppCountryStatsB.length > 0) && (
               <section>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Results by Opponent Country</h3>
@@ -977,13 +906,9 @@ export default function ComparePage() {
                               <td className="py-2.5 px-4 text-gray-700 font-medium">
                                 <span className="mr-1.5">{getFlag(country)}</span>{countryFullName(country)}
                               </td>
-                              <td className={`text-right px-2 font-semibold ${a && b ? (a.winPct > b.winPct ? 'text-green-600' : 'text-green-400') : 'text-green-500'}`}>
-                                {a ? `${a.winPct}%` : '—'}
-                              </td>
+                              <td className={`text-right px-2 font-semibold ${a && b ? (a.winPct > b.winPct ? 'text-green-600' : 'text-green-400') : 'text-green-500'}`}>{a ? `${a.winPct}%` : '—'}</td>
                               <td className="text-right px-2 text-gray-400 text-xs">{a?.games ?? '—'}</td>
-                              <td className={`text-right px-2 font-semibold ${a && b ? (b.winPct > a.winPct ? 'text-blue-600' : 'text-blue-400') : 'text-blue-500'}`}>
-                                {b ? `${b.winPct}%` : '—'}
-                              </td>
+                              <td className={`text-right px-2 font-semibold ${a && b ? (b.winPct > a.winPct ? 'text-blue-600' : 'text-blue-400') : 'text-blue-500'}`}>{b ? `${b.winPct}%` : '—'}</td>
                               <td className="text-right px-4 text-gray-400 text-xs">{b?.games ?? '—'}</td>
                             </tr>
                           )
@@ -1023,8 +948,7 @@ export default function ComparePage() {
                           return totalB - totalA
                         })
                         return allCountries.map(country => {
-                          const a = mapA[country]
-                          const b = mapB[country]
+                          const a = mapA[country], b = mapB[country]
                           const aPct = a?.win_percentage ?? null
                           const bPct = b?.win_percentage ?? null
                           return (
@@ -1032,13 +956,9 @@ export default function ComparePage() {
                               <td className="py-2.5 px-4 text-gray-700 font-medium">
                                 <span className="mr-1.5">{getFlag(country)}</span>{countryFullName(country)}
                               </td>
-                              <td className={`text-right px-3 font-semibold ${aPct !== null && bPct !== null && aPct > bPct ? 'text-green-600' : 'text-gray-500'}`}>
-                                {aPct !== null ? `${aPct}%` : '—'}
-                              </td>
+                              <td className={`text-right px-3 font-semibold ${aPct !== null && bPct !== null && aPct > bPct ? 'text-green-600' : 'text-gray-500'}`}>{aPct !== null ? `${aPct}%` : '—'}</td>
                               <td className="text-right px-3 text-gray-400 text-xs">{a?.games ?? '—'}</td>
-                              <td className={`text-right px-3 font-semibold ${aPct !== null && bPct !== null && bPct > aPct ? 'text-blue-600' : 'text-gray-500'}`}>
-                                {bPct !== null ? `${bPct}%` : '—'}
-                              </td>
+                              <td className={`text-right px-3 font-semibold ${aPct !== null && bPct !== null && bPct > aPct ? 'text-blue-600' : 'text-gray-500'}`}>{bPct !== null ? `${bPct}%` : '—'}</td>
                               <td className="text-right px-4 text-gray-400 text-xs">{b?.games ?? '—'}</td>
                             </tr>
                           )
@@ -1051,12 +971,12 @@ export default function ComparePage() {
             )}
 
             {/* No history notice */}
-            {(playerA && !playerA.history_imported) || (playerB && !playerB.history_imported) ? (
+            {((playerA && !playerA.history_imported) || (playerB && !playerB.history_imported)) && (
               <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm text-amber-700">
                 {playerA && !playerA.history_imported && <p>⚠️ <strong>{nameA}</strong> has no history imported — detailed stats unavailable.</p>}
                 {playerB && !playerB.history_imported && <p>⚠️ <strong>{nameB}</strong> has no history imported — detailed stats unavailable.</p>}
               </div>
-            ) : null}
+            )}
 
           </div>
         )}
