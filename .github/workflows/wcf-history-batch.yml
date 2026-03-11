@@ -1,8 +1,8 @@
-name: WCF History Batch Import
+yamlname: WCF History Batch Import
 
 on:
   schedule:
-    - cron: '5,35 * * * *'
+    - cron: '5,20,35,50 * * * *'
   workflow_dispatch:
     inputs:
       reason:
@@ -26,7 +26,6 @@ jobs:
             echo ""
             echo "=== Player $i of $BATCH ==="
 
-            # Get next player to import
             NEXT=$(curl -s -X GET \
               "https://gclab.app/api/wcf-history-next" \
               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
@@ -51,7 +50,6 @@ jobs:
               continue
             fi
 
-            # Import this player — read SSE stream until complete
             IMPORT_RESULT=$(curl -s -N -X POST \
               "https://gclab.app/api/wcf-history-import" \
               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
@@ -67,10 +65,9 @@ jobs:
 
             echo "Games imported: $GAMES"
 
-            # Wait 45 seconds between players (skip after last)
             if [ $i -lt $BATCH ]; then
-              echo "Waiting 30s before next player..."
-              sleep 30
+              echo "Waiting 15s before next player..."
+              sleep 15
             fi
           done
 
