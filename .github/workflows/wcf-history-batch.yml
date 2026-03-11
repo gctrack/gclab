@@ -1,9 +1,8 @@
-# SAVE TO: .github/workflows/wcf-history-batch.yml
 name: WCF History Batch Import
 
 on:
   schedule:
-    - cron: '15 * * * *'
+    - cron: '5,35 * * * *'
   workflow_dispatch:
     inputs:
       reason:
@@ -19,7 +18,7 @@ jobs:
     steps:
       - name: Import 8 players
         run: |
-          BATCH=8
+          BATCH=16
           SUCCESS=0
           TOTAL_GAMES=0
 
@@ -70,8 +69,8 @@ jobs:
 
             # Wait 45 seconds between players (skip after last)
             if [ $i -lt $BATCH ]; then
-              echo "Waiting 45s before next player..."
-              sleep 45
+              echo "Waiting 30s before next player..."
+              sleep 30
             fi
           done
 

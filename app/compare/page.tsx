@@ -343,6 +343,15 @@ export default function ComparePage() {
   const router = useRouter()
   const supabase = createClient()
 
+  // ── Stable game sort: date → event_name → dgrade_after ──────────────────
+  const sortGames = (games: Game[]) => [...games].sort((a, b) => {
+    const da = a.event_date || '', db = b.event_date || ''
+    if (da !== db) return da < db ? -1 : 1
+    const ea = a.event_name || '', eb = b.event_name || ''
+    return ea < eb ? -1 : ea > eb ? 1 : 0
+  })
+
+
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -362,6 +371,7 @@ export default function ComparePage() {
       .select('id, year, event_name, event_date, result, player_score, opponent_score, opponent_first_name, opponent_last_name, dgrade_after, opp_dgrade_after, round_detail')
       .eq('wcf_player_id', player.id)
       .order('event_date', { ascending: true })
+      .order('event_name', { ascending: true })
     setter(games || [])
 
     const { data: history } = await supabase
@@ -463,10 +473,7 @@ export default function ComparePage() {
 
   // Recent form (last 10/20/50) — sorted by date
   const recentForm = (games: Game[], n: number) => {
-    const sorted = [...games].sort((a, b) => {
-      const da = a.event_date || '', db = b.event_date || ''
-      return da < db ? -1 : da > db ? 1 : 0
-    })
+    const sorted = sortGames(games)
     const last = sorted.slice(-n)
     const wins = last.filter(g => g.result === 'win').length
     return { w: wins, t: last.length }
@@ -478,10 +485,7 @@ export default function ComparePage() {
 
   // Streaks
   const streaks = (games: Game[]) => {
-    const sorted = [...games].sort((a, b) => {
-      const da = a.event_date || '', db = b.event_date || ''
-      return da < db ? -1 : da > db ? 1 : 0
-    })
+    const sorted = sortGames(games)
     let maxWin = 0, maxLoss = 0, curWin = 0, curLoss = 0
     for (const g of sorted) {
       if (g.result === 'win') { curWin++; curLoss = 0; maxWin = Math.max(maxWin, curWin) }
@@ -493,7 +497,7 @@ export default function ComparePage() {
   const streakB = streaks(gamesB)
 
   // Best wins — with pre-game grades (same logic as dashboard)
-  const withBefore = (games: Game[]) => games.map((g, i) => {
+  const withBefore = (games: Game[]) => sortGames(games).map((g, i) => {
     const prev = i > 0 ? games[i - 1] : null
     const myGradeBefore = prev?.dgrade_after || g.dgrade_after
     const prevOpp = games.slice(0, i).reverse().find(pg =>
