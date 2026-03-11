@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
@@ -73,7 +73,7 @@ function getFlag(code: string): string {
     .join('')
 }
 
-const TABS = ['Rankings', 'Movers', 'Country Rankings']
+const TABS = ['Rankings', 'Movers', 'New Players', 'Country Stats', 'Historical Rankings']
 const MOVER_PERIODS = [
   { label: '7 days', days: 7 },
   { label: '30 days', days: 30 },
@@ -87,14 +87,6 @@ const NEW_PLAYERS_SINCE = '2026-03-03T00:00:00Z'
 
 type SortKey = 'dgrade' | 'egrade' | 'world_ranking' | 'games' | 'win_percentage' | 'wcf_last_name'
 type SortDir = 'asc' | 'desc'
-
-
-const ML_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-  .ghl  { font-family: 'Playfair Display', serif; }
-  .gmono{ font-family: 'DM Mono', monospace; }
-  .gsans{ font-family: 'DM Sans', sans-serif; }
-`
 
 export default function RankingsPage() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -150,7 +142,7 @@ export default function RankingsPage() {
   const [showDgrade, setShowDgrade] = useState(true)
   const [showEgrade, setShowEgrade] = useState(false)
   const [showRanking, setShowRanking] = useState(true)
-  const [historyRange, setHistoryRange] = useState('all')
+  const [historyRange, setHistoryRange] = useState('5y')
   const [historyFrom, setHistoryFrom] = useState('')
   const [historyTo, setHistoryTo] = useState('')
   const [lastSyncDate, setLastSyncDate] = useState<string | null>(null)
@@ -202,10 +194,10 @@ export default function RankingsPage() {
 
   useEffect(() => { if (activeTab === 'Rankings') loadRankings() }, [activeTab, activeOnly, rankingsPage, pageSize, sortKey, sortDir])
   useEffect(() => { if (activeTab === 'Movers') loadMovers() }, [activeTab, moverPeriod])
-  useEffect(() => { if (activeTab === 'Country Rankings') loadCountryStats() }, [activeTab])
-  // Historical Rankings moved to /history page
+  useEffect(() => { if (activeTab === 'New Players') loadNewPlayers() }, [activeTab, newPlayerDays, newPlayerCountry])
+  useEffect(() => { if (activeTab === 'Country Stats') loadCountryStats() }, [activeTab])
   useEffect(() => {
-    if (false) {
+    if (activeTab === 'Historical Rankings' && currentUserProfile?.wcf_player_id && !selectedPlayer) {
       loadPlayerHistory(currentUserProfile.wcf_player_id)
     }
   }, [activeTab, currentUserProfile])
@@ -298,15 +290,10 @@ export default function RankingsPage() {
 
   const loadMovers = async () => {
     setLoading(true)
-    let data: any[] | null = null
-    if (moverPeriod === 0) {
-      const res = await supabase.rpc('get_movers_alltime', { limit_count: 20 })
-      data = res.data
-    } else {
-      const sinceDate = new Date(Date.now() - moverPeriod * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const res = await supabase.rpc('get_movers', { since_date: sinceDate, limit_count: 20 })
-      data = res.data
-    }
+    const sinceDate = moverPeriod === 0
+      ? FIRST_SYNC_DATE
+      : new Date(Date.now() - moverPeriod * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const { data } = await supabase.rpc('get_movers', { since_date: sinceDate, limit_count: 20 })
     if (data) {
       setMovers({
         gains: data.filter((p: any) => p.change > 0).sort((a: any, b: any) => b.change - a.change).slice(0, 10),
@@ -364,7 +351,7 @@ export default function RankingsPage() {
   const loadPlayerHistory = async (wcfPlayerId: string) => {
     const { data: player } = await supabase
       .from('wcf_players')
-      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url, history_imported')
+      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url')
       .eq('id', wcfPlayerId)
       .single()
     if (player) { setSelectedPlayer(player); await fetchHistory(player.id) }
@@ -454,7 +441,7 @@ export default function RankingsPage() {
       const parts = value.trim().split(' ')
       let query = supabase
         .from('wcf_players')
-        .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url, history_imported')
+        .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url')
         .order('world_ranking', { ascending: true })
         .limit(8)
       if (parts.length >= 2 && parts[1]) {
@@ -665,7 +652,7 @@ export default function RankingsPage() {
             const firstRankLabel = firstRankPoint
               ? new Date(firstRankPoint.recorded_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
               : 'Mar 2026'
-            return <text x={W - padR} y={padT - 12} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank Collected Since March 2026</text>
+            return <text x={W - padR} y={padT - 12} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank (from {firstRankLabel})</text>
           })()}
 
           {/* dGrade line */}
@@ -749,53 +736,30 @@ export default function RankingsPage() {
   const thBase = "px-4 py-3 text-gray-700 font-semibold"
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f2ec' }} onClick={(e) => {
+    <div className="min-h-screen bg-gray-50 relative" onClick={(e) => {
       if (!(e.target as HTMLElement).closest('.relative')) setTooltip(null)
     }}>
-      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
-      <GCLabNav role={userRole} isSignedIn={!!currentUserProfile} currentPath="/rankings" />
+      <GCLabNav role={userRole} />
+      <main className="max-w-5xl mx-auto px-6 py-10">
+        <h2 className="text-2xl font-bold mb-6 text-gray-900">WCF Rankings & Stats</h2>
 
-      {/* Dark ML header */}
-      <div style={{ background: '#0d2818', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 100% 0%, rgba(74,222,128,0.06) 0%, transparent 55%)' }}/>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)', backgroundSize: '44px 44px' }}/>
-        <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '32px 24px 20px', position: 'relative', zIndex: 1 }}>
-          <h2 className="ghl" style={{ fontSize: 'clamp(22px, 3vw, 38px)', color: '#e8e0d0', fontWeight: 900, marginBottom: 20, letterSpacing: '-0.5px' }}>
-            WCF Rankings & Stats
-          </h2>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {TABS.map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className="gsans" style={{
-                padding: '7px 16px', borderRadius: 20, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                background: activeTab === tab ? 'rgba(74,222,128,0.15)' : 'transparent',
-                border: `1px solid ${activeTab === tab ? 'rgba(74,222,128,0.35)' : 'rgba(255,255,255,0.12)'}`,
-                color: activeTab === tab ? '#4ade80' : 'rgba(232,224,208,0.5)',
-                transition: 'all 0.15s',
-              }}>
-                {tab}
-              </button>
-            ))}
-          </div>
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {TABS.map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition ${activeTab === tab ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:border-green-500'}`}>
+              {tab}
+            </button>
+          ))}
         </div>
-        <div style={{ height: 24, background: 'linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)' }}/>
-      </div>
 
-      <main className="max-w-5xl mx-auto px-6 py-6">
-        {loading && <p className="gsans" style={{ color: '#9ca3af', fontSize: 13 }}>Loading...</p>}
+        {loading && <p className="text-gray-400 text-sm">Loading...</p>}
 
         {/* ── RANKINGS ── */}
         {activeTab === 'Rankings' && !loading && (
           <div>
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className="flex items-center gap-3">
-                <div>
-                  <p className="text-sm text-gray-500">{rankings.length} players shown</p>
-                  {lastSyncDate && (
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Last updated {new Date(lastSyncDate).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
-                    </p>
-                  )}
-                </div>
+                <p className="text-sm text-gray-500">{rankings.length} players shown</p>
                 <select value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setRankingsPage(0) }}
                   className="border border-gray-300 rounded-md px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500">
                   {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
@@ -873,7 +837,7 @@ export default function RankingsPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mb-4">GCLab baseline set 6 Mar 2026 — changes detected by daily sync. Showing moves of 10+ points only. Games and Win% show last 12 months from WCF. Note: all grades are regraded with each WCF entry — your grade can change without playing a game based on the performance of other players who have been regraded.</p>
+            <p className="text-xs text-gray-400 mb-4">GCLab baseline set 6 Mar 2026 — changes detected by daily sync. Games and Win% show career totals from WCF.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
                 { title: '📈 Biggest Gains', data: movers.gains, positive: true },
@@ -890,10 +854,9 @@ export default function RankingsPage() {
                           <tr>
                             <th className="text-left px-4 py-2 text-gray-700 font-semibold">Player</th>
                             <th className="text-right px-4 py-2 text-gray-700 font-semibold">Change</th>
-                            {moverPeriod === 0 && <th className="text-right px-4 py-2 text-gray-700 font-semibold">Start</th>}
-                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Current</th>
-                            {moverPeriod !== 0 && <th className="text-right px-4 py-2 text-gray-700 font-semibold">Games (12mo)</th>}
-                            {moverPeriod !== 0 && <th className="text-right px-4 py-2 text-gray-700 font-semibold">Win% (12mo)</th>}
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">dGrade</th>
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Games (career)</th>
+                            <th className="text-right px-4 py-2 text-gray-700 font-semibold">Win% (career)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -907,10 +870,9 @@ export default function RankingsPage() {
                               <td className={`px-4 py-2 text-right font-semibold ${positive ? 'text-green-600' : 'text-red-500'}`}>
                                 {positive ? `+${p.change}` : p.change}
                               </td>
-                              {moverPeriod === 0 && <td className="px-4 py-2 text-right text-gray-500">{p.old_dgrade || '—'}</td>}
                               <td className="px-4 py-2 text-right font-semibold text-gray-900">{p.current_dgrade}</td>
-                              {moverPeriod !== 0 && <td className="px-4 py-2 text-right text-gray-700">{p.games || '—'}</td>}
-                              {moverPeriod !== 0 && <td className="px-4 py-2 text-right text-gray-700">{p.win_percentage ? `${p.win_percentage}%` : '—'}</td>}
+                              <td className="px-4 py-2 text-right text-gray-700">{p.games || '—'}</td>
+                              <td className="px-4 py-2 text-right text-gray-700">{p.win_percentage ? `${p.win_percentage}%` : '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -923,10 +885,61 @@ export default function RankingsPage() {
           </div>
         )}
 
+        {/* ── NEW PLAYERS ── */}
+        {activeTab === 'New Players' && !loading && (
+          <div>
+            <div className="flex gap-3 mb-4 flex-wrap items-center">
+              {[30, 90, 180, 365].map(d => (
+                <button key={d} onClick={() => setNewPlayerDays(d)}
+                  className={`px-3 py-1 rounded-full text-sm border transition ${newPlayerDays === d ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'}`}>
+                  {d === 30 ? '30 days' : d === 90 ? '90 days' : d === 180 ? '6 months' : '1 year'}
+                </button>
+              ))}
+              <select value={newPlayerCountry} onChange={(e) => setNewPlayerCountry(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="">All countries</option>
+                {countryList.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>)}
+              </select>
+            </div>
+            <p className="text-sm text-gray-700 mb-1">{newPlayers.length} new players found</p>
+            <p className="text-xs text-gray-400 mb-3">Showing players first recorded by GCLab from 3 Mar 2026 onwards.</p>
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-gray-700 font-semibold">Player</th>
+                    <th className="text-left px-4 py-3 text-gray-700 font-semibold">Country</th>
+                    <th className="text-right px-4 py-3 text-gray-700 font-semibold">dGrade</th>
+                    <th className="text-right px-4 py-3 text-gray-700 font-semibold">eGrade</th>
+                    <th className="text-right px-4 py-3 text-gray-700 font-semibold">World Rank</th>
+                    <th className="text-right px-4 py-3 text-gray-700 font-semibold">First Seen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {newPlayers.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400 text-sm">No new players found for this period.</td></tr>
+                  ) : newPlayers.map((player, i) => (
+                    <tr key={player.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-2">
+                        <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline font-medium">
+                          {player.wcf_first_name} {player.wcf_last_name}
+                        </a>
+                      </td>
+                      <td className="px-4 py-2 text-gray-900"><span className="mr-1">{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
+                      <td className="px-4 py-2 text-right font-semibold text-gray-900">{player.dgrade}</td>
+                      <td className="px-4 py-2 text-right font-semibold text-amber-600">{player.egrade || '—'}</td>
+                      <td className="px-4 py-2 text-right text-gray-700">{player.world_ranking}</td>
+                      <td className="px-4 py-2 text-right text-gray-500">{formatDate(player.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
-        {/* ── COUNTRY RANKINGS — Top 6 used for WCF Team Championship seeding ── */}
-        {activeTab === 'Country Rankings' && !loading && (
+        {/* ── COUNTRY STATS ── */}
+        {activeTab === 'Country Stats' && !loading && (
           <div>
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
               <p className="text-xs text-gray-500">Click column headers to sort. Active = played a ranked game in the last 12 months.</p>
@@ -1038,6 +1051,185 @@ export default function RankingsPage() {
         )}
 
         {/* ── HISTORICAL RANKINGS ── */}
+        {activeTab === 'Historical Rankings' && (
+          <div>
+            {userRole === 'super_admin' && importedCount !== null && totalPlayers !== null && (
+              <div className="text-xs text-gray-400 text-right mb-2">
+                📥 {importedCount.toLocaleString()} of {totalPlayers.toLocaleString()} players history imported
+              </div>
+            )}
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3">Search any player</h3>
+              <div className="flex gap-2 flex-wrap items-start">
+                <div className="relative flex-1 min-w-48">
+                  <input
+                    type="text"
+                    placeholder="Type a name..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearchQueryChange(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  {searchSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-10 bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                      {searchSuggestions.map((player) => (
+                        <button
+                          key={player.id}
+                          onClick={() => handleSelectPlayer(player)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex justify-between items-center"
+                        >
+                          <span className="text-gray-900">{player.wcf_first_name} {player.wcf_last_name}</span>
+                          <span className="text-gray-400 text-xs">{getFlag(player.country)} #{player.world_ranking} · {player.dgrade}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {currentUserProfile?.wcf_player_id && (
+                  <button
+                    onClick={handleShowMyHistory}
+                    className="px-4 py-2 rounded-md text-sm font-medium bg-green-50 border border-green-300 text-green-700 hover:bg-green-100 transition whitespace-nowrap"
+                  >
+                    Show My History
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {selectedPlayer && (
+              <div>
+                <div className="flex items-center gap-3 mb-4 flex-wrap">
+                  <h3 className="font-semibold text-lg text-gray-900">{getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}</h3>
+                  <span className="text-sm text-gray-600">
+                    {getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade}
+                    {selectedPlayer.egrade ? ` · eGrade ${selectedPlayer.egrade}` : ''}
+                    {' '}· World #{selectedPlayer.world_ranking}
+                  </span>
+                  <div className="flex items-center gap-3 ml-auto">
+                    {userRole === 'super_admin' && (
+                      <button
+                        onClick={() => handleManualImport(selectedPlayer)}
+                        disabled={manualImporting}
+                        className="text-xs px-3 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50 disabled:opacity-50 transition"
+                      >
+                        {manualImporting ? 'Importing...' : '↻ Re-import History'}
+                      </button>
+                    )}
+                    <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline">WCF Profile →</a>
+                  </div>
+                  {userRole === 'super_admin' && manualImportLog.length > 0 && (
+                    <div className="w-full mt-2 bg-gray-50 rounded p-2 text-xs text-gray-500 max-h-32 overflow-y-auto">
+                      {manualImportLog.map((log, i) => <div key={i}>{log}</div>)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 mb-3 flex-wrap">
+                  <div className="flex gap-2">
+                    {[{ key: '1y', label: '1 Year' }, { key: '5y', label: '5 Years' }, { key: 'all', label: 'All Time' }, { key: 'custom', label: 'Custom' }].map(r => (
+                      <button key={r.key} onClick={() => setHistoryRange(r.key)}
+                        className={`px-3 py-1 rounded-full text-xs border transition ${historyRange === r.key ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'}`}>
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  {historyRange === 'custom' && (
+                    <div className="flex items-center gap-2">
+                      <input type="date" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)}
+                        className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-800" />
+                      <span className="text-gray-500 text-xs">to</span>
+                      <input type="date" value={historyTo} onChange={(e) => setHistoryTo(e.target.value)}
+                        className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-800" />
+                    </div>
+                  )}
+                  <div className="flex gap-2 ml-auto flex-wrap">
+                    <button onClick={() => setShowDgrade(!showDgrade)}
+                      className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${showDgrade ? 'bg-green-50 border-green-400 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
+                      <span className="w-4 h-1 bg-green-500 inline-block rounded" /> dGrade
+                    </button>
+                    <button onClick={() => setShowEgrade(!showEgrade)}
+                      className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${showEgrade ? 'bg-amber-50 border-amber-400 text-amber-700' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
+                      <span className="w-4 h-1 bg-amber-500 inline-block rounded" /> eGrade
+                    </button>
+                    <button onClick={() => setShowRanking(!showRanking)}
+                      className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition ${showRanking ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
+                      <span className="w-4 h-1 bg-blue-500 inline-block rounded" /> World Ranking
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-400 mb-3">
+                  {playerHistory.length <= 1
+                    ? 'No history recorded yet.'
+                    : `${playerHistory.filter((h: any) => h.is_imported).length} imported events + ${playerHistory.filter((h: any) => !h.is_imported).length} GCLab tracked points`}
+                  {showRanking && playerHistory.some(h => h.world_ranking) && (() => {
+                    const firstRank = playerHistory.find(h => h.world_ranking)
+                    const label = firstRank ? new Date(firstRank.recorded_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'Mar 2026'
+                    return <span className="ml-2 text-blue-400">· World rank shown from {label}</span>
+                  })()}
+                </p>
+
+                <div className="bg-white rounded-lg shadow-sm p-4 mb-4">{renderChart()}</div>
+
+                {playerHistory.length > 0 && (() => {
+                  // Only show events + most recent sync (last non-imported point)
+                  const eventPoints = playerHistory.filter((h: any) => h.is_imported || (h.event_name && h.event_name !== 'Daily sync'))
+                  const syncPoints = playerHistory.filter((h: any) => !h.is_imported && (!h.event_name || h.event_name === 'Daily sync'))
+                  const lastSync = syncPoints.length > 0 ? syncPoints[syncPoints.length - 1] : null
+                  const tableRows = [...eventPoints, ...(lastSync ? [lastSync] : [])].sort(
+                    (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
+                  )
+                  // Compute grade diffs vs previous entry in original chronological order
+                  const chronological = [...playerHistory]
+                  const getDiff = (h: any) => {
+                    const idx = chronological.findIndex(x => x.recorded_at === h.recorded_at)
+                    if (idx <= 0) return null
+                    return h.dgrade_value - chronological[idx - 1].dgrade_value
+                  }
+                  return (
+                    <div className="bg-white rounded-lg shadow-sm p-4">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-gray-500 border-b">
+                            <th className="text-left py-1 font-semibold">Date</th>
+                            <th className="text-left py-1 font-semibold">Event</th>
+                            <th className="text-right py-1 font-semibold">dGrade</th>
+                            <th className="text-right py-1 font-semibold">Change</th>
+                            <th className="text-right py-1 font-semibold">eGrade</th>
+                            <th className="text-right py-1 font-semibold">World Rank</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tableRows.map((h, i) => {
+                            const diff = getDiff(h)
+                            return (
+                              <tr key={i} className="border-t border-gray-100">
+                                <td className="py-1.5 text-gray-700">{formatDate(h.recorded_at)}</td>
+                                <td className="py-1.5 text-gray-500">
+                                  {h.event_url
+                                    ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">{h.event_name || '—'}</a>
+                                    : h.event_name || <span className="text-gray-400">{lastSyncDate ? `Last synced ${new Date(lastSyncDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Latest sync'}</span>}
+                                </td>
+                                <td className="py-1.5 text-right font-semibold text-gray-900">{h.dgrade_value}</td>
+                                <td className="py-1.5 text-right font-semibold">
+                                  {diff === null ? <span className="text-gray-400">—</span> :
+                                   diff > 0 ? <span className="text-green-600">↑ +{diff}</span> :
+                                   diff < 0 ? <span className="text-red-500">↓ {diff}</span> :
+                                   <span className="text-gray-400">—</span>}
+                                </td>
+                                <td className="py-1.5 text-right font-semibold text-amber-600">{h.egrade_value || '—'}</td>
+                                <td className="py-1.5 text-right text-gray-600">{h.world_ranking ? `#${h.world_ranking}` : '—'}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   )
