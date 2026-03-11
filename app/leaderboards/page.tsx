@@ -213,14 +213,12 @@ export default function LeaderboardsPage() {
   }
 
   const loadHeroStats = async () => {
-    // 0 — Most Games
-    const { data: mg } = await supabase.rpc('get_most_games_player').single().catch(() => ({ data: null }))
-    if (!mg) {
-      // Fallback: query wcf_players
-      const { data } = await supabase.from('wcf_players').select('id, wcf_first_name, wcf_last_name, country, games').order('games', { ascending: false }).limit(1)
+    // 0 — Most Games (from wcf_players.games field)
+    {
+      const { data } = await supabase.from('wcf_players').select('wcf_first_name, wcf_last_name, country, games').order('games', { ascending: false }).limit(1)
       if (data?.[0]) updateHero(0, { name: `${data[0].wcf_first_name} ${data[0].wcf_last_name}`, country: data[0].country, value: data[0].games?.toLocaleString() ?? '—' })
       else updateHero(0, undefined)
-    } else updateHero(0, undefined)
+    }
 
     // 1 — Best Win Rate (min 100 games)
     {
@@ -231,25 +229,21 @@ export default function LeaderboardsPage() {
 
     // 2 — Most Travelled (most distinct countries from wcf_player_country_stats)
     {
-      const { data } = await supabase.rpc('get_most_travelled').limit(1).catch(() => ({ data: null }))
-      if (!data) {
-        // Manual: group by wcf_player_id in wcf_player_country_stats
-        const { data: raw } = await supabase.from('wcf_player_country_stats').select('wcf_player_id, country')
-        if (raw) {
-          const byPlayer: Record<string, Set<string>> = {}
-          raw.forEach((r: any) => {
-            if (!byPlayer[r.wcf_player_id]) byPlayer[r.wcf_player_id] = new Set()
-            byPlayer[r.wcf_player_id].add(r.country)
-          })
-          const sorted = Object.entries(byPlayer).sort((a, b) => b[1].size - a[1].size)
-          if (sorted.length > 0) {
-            const [pid, countries] = sorted[0]
-            const { data: p } = await supabase.from('wcf_players').select('wcf_first_name, wcf_last_name, country').eq('id', pid).single()
-            if (p) updateHero(2, { name: `${p.wcf_first_name} ${p.wcf_last_name}`, country: p.country, value: `${countries.size}`, detail: `countries played in` })
-            else updateHero(2, undefined)
-          } else updateHero(2, undefined)
+      const { data: raw } = await supabase.from('wcf_player_country_stats').select('wcf_player_id, country')
+      if (raw) {
+        const byPlayer: Record<string, Set<string>> = {}
+        raw.forEach((r: any) => {
+          if (!byPlayer[r.wcf_player_id]) byPlayer[r.wcf_player_id] = new Set()
+          byPlayer[r.wcf_player_id].add(r.country)
+        })
+        const sorted = Object.entries(byPlayer).sort((a, b) => b[1].size - a[1].size)
+        if (sorted.length > 0) {
+          const [pid, countries] = sorted[0]
+          const { data: p } = await supabase.from('wcf_players').select('wcf_first_name, wcf_last_name, country').eq('id', pid).single()
+          if (p) updateHero(2, { name: `${p.wcf_first_name} ${p.wcf_last_name}`, country: p.country, value: `${countries.size}`, detail: `countries played in` })
+          else updateHero(2, undefined)
         } else updateHero(2, undefined)
-      }
+      } else updateHero(2, undefined)
     }
 
     // 3 — Most Unique Opponents
@@ -271,7 +265,7 @@ export default function LeaderboardsPage() {
       } else updateHero(3, undefined)
     }
 
-    // 4 — Biggest Career Rise (max dgrade_value - min dgrade_value)
+    // 4 — Biggest Career Rise (max - min dgrade_value)
     {
       const { data: raw } = await supabase.from('wcf_dgrade_history').select('wcf_player_id, dgrade_value').gt('dgrade_value', 0)
       if (raw) {
@@ -322,7 +316,7 @@ export default function LeaderboardsPage() {
     }
   }
 
-  const loadCountryStats = async () => {
+    const loadCountryStats = async () => {
     const { data } = await supabase.from('wcf_players').select('country, games, dgrade').gt('dgrade', 0)
     if (!data) return
 
