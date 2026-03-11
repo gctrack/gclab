@@ -11,7 +11,21 @@ type HeroStat = {
   icon: string
   accentColor: string
   loading: boolean
-  player?: { name: string; country: string; value: string; detail?: string; event?: string; date?: string; score?: string; vsDisplay?: string; sublabelOverride?: string; opponentName?: string; opponentCountry?: string }
+  player?: {
+    name: string
+    country: string
+    value: string
+    detail?: string
+    event?: string
+    date?: string
+    score?: string
+    vsDisplay?: string
+    sublabelOverride?: string
+    opponentName?: string
+    opponentCountry?: string
+    winnerDgrade?: string
+    oppDgrade?: string
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -85,21 +99,30 @@ function HeroCard({ stat }: { stat: HeroStat }) {
             <div className="gmono" style={{ fontSize: 34, fontWeight: 700, color: accentColor, lineHeight: 1, marginBottom: 8 }}>
               {player.value}
             </div>
+
             {/* Upset win layout or normal player name */}
             {player.opponentName ? (
               <div style={{ marginBottom: 8 }}>
-                <div className="gmono" style={{ fontSize: 15, fontWeight: 700, color: '#6b7280', marginBottom: 10, letterSpacing: '0.02em' }}>{player.vsDisplay}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                {/* Winner row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 16 }}>{getFlag(player.country)}</span>
                   <span className="gsans" style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{player.name}</span>
+                  {player.winnerDgrade && (
+                    <span className="gmono" style={{ fontSize: 12, fontWeight: 600, color: accentColor }}>{player.winnerDgrade}</span>
+                  )}
                   <span className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>{countryName(player.country)}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2, marginBottom: 2 }}>
+                {/* Beat label */}
+                <div style={{ paddingLeft: 2, marginBottom: 6 }}>
                   <span className="gsans" style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic' }}>beat</span>
                 </div>
+                {/* Opponent row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 16 }}>{getFlag(player.opponentCountry || '')}</span>
                   <span className="gsans" style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>{player.opponentName}</span>
+                  {player.oppDgrade && (
+                    <span className="gmono" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>{player.oppDgrade}</span>
+                  )}
                   <span className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>{countryName(player.opponentCountry || '')}</span>
                 </div>
               </div>
@@ -110,6 +133,7 @@ function HeroCard({ stat }: { stat: HeroStat }) {
                 <span className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>{countryName(player.country)}</span>
               </div>
             )}
+
             {/* Detail line */}
             {player.detail && (
               <p className="gsans" style={{ fontSize: 12, color: '#6b7280', margin: '6px 0 0', lineHeight: 1.5 }}>{player.detail}</p>
@@ -195,8 +219,8 @@ export default function LeaderboardsPage() {
   const [tab, setTab]                 = useState<'records' | 'countries' | 'new'>('records')
 
   const [heroStats, setHeroStats] = useState<HeroStat[]>([
-    { label: 'Most Games Played',    sublabel: 'Imported players only', icon: '🎮', accentColor: '#2563eb', loading: true },
-    { label: 'Best Win Rate',        sublabel: 'Min 100 wins imported · career %', icon: '🏆', accentColor: '#16a34a', loading: true },
+    { label: 'Most Games Played',    sublabel: 'Career total games · imported players', icon: '🎮', accentColor: '#2563eb', loading: true },
+    { label: 'Best Win Rate',        sublabel: 'Min 100 games · min 5 losses · career %', icon: '🏆', accentColor: '#16a34a', loading: true },
     { label: 'Most Travelled',       sublabel: 'Countries played in · imported players', icon: '✈️', accentColor: '#ea580c', loading: true },
     { label: 'Most Opponents',       sublabel: 'Unique opponents · imported players', icon: '🤝', accentColor: '#7c3aed', loading: true },
     { label: 'Biggest Career Rise',  sublabel: 'All-time dGrade gain · imported players', icon: '📈', accentColor: '#0891b2', loading: true },
@@ -232,47 +256,72 @@ export default function LeaderboardsPage() {
   }
 
   const loadHeroStats = async () => {
-    // 0 — Most Games (from actual wcf_player_games count via RPC)
+    // 0 — Most Games
     {
       const { data } = await supabase.rpc('get_most_games_player')
       const r = data?.[0]
-      if (r) updateHero(0, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: Number(r.game_count).toLocaleString(), detail: 'imported games' })
+      if (r) updateHero(0, {
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
+        country: r.country,
+        value: Number(r.game_count).toLocaleString(),
+        detail: 'career games played',
+      })
       else updateHero(0, undefined)
     }
 
-    // 1 — Best Win Rate (career % from WCF, min 100 imported wins)
+    // 1 — Best Win Rate (career % from imported games, min 100 games, min 5 losses)
     {
       const { data } = await supabase.rpc('get_best_win_rate')
       const r = data?.[0]
-      if (r) updateHero(1, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: `${r.win_rate}%`, detail: `${Number(r.win_count).toLocaleString()} wins · career record` })
+      if (r) updateHero(1, {
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
+        country: r.country,
+        value: `${r.win_rate}%`,
+        detail: `${Number(r.win_count).toLocaleString()} wins from ${Number(r.game_count).toLocaleString()} games`,
+      })
       else updateHero(1, undefined)
     }
 
-    // 2 — Most Travelled (via RPC)
+    // 2 — Most Travelled
     {
       const { data } = await supabase.rpc('get_most_travelled')
       const r = data?.[0]
-      if (r) updateHero(2, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: `${r.country_count}`, detail: 'countries played in' })
+      if (r) updateHero(2, {
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
+        country: r.country,
+        value: `${r.country_count}`,
+        detail: 'countries played in',
+      })
       else updateHero(2, undefined)
     }
 
-    // 3 — Most Unique Opponents (via RPC)
+    // 3 — Most Unique Opponents
     {
       const { data } = await supabase.rpc('get_most_unique_opponents')
       const r = data?.[0]
-      if (r) updateHero(3, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: `${r.opponent_count}`, detail: 'unique opponents' })
+      if (r) updateHero(3, {
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
+        country: r.country,
+        value: `${r.opponent_count}`,
+        detail: 'unique opponents',
+      })
       else updateHero(3, undefined)
     }
 
-    // 4 — Biggest Career Rise (via RPC)
+    // 4 — Biggest Career Rise
     {
       const { data } = await supabase.rpc('get_biggest_career_rise')
       const r = data?.[0]
-      if (r) updateHero(4, { name: `${r.wcf_first_name} ${r.wcf_last_name}`, country: r.country, value: `+${r.gain}`, detail: `${r.min_dgrade} → ${r.max_dgrade} dGrade` })
+      if (r) updateHero(4, {
+        name: `${r.wcf_first_name} ${r.wcf_last_name}`,
+        country: r.country,
+        value: `+${r.gain}`,
+        detail: `${r.min_dgrade} → ${r.max_dgrade} dGrade`,
+      })
       else updateHero(4, undefined)
     }
 
-    // 5 — Biggest Upset Win (via RPC)
+    // 5 — Biggest Upset Win
     {
       const { data } = await supabase.rpc('get_biggest_upset_win')
       const r = data?.[0]
@@ -280,7 +329,8 @@ export default function LeaderboardsPage() {
         name: `${r.wcf_first_name} ${r.wcf_last_name}`,
         country: r.country,
         value: `+${r.gap}`,
-        vsDisplay: `${r.winner_dgrade} vs ${r.opp_dgrade}`,
+        winnerDgrade: `${r.winner_dgrade}`,
+        oppDgrade: `${r.opp_dgrade}`,
         opponentName: r.opponent_name,
         opponentCountry: r.opponent_country || '',
         event: r.event_name,
@@ -291,8 +341,7 @@ export default function LeaderboardsPage() {
     }
   }
 
-    const loadCountryStats = async () => {
-    // Use RPCs to get accurate counts across all 11k+ players
+  const loadCountryStats = async () => {
     const { data: total } = await supabase.rpc('get_players_by_country')
     if (total) setTotalByCountry(total.map((r: any) => ({ country: r.country, value: Number(r.total) })))
 
@@ -300,7 +349,7 @@ export default function LeaderboardsPage() {
     if (active) setActiveByCountry(active.map((r: any) => ({ country: r.country, value: Number(r.total) })))
   }
 
-    const loadNewPlayers = async () => {
+  const loadNewPlayers = async () => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 60)
     const { data } = await supabase
       .from('wcf_players')

@@ -225,3 +225,184 @@ Joe Zowry 1583, Adam Peck 1998, Margaret Hudson 1486, Bruce Hindin 1908, Rich Ro
 - ⬜ Apple Watch app
 - ⬜ Chart zoom feature
 - ⬜ Re-import previously imported players with fixed loss-row regex
+
+
+Updated Mar 11 - leaving original in case there are important details.
+# GCLab Development Log
+
+## Project Overview
+Golf croquet analytics web app. Target platforms: Web, iPhone, Apple Watch.
+Stack: Next.js 16 (Turbopack), TypeScript, Tailwind CSS v4, Supabase, Vercel.
+Repo: https://github.com/gctrack/gclab
+Production: https://gclab.app
+Supabase project: oswjsxtbbekrciqbivdy
+
+## Development Machines
+- MacBook and Mac Studio both configured
+- Both have Node.js, Homebrew, GitHub CLI, Cursor IDE
+- Workflow: git pull before work, git push after
+- .env.local is NOT in git — must be recreated on each machine if missing
+
+## .env.local Required Variables
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+CRON_SECRET=gclab_wcf_sync_secret_2026
+NEXT_PUBLIC_CRON_SECRET=gclab_wcf_sync_secret_2026
+```
+
+## Key User Info
+- Real user ID: 6a22078c-7f21-4cee-8d3d-d80364ca222a
+- Email: adamcbarr@gmail.com — Role: super_admin
+- WCF player ID: 67d1eadf-1eee-4668-b303-3dc6fb019807
+
+## File Deployment Map
+```
+login-page.tsx              → app/login/page.tsx
+page.tsx                    → app/page.tsx
+dashboard-page.tsx          → app/dashboard/page.tsx
+profile-page.tsx            → app/profile/page.tsx
+profile-view-page.tsx       → app/profile/[id]/page.tsx
+rankings-page.tsx           → app/rankings/page.tsx
+compare-page.tsx            → app/compare/page.tsx
+leaderboards-page.tsx       → app/leaderboards/page.tsx
+history-page.tsx            → app/history/page.tsx
+community-page.tsx          → app/community/page.tsx
+admin-page.tsx              → app/admin/page.tsx
+GCLabNav.tsx                → components/GCLabNav.tsx
+route.ts                    → app/api/wcf-sync/route.ts
+wcf-history-import-route.ts → app/api/wcf-history-import/route.ts
+wcf-history-next-route.ts   → app/api/wcf-history-next/route.ts
+wcf-history-batch.yml       → .github/workflows/wcf-history-batch.yml
+admin-users-route.ts        → app/api/admin/users/route.ts
+admin-user-id-route.ts      → app/api/admin/users/[id]/route.ts
+admin-reset-password-route.ts → app/api/admin/users/[id]/reset-password/route.ts
+```
+
+## Architecture Notes
+- Supabase client import: `@/lib/supabase` throughout
+- Next.js 15/16: params must be `Promise<{id: string}>` and awaited in dynamic routes
+- zsh: quote bracket paths — "app/profile/[id]/page.tsx"
+- 'use client' must be ABSOLUTE FIRST LINE — no comments above it
+- World rank only meaningful from March 2026 — imported history has null world_ranking
+- Daily sync writes world_ranking to wcf_dgrade_history on dgrade, egrade, OR world_ranking change
+- Sync pre-snap: written 1 second before event record, event_name=null (renders as "Grade change")
+
+## Navigation Structure (live)
+1. Dashboard — /dashboard
+2. My Profile — /profile
+3. WCF Rankings — /rankings (tabs: Rankings, Movers, Country Rankings)
+4. Stats & Leaderboards — /leaderboards
+5. Compare — /compare
+6. Player History — /history
+7. Community — /community (members only)
+8. Admin — /admin (super_admin only)
+
+## Database Tables (key ones)
+- wcf_players — 11,450 players. Fields: id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, games (WCF rolling ~12mo), win_percentage (WCF rolling ~12mo), history_imported
+- wcf_player_games — imported game records. Fields: id, wcf_player_id, event_date, event_name, result, dgrade_after, opp_dgrade_after, opponent_first_name, opponent_last_name, player_score, opponent_score, is_imported
+- wcf_dgrade_history — grade history snapshots. Fields: id, wcf_player_id, recorded_at, dgrade_value, egrade_value, world_ranking, event_name, is_imported
+- wcf_player_country_stats — aggregated stats per player per country
+- profiles — GCLab user accounts. Fields: id, first_name, last_name, wcf_player_id, role
+- sync_log — daily sync audit log
+- forum_threads — community board threads (PENDING SQL — see below)
+- forum_posts — community board posts (PENDING SQL — see below)
+
+## Supabase RPC Functions (all live)
+- get_players_by_country() — total ranked players by country
+- get_active_players_by_country() — players with games in last 12 months
+- get_most_games_player() — top 1 by imported game count
+- get_most_unique_opponents() — top 1 by distinct opponents
+- get_most_travelled() — top 1 by distinct countries
+- get_biggest_career_rise() — top 1 by max-min dgrade_value
+- get_biggest_upset_win() — top 1 by grade gap, includes opponent_country via join
+- get_best_win_rate() — top 1 by wcf win_percentage where imported games >= 100
+- get_top10_most_games() — top 10 by imported game count
+- get_top10_win_rate() — top 10 by win rate
+- get_top10_most_travelled() — top 10 by countries
+- get_top10_most_opponents() — top 10 by unique opponents
+- get_top10_career_rise() — top 10 by career grade rise
+- get_top10_upset_wins() — top 10 by upset gap
+
+## Import System
+- GitHub Actions: .github/workflows/wcf-history-batch.yml
+- Runs at :05 and :35 each hour (2x/hour)
+- 16 players/run, 30s between players = ~32 players/hour
+- 200+ players fully imported as of session 15
+
+## Pending SQL (run in Supabase SQL Editor)
+
+### Forum tables for Community page:
+```sql
+CREATE TABLE forum_threads (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  title text NOT NULL,
+  created_by uuid REFERENCES auth.users(id),
+  post_count int DEFAULT 0,
+  last_post_at timestamptz DEFAULT now(),
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE forum_posts (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  thread_id uuid REFERENCES forum_threads(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES auth.users(id),
+  content text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+```
+
+### Jodie Rugart bad records (still pending):
+```sql
+DELETE FROM wcf_dgrade_history WHERE id IN (
+  '310f915a-e574-471b-9107-67bd52bcdf43',
+  '7af02a8d-7efe-48ec-af5c-98c46111ae01',
+  'c7a5762b-fd52-4fdb-baed-4138dd6dd686'
+);
+```
+
+## What's Live on gclab.app
+- New nav with all 7 tabs
+- Login page redesign (SVG logo, dark green)
+- WCF Rankings (restructured, Country Rankings tab)
+- Stats & Leaderboards (scorecards via RPCs, country tables, new players)
+- Player History (grade chart, player search)
+- Community (members-only board, needs forum SQL tables to work)
+- Compare (streak fix, flat colors, country matching)
+- Import running 4x faster
+
+## What Needs Finishing (start of next session)
+
+### 1. Leaderboards top-10 tables
+RPCs are live (get_top10_*). Need to add tables below the scorecards on the Records tab.
+Each metric gets a table showing rank, flag, name, country, value.
+Upset wins table also shows opponent name+flag.
+
+### 2. Leaderboard scorecard copy fixes
+- Most Games Played: sublabel → "Career total games". Remove "imported games" from detail line.
+- Most Travelled: remove "imported players" from sublabel.
+- Biggest Upset: remove grade display from above names. Show winner flag+name+dgrade, then "beat", then opponent flag+name+dgrade.
+
+### 3. Win Rate
+Currently uses wcf_players.win_percentage (WCF rolling ~12 month figure).
+Best approach for career rate = count wins/total from wcf_player_games.
+Blocked by data artifact: some players with partial imports show 100%.
+Fix: require minimum 5 losses in imported data (already in get_best_win_rate RPC as HAVING losses >= 5... verify this is live).
+
+### 4. Other pending items
+- Re-import Jana Saeed and Rania Gabr (is_imported was false, pre-fix)
+- Store opponent_country on game record at import time
+- Jodie Rugart DB cleanup (SQL above)
+- Profile career stats view
+- Game logging UI (shots, hoops, results) — core future feature
+- iPhone app, Apple Watch app
+
+## Key Design Decisions / Conventions
+- Dark green: #0d2818, Accent green: #4ade80, Cream: #f5f0e8
+- Fonts: Playfair Display (headers), DM Sans (body), DM Mono (numbers/grades)
+- All pages use GCLabNav component with role + isSignedIn + currentPath props
+- Game sort order: event_date ASC → event_name ASC (alphabetical). Critical for streak accuracy.
+  "World Championship Block Stage" < "World Championship Consolation" = correct order.
+- wcf_players.games and win_percentage = WCF rolling ~12 month figures, NOT career totals
+- Career game count = COUNT(*) from wcf_player_games for that player
+- Supabase anon role sees all wcf_player_games (RLS allows public read)
