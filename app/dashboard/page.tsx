@@ -66,7 +66,7 @@ function pct(w: number, t: number): number | null {
 }
 
 function pctColor(p: number) {
-  return p >= 50 ? LIME : p >= 30 ? AMBER : RED
+  return p >= 50 ? '#16a34a' : p >= 30 ? '#d97706' : '#dc2626'
 }
 
 // ─── Career SVG Chart ────────────────────────────────────────────────────────
