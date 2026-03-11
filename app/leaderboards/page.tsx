@@ -17,6 +17,7 @@ type HeroStat = {
     value: string
     detail?: string
     detail2?: string
+    detail3?: string
     event?: string
     date?: string
     score?: string
@@ -24,6 +25,9 @@ type HeroStat = {
     opponentCountry?: string
     winnerDgrade?: string
     oppDgrade?: string
+    countriesPlayed?: string[]
+    streakStart?: string
+    streakEnd?: string
   }
 }
 
@@ -45,6 +49,10 @@ function getFlag(code: string): string {
   if (code === 'GB-WLS') return '🏴󠁧󠁢󠁷󠁬󠁳󠁿'
   if (code.length !== 2) return ''
   return code.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('')
+}
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('en-CA', { year: 'numeric', month: 'short' })
 }
 
 const ML = `
@@ -94,6 +102,7 @@ function HeroCard({ stat }: { stat: HeroStat }) {
             </div>
 
             {player.opponentName ? (
+              /* Upset win layout */
               <div style={{ marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 16 }}>{getFlag(player.country)}</span>
@@ -116,19 +125,49 @@ function HeroCard({ stat }: { stat: HeroStat }) {
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: (player.detail || player.detail2) ? 10 : 0 }}>
+              /* Normal player layout */
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
                 <span style={{ fontSize: 18 }}>{getFlag(player.country)}</span>
                 <span className="gsans" style={{ fontSize: 16, fontWeight: 600, color: '#111827' }}>{player.name}</span>
                 <span className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>{countryName(player.country)}</span>
               </div>
             )}
 
+            {/* detail line */}
             {player.detail && (
               <p className="gsans" style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0', lineHeight: 1.5 }}>{player.detail}</p>
             )}
+
+            {/* detail2 line */}
             {player.detail2 && (
               <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0', lineHeight: 1.5 }}>{player.detail2}</p>
             )}
+
+            {/* detail3 line */}
+            {player.detail3 && (
+              <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0', lineHeight: 1.5 }}>{player.detail3}</p>
+            )}
+
+            {/* Countries played flags */}
+            {player.countriesPlayed && player.countriesPlayed.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                {player.countriesPlayed.map(c => (
+                  <span key={c} title={countryName(c)} style={{ fontSize: 18, lineHeight: 1 }}>{getFlag(c)}</span>
+                ))}
+              </div>
+            )}
+
+            {/* Streak date range */}
+            {player.streakStart && player.streakEnd && (
+              <div style={{ marginTop: 8, padding: '6px 10px', background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                <p className="gsans" style={{ fontSize: 11, color: '#6b7280', margin: 0 }}>Event date range</p>
+                <p className="gmono" style={{ fontSize: 12, fontWeight: 600, color: '#374151', margin: '2px 0 0' }}>
+                  {formatDate(player.streakStart)} — {formatDate(player.streakEnd)}
+                </p>
+              </div>
+            )}
+
+            {/* Upset event box */}
             {player.event && (
               <div style={{ marginTop: 8, padding: '7px 10px', background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
                 <p className="gsans" style={{ fontSize: 11, color: '#6b7280', margin: 0 }}>{player.event}</p>
@@ -332,12 +371,12 @@ export default function LeaderboardsPage() {
   const [tab, setTab]                 = useState<'records' | 'countries' | 'new'>('records')
 
   const [heroStats, setHeroStats] = useState<HeroStat[]>([
-    { label: 'Most Games Played',   sublabel: 'Career total · imported players',          icon: '🎮', accentColor: '#2563eb', loading: true },
-    { label: 'Best Win Rate',       sublabel: 'Min 100 games · min 5 losses · career %',  icon: '🏆', accentColor: '#16a34a', loading: true },
-    { label: 'Most Travelled',      sublabel: 'Countries played in · imported players',   icon: '✈️', accentColor: '#ea580c', loading: true },
-    { label: 'Longest Win Streak',  sublabel: 'Consecutive wins · imported players',      icon: '🔥', accentColor: '#7c3aed', loading: true },
-    { label: 'Biggest Career Rise', sublabel: 'All-time dGrade gain · imported players',  icon: '📈', accentColor: '#0891b2', loading: true },
-    { label: 'Biggest Upset Win',   sublabel: 'Winner vs opponent dGrade gap',            icon: '⚡', accentColor: '#dc2626', loading: true },
+    { label: 'Most Games Played',   sublabel: 'Career total',             icon: '🎮', accentColor: '#2563eb', loading: true },
+    { label: 'Best Win Rate',       sublabel: 'Min 100 games · career %', icon: '🏆', accentColor: '#16a34a', loading: true },
+    { label: 'Most Travelled',      sublabel: 'Countries played in',      icon: '✈️', accentColor: '#ea580c', loading: true },
+    { label: 'Longest Win Streak',  sublabel: 'Consecutive wins',         icon: '🔥', accentColor: '#7c3aed', loading: true },
+    { label: 'Biggest Career Rise', sublabel: 'All-time dGrade gain',     icon: '📈', accentColor: '#0891b2', loading: true },
+    { label: 'Biggest Upset Win',   sublabel: 'Winner vs opponent dGrade gap', icon: '⚡', accentColor: '#dc2626', loading: true },
   ])
 
   const [top10Games,      setTop10Games]      = useState<any[]>([])
@@ -407,7 +446,7 @@ export default function LeaderboardsPage() {
       else updateHero(1, undefined)
     }
 
-    // 2 — Most Travelled
+    // 2 — Most Travelled (with country flags)
     {
       const { data } = await supabase.rpc('get_most_travelled')
       const r = data?.[0]
@@ -416,11 +455,12 @@ export default function LeaderboardsPage() {
         country: r.country,
         value: `${r.country_count}`,
         detail: 'countries played in',
+        countriesPlayed: r.countries_played || [],
       })
       else updateHero(2, undefined)
     }
 
-    // 3 — Longest Win Streak
+    // 3 — Longest Win Streak (with date range)
     {
       const { data } = await supabase.rpc('get_longest_win_streak')
       const r = data?.[0]
@@ -429,11 +469,13 @@ export default function LeaderboardsPage() {
         country: r.country,
         value: `${r.streak}`,
         detail: 'consecutive wins',
+        streakStart: r.streak_start,
+        streakEnd: r.streak_end,
       })
       else updateHero(3, undefined)
     }
 
-    // 4 — Biggest Career Rise
+    // 4 — Biggest Career Rise (with games + win rate)
     {
       const { data } = await supabase.rpc('get_biggest_career_rise')
       const r = data?.[0]
@@ -442,6 +484,7 @@ export default function LeaderboardsPage() {
         country: r.country,
         value: `+${r.gain}`,
         detail: `${r.min_dgrade} → ${r.max_dgrade} dGrade`,
+        detail2: `${Number(r.game_count).toLocaleString()} games · ${r.win_rate}% win rate`,
       })
       else updateHero(4, undefined)
     }
@@ -637,7 +680,7 @@ export default function LeaderboardsPage() {
             </div>
 
             {/* Best Win Rate */}
-            <SectionHeader title="Best Win Rate" subtitle="Career win percentage — minimum 100 games and 5 losses" />
+            <SectionHeader title="Best Win Rate" subtitle="Career win percentage — minimum 100 games" />
             <div style={{ maxWidth: 560 }}>
               <LeaderTable
                 title="Best Career Win Rate" icon="🏆" accentColor="#16a34a"
