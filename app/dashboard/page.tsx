@@ -47,7 +47,7 @@ const ML = `
     .dash-pad { padding: 24px !important; }
   }
   @media (max-width: 600px) {
-    .dash-hero-grid { grid-template-columns: repeat(2,1fr) !important; }
+    .dash-hero-grid { grid-template-columns: repeat(3,1fr) !important; }
   }
 `
 
@@ -73,11 +73,12 @@ function pctColor(p: number) {
 
 type ChartFilter = '1Y' | '5Y' | 'All'
 
-function CareerChart({ history, currentDgrade, peakDgrade, yearsActive }: {
+function CareerChart({ history, playerName, playerFlag, playerMeta, statStrip }: {
   history: any[]
-  currentDgrade?: number | string
-  peakDgrade?: number
-  yearsActive?: number
+  playerName?: string
+  playerFlag?: string
+  playerMeta?: string
+  statStrip?: { label: string; val: string | number; accent: boolean }[]
 }) {
   const [tooltip, setTooltip] = React.useState<{ x: number; y: number; grade: number; date: string } | null>(null)
   const [filter, setFilter] = React.useState<ChartFilter>('All')
@@ -166,19 +167,17 @@ function CareerChart({ history, currentDgrade, peakDgrade, yearsActive }: {
 
   return (
     <div>
-      {/* Header row: stats + filter buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 28 }}>
-          {[
-            { label: 'Current', val: currentDgrade, highlight: false },
-            { label: 'Peak',    val: peakDgrade || '—', highlight: true },
-            { label: 'Years',   val: yearsActive,       highlight: false },
-          ].map(({ label, val, highlight }) => (
-            <div key={label} style={{ textAlign: 'center' }}>
-              <div className="gmono" style={{ fontSize: 20, fontWeight: 500, color: highlight ? LIME : CREAM, lineHeight: 1 }}>{val || '—'}</div>
-              <div className="gsans" style={{ fontSize: 10, color: CREAM25, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+      {/* Header row: player info left, filter buttons right */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 28px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          {playerName && (
+            <div style={{ fontSize: 16, fontWeight: 600, color: CREAM, marginBottom: 3 }}>
+              {playerFlag} {playerName}
             </div>
-          ))}
+          )}
+          <div style={{ fontSize: 12, color: 'rgba(232,224,208,0.42)' }}>
+            {playerMeta}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['1Y', '5Y', 'All'] as ChartFilter[]).map(f => (
@@ -186,6 +185,18 @@ function CareerChart({ history, currentDgrade, peakDgrade, yearsActive }: {
           ))}
         </div>
       </div>
+
+      {/* Full-width stat strip */}
+      {statStrip && (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${statStrip.length}, 1fr)`, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          {statStrip.map(({ label, val, accent }: { label: string; val: string | number; accent: boolean }) => (
+            <div key={label} style={{ padding: '14px 20px', borderRight: '1px solid rgba(255,255,255,0.07)', textAlign: 'center' }}>
+              <div className="gmono" style={{ fontSize: 20, fontWeight: 500, color: accent ? LIME : CREAM, lineHeight: 1 }}>{val}</div>
+              <div className="gsans" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: CREAM25, marginTop: 5 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Chart */}
       <div style={{ padding: '16px 12px 8px', maxWidth: 900, margin: '0 auto' }}>
@@ -546,7 +557,7 @@ export default function DashboardPage() {
     { label: 'Current dGrade',      value: wcfPlayer?.dgrade ?? profile?.dgrade ?? '—',    accent: false },
     { label: 'Peak dGrade',         value: hasHistory && peakDgrade ? peakDgrade.toLocaleString() : '—', accent: hasHistory && peakDgrade > 0 },
     { label: 'World Rank',          value: wcfPlayer?.world_ranking ? `#${wcfPlayer.world_ranking}` : '—', accent: false },
-    { label: 'Countries Played In', value: hasHistory && countriesPlayed ? countriesPlayed : yearsActive ? `${yearsActive}yr` : '—', accent: false },
+
   ]
 
   const displayName = profile?.first_name
@@ -594,25 +605,36 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="dash-pad dash-hero-grid" style={{ padding: '0 48px 32px', display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10, position: 'relative', zIndex: 1 }}>
-          {heroStats.map(s => <StatCard key={s.label} label={s.label} value={s.value} accent={s.accent}/>)}
-        </div>
+        {/* Stat cards — only shown when no history (no chart to house them) */}
+        {!hasHistory && (
+          <div className="dash-pad dash-hero-grid" style={{ padding: '0 48px 32px', display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, position: 'relative', zIndex: 1 }}>
+            {heroStats.map(s => <StatCard key={s.label} label={s.label} value={s.value} accent={s.accent}/>)}
+          </div>
+        )}
 
-        {/* Grade History Chart */}
+        {/* Grade History Chart — includes stat strip + filter tabs, matching homepage */}
         {hasHistory && history.length > 1 && (
           <div className="dash-pad" style={{ padding: '0 48px 0', position: 'relative', zIndex: 1 }}>
             <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, overflow: 'hidden', maxWidth: 960 }}>
-              <div style={{ padding: '18px 24px 0', borderBottom: 'none' }}>
-                <div className="ghl" style={{ fontSize: 16, color: CREAM, fontWeight: 700 }}>Grade History</div>
-                <div className="gsans" style={{ fontSize: 11, color: CREAM25, marginTop: 2 }}>Your complete career arc</div>
-              </div>
               <CareerChart
                 history={history}
-                currentDgrade={wcfPlayer?.dgrade}
-                peakDgrade={peakDgrade || undefined}
-                yearsActive={yearsActive}
+                playerName={wcfPlayer ? `${wcfPlayer.wcf_first_name} ${wcfPlayer.wcf_last_name}` : displayName}
+                playerFlag={wcfPlayer ? getFlag(wcfPlayer.country) : ''}
+                playerMeta={[
+                  wcfPlayer?.country ? countryName(wcfPlayer.country) : null,
+                  wcfPlayer?.dgrade  ? `dGrade ${wcfPlayer.dgrade}` : null,
+                  wcfPlayer?.world_ranking ? `World #${wcfPlayer.world_ranking}` : null,
+                ].filter(Boolean).join(' · ')}
+                statStrip={heroStats.map(s => ({ label: s.label, val: s.value, accent: s.accent }))}
               />
             </div>
+          </div>
+        )}
+
+        {/* Stat cards shown below chart when history exists */}
+        {hasHistory && (
+          <div className="dash-pad dash-hero-grid" style={{ padding: '16px 48px 0', display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, position: 'relative', zIndex: 1 }}>
+            {heroStats.map(s => <StatCard key={s.label} label={s.label} value={s.value} accent={s.accent}/>)}
           </div>
         )}
 
