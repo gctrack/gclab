@@ -1,511 +1,615 @@
-// SAVE TO: app/admin/page.tsx
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
 
-type ImportStep = { type: string; message: string }
+const supabase = createClient()
 
-const ROLES = ['user', 'club_manager', 'admin', 'super_admin']
+// ── Types ─────────────────────────────────────────────────────────────────────
 
+type SyncRun = {
+  id: string
+  status: 'running' | 'complete' | 'error'
+  started_at: string
+  completed_at: string | null
+  total: number | null
+  created: number | null
+  updated: number | null
+  error: string | null
+}
 
-const ML_STYLES = `
+type ChangeEvent = {
+  id: number
+  sync_log_id: string
+  event_type: 'grade_change' | 'new_games' | 'new_player' | 'error'
+  wcf_player_id: string | null
+  player_name: string | null
+  country: string | null
+  detail: Record<string, any> | null
+  created_at: string
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const G    = '#0d2818'
+const LIME = '#4ade80'
+
+const ML = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
   .ghl  { font-family: 'Playfair Display', serif; }
   .gmono{ font-family: 'DM Mono', monospace; }
   .gsans{ font-family: 'DM Sans', sans-serif; }
+  .adm-row:hover { background: rgba(13,40,24,0.02) !important; }
 `
 
-export default function AdminPage() {
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+const EVENT_META = {
+  grade_change: { label: 'Grade change', bg: '#f0fdf4', border: '#bbf7d0', dot: '#16a34a', text: '#15803d' },
+  new_games:    { label: 'New games',    bg: '#eff6ff', border: '#bfdbfe', dot: '#2563eb', text: '#1d4ed8' },
+  new_player:   { label: 'New player',   bg: '#fefce8', border: '#fde68a', dot: '#d97706', text: '#b45309' },
+  error:        { label: 'Error',        bg: '#fef2f2', border: '#fecaca', dot: '#dc2626', text: '#b91c1c' },
+}
+
+function countryToEmoji(code: string | null): string {
+  if (!code) return ''
+  const map: Record<string, string> = {
+    'AU': '🇦🇺', 'NZ': '🇳🇿', 'GB-ENG': '🏴󠁧󠁢󠁥󠁮󠁧󠁿', 'GB-SCT': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'GB-WLS': '🏴󠁧󠁢󠁷󠁬󠁳󠁿',
+    'US': '🇺🇸', 'IE': '🇮🇪', 'ZA': '🇿🇦', 'EG': '🇪🇬', 'SE': '🇸🇪', 'NO': '🇳🇴',
+    'DE': '🇩🇪', 'CH': '🇨🇭', 'ES': '🇪🇸', 'PT': '🇵🇹', 'BE': '🇧🇪', 'CZ': '🇨🇿',
+    'LV': '🇱🇻', 'CA': '🇨🇦', 'MX': '🇲🇽', 'HK': '🇭🇰',
+  }
+  return map[code] ?? ''
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+function formatDuration(start: string, end: string | null): string {
+  if (!end) return '…'
+  const ms = new Date(end).getTime() - new Date(start).getTime()
+  const s = Math.round(ms / 1000)
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function GradeDiff({ diff }: { diff: number }) {
+  const up = diff > 0
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 2,
+      padding: '1px 6px', borderRadius: 4, fontSize: 12, fontWeight: 600,
+      background: up ? '#f0fdf4' : '#fef2f2',
+      color: up ? '#15803d' : '#b91c1c',
+      border: `1px solid ${up ? '#bbf7d0' : '#fecaca'}`,
+    }}>
+      {up ? '▲' : '▼'} {up ? '+' : ''}{diff}
+    </span>
+  )
+}
+
+function ChangeDetail({ ev }: { ev: ChangeEvent }) {
+  const d = ev.detail || {}
+  if (ev.event_type === 'grade_change') {
+    return (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span className="gmono" style={{ fontWeight: 500, color: '#374151', fontSize: 13 }}>
+          {d.dgrade_before} → {d.dgrade_after}
+        </span>
+        <GradeDiff diff={d.diff} />
+        {d.event_name && (
+          <span className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>via {d.event_name}</span>
+        )}
+      </span>
+    )
+  }
+  if (ev.event_type === 'new_games') {
+    return (
+      <span className="gsans" style={{ fontSize: 13, color: '#6b7280' }}>
+        +{d.games_added} game{d.games_added !== 1 ? 's' : ''}
+        {d.event_name && <span style={{ color: '#9ca3af' }}> · {d.event_name}</span>}
+      </span>
+    )
+  }
+  if (ev.event_type === 'new_player') {
+    return (
+      <span className="gsans" style={{ fontSize: 13, color: '#6b7280' }}>
+        dGrade {d.dgrade} · Rank #{d.world_ranking}
+      </span>
+    )
+  }
+  if (ev.event_type === 'error') {
+    return (
+      <span className="gmono" style={{ fontSize: 12, color: '#b91c1c', wordBreak: 'break-all' }}>
+        {d.message || 'Unknown error'}
+      </span>
+    )
+  }
+  return null
+}
+
+function FilterPill({
+  label, active, count, color, onClick
+}: {
+  label: string, active: boolean, count: number, color: string, onClick: () => void
+}) {
+  return (
+    <button onClick={onClick} className="gsans" style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '4px 12px', borderRadius: 20, border: `1.5px solid ${active ? color : '#e5e7eb'}`,
+      background: active ? color + '18' : 'white', cursor: 'pointer', fontSize: 13,
+      color: active ? color : '#6b7280', fontWeight: active ? 600 : 400,
+    }}>
+      {label}
+      <span style={{
+        background: active ? color : '#f3f4f6', color: active ? 'white' : '#9ca3af',
+        fontSize: 11, fontWeight: 700, borderRadius: 10, padding: '0 5px', lineHeight: '18px',
+        minWidth: 18, textAlign: 'center',
+      }}>{count}</span>
+    </button>
+  )
+}
+
+// ── Sync Activity Log Section ─────────────────────────────────────────────────
+
+function SyncActivityLog() {
+  const [runs, setRuns] = useState<SyncRun[]>([])
+  const [changes, setChanges] = useState<ChangeEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
-  const [syncStatus, setSyncStatus] = useState<any>(null)
-  const [syncHistory, setSyncHistory] = useState<any[]>([])
+  const [activeFilter, setActiveFilter] = useState<string | null>(null)
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
 
-  // Player history import
-  const [playerSearch, setPlayerSearch] = useState('')
-  const [playerSuggestions, setPlayerSuggestions] = useState<any[]>([])
-  const [selectedPlayer, setSelectedPlayer] = useState<any>(null)
-  const [importing, setImporting] = useState(false)
-  const [importSteps, setImportSteps] = useState<ImportStep[]>([])
-  const [importResult, setImportResult] = useState<any>(null)
-  const importLogRef = useRef<HTMLDivElement>(null)
-
-  // User management
-  const [users, setUsers] = useState<any[]>([])
-  const [userTotal, setUserTotal] = useState(0)
-  const [userSearch, setUserSearch] = useState('')
-  const [userPage, setUserPage] = useState(0)
-  const [expandedUser, setExpandedUser] = useState<string | null>(null)
-  const [editingUser, setEditingUser] = useState<any>(null)
-  const [userActionMsg, setUserActionMsg] = useState<{ id: string; msg: string; ok: boolean } | null>(null)
-  const [savingUser, setSavingUser] = useState(false)
-  const userSearchRef = useRef<any>(null)
-
-  const pollRef = useRef<any>(null)
-  const searchTimeoutRef = useRef<any>(null)
-  const router = useRouter()
-  const supabase = createClient()
-
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { router.push('/login'); return }
-        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-        if (!data || !['admin', 'super_admin'].includes(data.role)) { router.push('/dashboard'); return }
-        setUser(user)
-        setProfile(data)
-        await loadSyncHistory()
-        if (data.role === 'super_admin') await loadUsers(0, '')
-        setLoading(false)
-      } catch { router.push('/dashboard') }
-    }
-    init()
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
-    }
+  const load = useCallback(async () => {
+    setLoading(true)
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const [{ data: runsData }, { data: changesData }] = await Promise.all([
+      supabase
+        .from('sync_log')
+        .select('id, status, started_at, completed_at, total, created, updated, error')
+        .gte('started_at', cutoff)
+        .order('started_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('sync_change_log')
+        .select('id, sync_log_id, event_type, wcf_player_id, player_name, country, detail, created_at')
+        .gte('created_at', cutoff)
+        .order('created_at', { ascending: false })
+        .limit(500),
+    ])
+    setRuns(runsData || [])
+    setChanges(changesData || [])
+    setLoading(false)
   }, [])
 
   useEffect(() => {
-    if (importLogRef.current) importLogRef.current.scrollTop = importLogRef.current.scrollHeight
-  }, [importSteps])
+    load()
+    const interval = setInterval(load, 60_000)
+    return () => clearInterval(interval)
+  }, [load])
 
-  const loadSyncHistory = async () => {
-    const { data } = await supabase.from('sync_log').select('*').order('started_at', { ascending: false }).limit(10)
-    if (data) setSyncHistory(data)
+  const filteredChanges = changes.filter(c => {
+    if (activeFilter && c.event_type !== activeFilter) return false
+    if (selectedRunId && c.sync_log_id !== selectedRunId) return false
+    return true
+  })
+
+  const counts = {
+    grade_change: changes.filter(c => c.event_type === 'grade_change').length,
+    new_games:    changes.filter(c => c.event_type === 'new_games').length,
+    new_player:   changes.filter(c => c.event_type === 'new_player').length,
+    error:        changes.filter(c => c.event_type === 'error').length,
   }
 
-  const loadUsers = async (page: number, search: string) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    const params = new URLSearchParams({ page: String(page), pageSize: '20', search })
-    const res = await fetch(`/api/admin/users?${params}`, { headers: { Authorization: `Bearer ${session.access_token}` } })
-    const data = await res.json()
-    if (data.profiles) { setUsers(data.profiles); setUserTotal(data.total || 0) }
-  }
-
-  const pollSyncStatus = (logId: string) => {
-    pollRef.current = setInterval(async () => {
-      const { data } = await supabase.from('sync_log').select('*').eq('id', logId).single()
-      if (data) {
-        setSyncStatus(data)
-        if (data.status === 'complete' || data.status === 'error') {
-          clearInterval(pollRef.current); setSyncing(false); await loadSyncHistory()
-        }
-      }
-    }, 5000)
-  }
-
-  const handleWcfSync = async () => {
-    setSyncing(true); setSyncStatus({ status: 'running' })
-    try {
-      const res = await fetch('/api/wcf-sync', { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET}` } })
-      const data = await res.json()
-      if (data.logId) pollSyncStatus(data.logId)
-      else { setSyncing(false); setSyncStatus({ status: 'error', error: data.error }) }
-    } catch { setSyncing(false); setSyncStatus({ status: 'error', error: 'Request failed' }) }
-  }
-
-  const handlePlayerSearchChange = (value: string) => {
-    setPlayerSearch(value); setSelectedPlayer(null)
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
-    if (value.length < 2) { setPlayerSuggestions([]); return }
-    searchTimeoutRef.current = setTimeout(async () => {
-      const parts = value.trim().split(' ')
-      let query = supabase.from('wcf_players').select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking, history_imported').order('world_ranking', { ascending: true }).limit(8)
-      if (parts.length >= 2) query = query.ilike('wcf_last_name', `%${parts[parts.length - 1]}%`).ilike('wcf_first_name', `%${parts[0]}%`)
-      else query = query.or(`wcf_last_name.ilike.%${value}%,wcf_first_name.ilike.%${value}%`)
-      const { data } = await query
-      setPlayerSuggestions(data || [])
-    }, 300)
-  }
-
-  const handleSelectPlayer = (player: any) => {
-    setSelectedPlayer(player); setPlayerSearch(`${player.wcf_first_name} ${player.wcf_last_name}`)
-    setPlayerSuggestions([]); setImportSteps([]); setImportResult(null)
-  }
-
-  const handleImportPlayerHistory = async () => {
-    if (!selectedPlayer) return
-    setImporting(true); setImportSteps([]); setImportResult(null)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { setImporting(false); return }
-      const response = await fetch('/api/wcf-history-import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ wcf_player_id: selectedPlayer.id }),
-      })
-      if (!response.ok || !response.body) { setImportSteps([{ type: 'error', message: 'Import request failed' }]); setImporting(false); return }
-      const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ''
-      while (true) {
-        const { done, value } = await reader.read(); if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n'); buffer = lines.pop() || ''
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const data = JSON.parse(line.slice(6))
-            setImportSteps(prev => [...prev, { type: data.step, message: data.message }])
-            if (data.step === 'complete') { setImportResult(data); setSelectedPlayer((p: any) => ({ ...p, history_imported: true })) }
-          } catch { }
-        }
-      }
-    } catch (err) { setImportSteps(prev => [...prev, { type: 'error', message: String(err) }]) }
-    setImporting(false)
-  }
-
-  const handleUserSearchChange = (value: string) => {
-    setUserSearch(value)
-    if (userSearchRef.current) clearTimeout(userSearchRef.current)
-    userSearchRef.current = setTimeout(() => { setUserPage(0); loadUsers(0, value) }, 300)
-  }
-
-  const handleExpandUser = (userId: string, userData: any) => {
-    if (expandedUser === userId) { setExpandedUser(null); setEditingUser(null) }
-    else { setExpandedUser(userId); setEditingUser({ ...userData }) }
-  }
-
-  const handleSaveUser = async (userId: string) => {
-    setSavingUser(true)
-    const { data: { session } } = await supabase.auth.getSession(); if (!session) return
-    const res = await fetch(`/api/admin/users/${userId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify(editingUser),
-    })
-    const data = await res.json()
-    if (data.profile) {
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...data.profile } : u))
-      setUserActionMsg({ id: userId, msg: 'Saved successfully', ok: true })
-    } else { setUserActionMsg({ id: userId, msg: data.error || 'Save failed', ok: false }) }
-    setSavingUser(false)
-    setTimeout(() => setUserActionMsg(null), 3000)
-  }
-
-  const handleResetPassword = async (userId: string) => {
-    const { data: { session } } = await supabase.auth.getSession(); if (!session) return
-    const res = await fetch(`/api/admin/users/${userId}/reset-password`, { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}` } })
-    const data = await res.json()
-    if (data.success) setUserActionMsg({ id: userId, msg: `Password reset email sent to ${data.email}`, ok: true })
-    else setUserActionMsg({ id: userId, msg: data.error || 'Failed', ok: false })
-    setTimeout(() => setUserActionMsg(null), 4000)
-  }
-
-  const handleDeleteUser = async (userId: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete ${name}? This cannot be undone.`)) return
-    const { data: { session } } = await supabase.auth.getSession(); if (!session) return
-    const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${session.access_token}` } })
-    const data = await res.json()
-    if (data.success) { setUsers(prev => prev.filter(u => u.id !== userId)); setUserTotal(prev => prev - 1); setExpandedUser(null) }
-    else setUserActionMsg({ id: userId, msg: data.error || 'Delete failed', ok: false })
-  }
-
-  const stepIcon = (type: string) => {
-    if (type === 'complete') return '✅'
-    if (type === 'error' || type === 'year_error') return '❌'
-    if (type === 'year_done') return '✓'
-    if (type === 'year') return '⟳'
-    return '•'
-  }
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  const latestRun = runs[0]
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f2ec" }}>
-      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
+    <div>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h2 className="ghl" style={{ margin: 0, fontSize: 20, fontWeight: 700, color: G }}>
+            Sync Activity Log
+          </h2>
+          <p className="gsans" style={{ margin: '3px 0 0', fontSize: 13, color: '#9ca3af' }}>
+            Last 7 days · refreshes every minute
+          </p>
+        </div>
+        <button onClick={load} disabled={loading} className="gsans" style={{
+          padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e5e7eb',
+          background: 'white', cursor: loading ? 'not-allowed' : 'pointer',
+          fontSize: 13, color: '#374151', fontWeight: 500,
+          opacity: loading ? 0.5 : 1,
+        }}>
+          {loading ? 'Loading…' : '↻ Refresh'}
+        </button>
+      </div>
+
+      {/* Latest run summary banner */}
+      {latestRun && (
+        <div style={{
+          background: latestRun.status === 'error' ? '#fef2f2' : latestRun.status === 'running' ? '#eff6ff' : '#faf9f7',
+          border: `1.5px solid ${latestRun.status === 'error' ? '#fecaca' : latestRun.status === 'running' ? '#bfdbfe' : '#ede9e2'}`,
+          borderRadius: 12, padding: '14px 18px', marginBottom: 20,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: latestRun.status === 'error' ? '#dc2626' : latestRun.status === 'running' ? '#2563eb' : '#16a34a',
+            }} />
+            <span className="gsans" style={{ fontWeight: 600, fontSize: 14, color: G }}>
+              Latest sync — {latestRun.status === 'running' ? 'in progress…' : latestRun.status}
+            </span>
+            <span className="gsans" style={{ fontSize: 13, color: '#9ca3af' }}>
+              {formatDate(latestRun.started_at)} at {formatTime(latestRun.started_at)}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
+            {latestRun.total != null && (
+              <span className="gsans"><b className="gmono" style={{ color: G }}>{latestRun.total.toLocaleString()}</b> <span style={{ color: '#9ca3af' }}>players</span></span>
+            )}
+            {latestRun.created != null && latestRun.created > 0 && (
+              <span className="gsans"><b className="gmono" style={{ color: '#d97706' }}>+{latestRun.created}</b> <span style={{ color: '#9ca3af' }}>new</span></span>
+            )}
+            {latestRun.updated != null && (
+              <span className="gsans"><b className="gmono" style={{ color: G }}>{latestRun.updated}</b> <span style={{ color: '#9ca3af' }}>updated</span></span>
+            )}
+            <span className="gsans"><b className="gmono" style={{ color: G }}>{formatDuration(latestRun.started_at, latestRun.completed_at)}</b> <span style={{ color: '#9ca3af' }}>duration</span></span>
+          </div>
+          {latestRun.error && (
+            <div className="gmono" style={{ width: '100%', fontSize: 12, color: '#b91c1c', marginTop: 4 }}>
+              {latestRun.error}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sync run selector */}
+      {runs.length > 1 && (
+        <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span className="gsans" style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500, whiteSpace: 'nowrap' }}>Filter by run:</span>
+          <button
+            onClick={() => setSelectedRunId(null)}
+            className="gsans"
+            style={{
+              padding: '3px 10px', borderRadius: 6,
+              border: `1px solid ${selectedRunId === null ? G : '#e5e7eb'}`,
+              background: selectedRunId === null ? G : 'white', cursor: 'pointer',
+              fontSize: 12, color: selectedRunId === null ? 'white' : '#6b7280',
+            }}
+          >All</button>
+          {runs.slice(0, 14).map(r => (
+            <button
+              key={r.id}
+              onClick={() => setSelectedRunId(selectedRunId === r.id ? null : r.id)}
+              className="gsans"
+              style={{
+                padding: '3px 10px', borderRadius: 6,
+                border: `1px solid ${selectedRunId === r.id ? G : r.status === 'error' ? '#fecaca' : '#e5e7eb'}`,
+                background: selectedRunId === r.id ? G : r.status === 'error' ? '#fef2f2' : 'white',
+                cursor: 'pointer', fontSize: 12,
+                color: selectedRunId === r.id ? 'white' : r.status === 'error' ? '#b91c1c' : '#6b7280',
+              }}
+            >
+              {formatDate(r.started_at)} {formatTime(r.started_at)}{r.status === 'error' ? ' ⚠' : ''}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Event type filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {(Object.entries(EVENT_META) as [string, typeof EVENT_META[keyof typeof EVENT_META]][]).map(([type, meta]) => (
+          <FilterPill
+            key={type}
+            label={meta.label}
+            active={activeFilter === type}
+            count={counts[type as keyof typeof counts]}
+            color={meta.dot}
+            onClick={() => setActiveFilter(activeFilter === type ? null : type)}
+          />
+        ))}
+        {(activeFilter || selectedRunId) && (
+          <button onClick={() => { setActiveFilter(null); setSelectedRunId(null) }} className="gsans" style={{
+            padding: '4px 12px', borderRadius: 20, border: '1.5px solid #e5e7eb',
+            background: 'white', cursor: 'pointer', fontSize: 13, color: '#9ca3af',
+          }}>
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* Events list */}
+      {loading ? (
+        <div className="gsans" style={{ textAlign: 'center', padding: 40, color: '#9ca3af', fontSize: 14 }}>Loading…</div>
+      ) : filteredChanges.length === 0 ? (
+        <div className="gsans" style={{
+          textAlign: 'center', padding: 40, color: '#9ca3af', fontSize: 14,
+          background: '#faf9f7', borderRadius: 12, border: '1.5px solid #ede9e2',
+        }}>
+          {changes.length === 0
+            ? 'No activity yet — changes will appear here after the next sync runs.'
+            : 'No events match the current filter.'}
+        </div>
+      ) : (
+        <div style={{ background: 'white', border: '1.5px solid #ede9e2', borderRadius: 12, overflow: 'hidden' }}>
+          {filteredChanges.map((ev, idx) => {
+            const meta = EVENT_META[ev.event_type]
+            return (
+              <div key={ev.id} className="adm-row" style={{
+                display: 'grid',
+                gridTemplateColumns: '10px 180px 1fr auto',
+                gap: 14, alignItems: 'center',
+                padding: '11px 18px',
+                borderBottom: idx < filteredChanges.length - 1 ? '1px solid #f3f0eb' : undefined,
+              }}>
+                {/* Dot */}
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: meta.dot }} />
+
+                {/* Player */}
+                <div style={{ minWidth: 0 }}>
+                  <div className="gsans" style={{ fontSize: 13, fontWeight: 600, color: G, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {countryToEmoji(ev.country)} {ev.player_name || '—'}
+                  </div>
+                  <span style={{
+                    display: 'inline-block', marginTop: 2, padding: '0 5px', borderRadius: 4,
+                    background: meta.bg, color: meta.text,
+                    border: `1px solid ${meta.border}`, fontSize: 10, fontWeight: 600,
+                  }}>{meta.label}</span>
+                </div>
+
+                {/* Detail */}
+                <div><ChangeDetail ev={ev} /></div>
+
+                {/* Timestamp */}
+                <div className="gsans" style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  {formatDate(ev.created_at)}<br />{formatTime(ev.created_at)}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {filteredChanges.length > 0 && (
+        <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', marginTop: 10, textAlign: 'right' }}>
+          {filteredChanges.length} event{filteredChanges.length !== 1 ? 's' : ''}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Main Admin Page ───────────────────────────────────────────────────────────
+
+export default function AdminPage() {
+  const [profile, setProfile] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'sync' | 'users' | 'import'>('sync')
+
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      setProfile(prof)
+      setLoading(false)
+    }
+    init()
+  }, [])
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f0ece4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+        Loading…
+      </div>
+    )
+  }
+
+  const isAdmin = ['admin', 'super_admin'].includes(profile?.role)
+  if (!isAdmin) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f0ece4', display: 'flex', flexDirection: 'column' }}>
+        <style dangerouslySetInnerHTML={{ __html: ML }} />
+        <GCLabNav role={profile?.role} isSignedIn={!!profile} currentPath="/admin" />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="gsans" style={{ textAlign: 'center', color: '#9ca3af', fontSize: 15 }}>
+            You don't have permission to view this page.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const tabs = [
+    { id: 'sync',   label: '⚡ Sync Log' },
+    { id: 'import', label: '📥 Import Queue' },
+    { id: 'users',  label: '👥 Users' },
+  ] as const
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#f0ece4' }}>
+      <style dangerouslySetInnerHTML={{ __html: ML }} />
       <GCLabNav role={profile?.role} isSignedIn={true} currentPath="/admin" />
 
-      {/* Dark ML header */}
-      <div style={{ background: "#0d2818", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)" }}/>
-        <div style={{ maxWidth: "80rem", margin: "0 auto", padding: "32px 24px 40px", position: "relative", zIndex: 1 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", color: "rgba(192,132,252,0.9)", padding: "3px 12px", borderRadius: 20, fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }} className="gsans">Admin Panel</div>
-          <h2 className="ghl" style={{ fontSize: "clamp(24px,3vw,38px)", color: "#e8e0d0", fontWeight: 900, letterSpacing: "-0.5px" }}>Administration</h2>
+      {/* Page header */}
+      <div style={{ background: G, padding: '36px 48px 0', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 90% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)' }} />
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)', color: '#c4b5fd', padding: '3px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }} className="gsans">
+            Admin Panel
+          </div>
+          <h1 className="ghl" style={{ fontSize: 32, color: '#e8e0d0', fontWeight: 900, margin: '0 0 6px' }}>
+            GCLab Admin
+          </h1>
+          <p className="gsans" style={{ fontSize: 14, color: 'rgba(232,224,208,0.5)', margin: '0 0 28px' }}>
+            Sync monitoring, imports, user management
+          </p>
+
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="gsans"
+                style={{
+                  padding: '10px 20px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer',
+                  fontSize: 14, fontWeight: activeTab === tab.id ? 600 : 400,
+                  background: activeTab === tab.id ? '#f0ece4' : 'rgba(255,255,255,0.07)',
+                  color: activeTab === tab.id ? G : 'rgba(232,224,208,0.6)',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div style={{ height: 24, background: "linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)" }}/>
       </div>
-      <div className="max-w-6xl mx-auto px-6 py-10 flex gap-8">
 
-        {/* Sidebar */}
-        <aside className="hidden lg:block w-48 shrink-0">
-          <div className="sticky top-8 bg-white rounded-lg shadow-sm p-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Admin</p>
-            <nav className="space-y-1">
-              {[
-                { label: 'Overview', href: '#overview' },
-                { label: 'WCF Sync', href: '#wcf-sync' },
-                { label: 'History Import', href: '#history-import', superAdmin: true },
-                { label: 'Users', href: '#users', superAdmin: true },
-                { label: 'Clubs', href: '#clubs' },
-                { label: 'Feature Flags', href: '#flags' },
-              ].filter(item => !item.superAdmin || profile.role === 'super_admin').map(item => (
-                <a key={item.href} href={item.href}
-                  className="block text-sm text-gray-600 hover:text-green-700 hover:bg-green-50 px-2 py-1.5 rounded transition">
-                  {item.label}
-                </a>
-              ))}
-            </nav>
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <a href="/dashboard" className="block text-sm text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded transition">
-                ← Dashboard
-              </a>
-            </div>
-          </div>
-        </aside>
+      {/* Tab content */}
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 48px 60px' }}>
 
-        <main className="flex-1 min-w-0">
-        <h2 className="text-2xl font-bold mb-8">Admin Panel</h2>
+        {activeTab === 'sync' && (
+          <SyncActivityLog />
+        )}
 
-        <div id="overview" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-5">
-            <p className="text-sm text-gray-500 mb-1">Signed in as</p>
-            <p className="text-sm font-medium text-gray-800 truncate">{user.email}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-5">
-            <p className="text-sm text-gray-500 mb-1">Your Role</p>
-            <p className="text-2xl font-bold text-gray-800">{profile.role === 'super_admin' ? 'Super Admin' : 'Admin'}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-5">
-            <p className="text-sm text-gray-500 mb-1">Total Users</p>
-            <p className="text-2xl font-bold text-gray-800">{userTotal || '—'}</p>
-          </div>
-        </div>
+        {activeTab === 'import' && (
+          <ImportQueueSection />
+        )}
 
-        <div className="space-y-6">
+        {activeTab === 'users' && (
+          <UsersSection />
+        )}
 
-          {/* WCF Sync */}
-          <div id="wcf-sync" className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-1">WCF Player Sync</h3>
-            <p className="text-sm text-gray-500 mb-4">Fetches the latest rankings from the WCF website and updates all player records and dGrade history.</p>
-            <button onClick={handleWcfSync} disabled={syncing} className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition disabled:opacity-50">
-              {syncing ? 'Syncing...' : 'Run WCF Sync Now'}
-            </button>
-            {syncStatus && (
-              <div className={`mt-4 p-4 rounded-md text-sm ${syncStatus.status === 'error' ? 'bg-red-50 text-red-700' : syncStatus.status === 'complete' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-                {syncStatus.status === 'running' && <p>Sync in progress — checking every 5 seconds...</p>}
-                {syncStatus.status === 'complete' && <div><p className="font-medium">Sync complete</p><p>Total: {syncStatus.total} — Created: {syncStatus.created} — Updated: {syncStatus.updated}</p></div>}
-                {syncStatus.status === 'error' && <p>Error: {syncStatus.error}</p>}
-              </div>
-            )}
-            {syncHistory.length > 0 && (
-              <div className="mt-6">
-                <p className="text-sm font-medium text-gray-700 mb-2">Sync History</p>
-                <div className="space-y-2">
-                  {syncHistory.map((log) => (
-                    <div key={log.id} className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded flex justify-between">
-                      <span>{log.status === 'complete' ? `${log.total} players — ${log.created} created, ${log.updated} updated` : log.status === 'error' ? `Failed: ${log.error}` : 'Running...'}</span>
-                      <span>{new Date(log.started_at).toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Player History Import — Super Admin only */}
-          {profile.role === 'super_admin' && (
-            <div id="history-import" className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-1">Import Player WCF History</h3>
-              <p className="text-sm text-gray-500 mb-4">Manually trigger a full WCF history import for any player.</p>
-              <div className="relative mb-4">
-                <input type="text" placeholder="Search player by name..." value={playerSearch} onChange={(e) => handlePlayerSearchChange(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500" />
-                {playerSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 z-10 bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
-                    {playerSuggestions.map((player) => (
-                      <button key={player.id} onClick={() => handleSelectPlayer(player)} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex justify-between items-center">
-                        <span className="text-gray-900">{player.wcf_first_name} {player.wcf_last_name}</span>
-                        <span className="text-gray-400 text-xs flex items-center gap-2">#{player.world_ranking} · {player.dgrade}{player.history_imported && <span className="text-green-600">✓ imported</span>}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {selectedPlayer && (
-                <div className="bg-gray-50 border border-gray-200 rounded-md p-3 mb-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}</p>
-                    <p className="text-xs text-gray-500">World #{selectedPlayer.world_ranking} · dGrade {selectedPlayer.dgrade}</p>
-                    {selectedPlayer.history_imported && <p className="text-xs text-green-600 mt-0.5">✓ Previously imported — re-importing will refresh all data</p>}
-                  </div>
-                  <button onClick={handleImportPlayerHistory} disabled={importing} className="bg-green-600 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 transition disabled:opacity-50 shrink-0 ml-4">
-                    {importing ? 'Importing...' : selectedPlayer.history_imported ? '↻ Re-import History' : '↓ Import History'}
-                  </button>
-                </div>
-              )}
-              {importSteps.length > 0 && (
-                <div>
-                  <div ref={importLogRef} className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-48 overflow-y-auto font-mono text-xs space-y-1">
-                    {importSteps.map((step, i) => (
-                      <div key={i} className={`flex gap-2 ${step.type === 'complete' ? 'text-green-700 font-semibold' : step.type === 'error' || step.type === 'year_error' ? 'text-red-600' : step.type === 'year_done' ? 'text-gray-700' : 'text-gray-400'}`}>
-                        <span>{stepIcon(step.type)}</span><span>{step.message}</span>
-                      </div>
-                    ))}
-                    {importing && <div className="text-gray-400 animate-pulse">• Working...</div>}
-                  </div>
-                  {importResult && (
-                    <div className="mt-3 grid grid-cols-3 gap-3">
-                      <div className="bg-green-50 border border-green-100 rounded-md p-3 text-center"><p className="text-2xl font-bold text-green-700">{importResult.totalGames?.toLocaleString()}</p><p className="text-xs text-green-600 mt-0.5">Games imported</p></div>
-                      <div className="bg-green-50 border border-green-100 rounded-md p-3 text-center"><p className="text-2xl font-bold text-green-700">{importResult.years}</p><p className="text-xs text-green-600 mt-0.5">Years of history</p></div>
-                      <div className="bg-green-50 border border-green-100 rounded-md p-3 text-center"><p className="text-2xl font-bold text-green-700">{importResult.startingGrade ?? '—'}</p><p className="text-xs text-green-600 mt-0.5">Starting grade</p></div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* User Management — Super Admin only */}
-          {profile.role === 'super_admin' && (
-            <div id="users" className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">User Management</h3>
-                  <p className="text-sm text-gray-500">{userTotal} registered users</p>
-                </div>
-              </div>
-              <input type="text" placeholder="Search by name or email..." value={userSearch} onChange={(e) => handleUserSearchChange(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 mb-4" />
-              <div className="space-y-2">
-                {users.map((u) => (
-                  <div key={u.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <button onClick={() => handleExpandUser(u.id, u)} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-green-100 text-green-700 text-sm font-semibold flex items-center justify-center shrink-0">
-                          {u.first_name?.[0]}{u.last_name?.[0]}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{u.first_name} {u.last_name}</p>
-                          <p className="text-xs text-gray-400 truncate">{u.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.role === 'super_admin' ? 'bg-purple-100 text-purple-700' : u.role === 'admin' ? 'bg-blue-100 text-blue-700' : u.role === 'club_manager' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
-                          {u.role || 'user'}
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${u.wcf_player_id ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-400'}`}>
-                          WCF {u.wcf_player_id ? '✓' : '—'}
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${u.wcf_player_id && u.history_imported ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-400'}`}>
-                          History {u.history_imported ? '✓' : '—'}
-                        </span>
-                        {u.last_sign_in_at && (
-                          <span className="text-xs text-gray-400 hidden sm:block">
-                            {new Date(u.last_sign_in_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                          </span>
-                        )}
-                        <span className="text-gray-400 text-xs">{expandedUser === u.id ? '▲' : '▼'}</span>
-                      </div>
-                    </button>
-                    {expandedUser === u.id && editingUser && (
-                      <div className="border-t border-gray-100 bg-gray-50 px-4 py-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                          <div>
-                            <label className="text-xs text-gray-500 block mb-1">First Name</label>
-                            <input value={editingUser.first_name || ''} onChange={(e) => setEditingUser((p: any) => ({ ...p, first_name: e.target.value }))}
-                              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 block mb-1">Last Name</label>
-                            <input value={editingUser.last_name || ''} onChange={(e) => setEditingUser((p: any) => ({ ...p, last_name: e.target.value }))}
-                              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 block mb-1">Email</label>
-                            <input value={editingUser.email || ''} onChange={(e) => setEditingUser((p: any) => ({ ...p, email: e.target.value }))}
-                              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 block mb-1">Role</label>
-                            <select value={editingUser.role || 'user'} onChange={(e) => setEditingUser((p: any) => ({ ...p, role: e.target.value }))}
-                              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500">
-                              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 block mb-1">Country</label>
-                            <input value={editingUser.country || ''} onChange={(e) => setEditingUser((p: any) => ({ ...p, country: e.target.value }))}
-                              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 block mb-1">City</label>
-                            <input value={editingUser.city || ''} onChange={(e) => setEditingUser((p: any) => ({ ...p, city: e.target.value }))}
-                              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 block mb-1">dGrade</label>
-                            <input type="number" value={editingUser.dgrade || ''} onChange={(e) => setEditingUser((p: any) => ({ ...p, dgrade: parseInt(e.target.value) || null }))}
-                              className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 block mb-1">Joined</label>
-                            <p className="text-sm text-gray-600 py-1.5">{u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</p>
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 block mb-1">Last Login</label>
-                            <p className="text-sm text-gray-600 py-1.5">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Never'}</p>
-                          </div>
-                        </div>
-                        {userActionMsg?.id === u.id && userActionMsg && (
-                          <p className={`text-xs mb-3 ${userActionMsg.ok ? 'text-green-600' : 'text-red-500'}`}>{userActionMsg.msg}</p>
-                        )}
-                        <div className="flex flex-wrap gap-2">
-                          <button onClick={() => handleSaveUser(u.id)} disabled={savingUser}
-                            className="px-4 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 transition">
-                            {savingUser ? 'Saving...' : 'Save Changes'}
-                          </button>
-                          <a href={`/profile/${u.id}`} target="_blank" rel="noopener noreferrer"
-                            className="px-4 py-1.5 bg-white border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 transition">
-                            View Profile →
-                          </a>
-                          <button onClick={() => handleResetPassword(u.id)}
-                            className="px-4 py-1.5 bg-white border border-amber-300 text-amber-700 text-sm rounded hover:bg-amber-50 transition">
-                            Send Password Reset
-                          </button>
-                          <button onClick={() => handleDeleteUser(u.id, `${u.first_name} ${u.last_name}`)}
-                            className="px-4 py-1.5 bg-white border border-red-300 text-red-600 text-sm rounded hover:bg-red-50 transition ml-auto">
-                            Delete User
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {userTotal > 20 && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-xs text-gray-400">Showing {userPage * 20 + 1}–{Math.min((userPage + 1) * 20, userTotal)} of {userTotal}</p>
-                  <div className="flex gap-2">
-                    <button onClick={() => { const p = userPage - 1; setUserPage(p); loadUsers(p, userSearch) }} disabled={userPage === 0}
-                      className="px-3 py-1 text-sm border rounded disabled:opacity-40 hover:bg-gray-50">← Prev</button>
-                    <button onClick={() => { const p = userPage + 1; setUserPage(p); loadUsers(p, userSearch) }} disabled={(userPage + 1) * 20 >= userTotal}
-                      className="px-3 py-1 text-sm border rounded disabled:opacity-40 hover:bg-gray-50">Next →</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div id="clubs" className="bg-white rounded-lg shadow-sm p-6 opacity-50">
-            <h3 className="text-lg font-semibold text-gray-800 mb-1">Club Management</h3>
-            <p className="text-sm text-gray-500">Coming soon</p>
-          </div>
-
-          <div id="flags" className="bg-white rounded-lg shadow-sm p-6 opacity-50">
-            <h3 className="text-lg font-semibold text-gray-800 mb-1">Feature Flags</h3>
-            <p className="text-sm text-gray-500">Coming soon</p>
-          </div>
-
-        </div>
-        </main>
       </div>
+    </div>
+  )
+}
+
+// ── Import Queue Section (placeholder until you need more) ────────────────────
+
+function ImportQueueSection() {
+  const [stats, setStats] = useState<{ pending: number; imported: number; total: number } | null>(null)
+
+  useEffect(() => {
+    const load = async () => {
+      const [{ count: total }, { count: imported }] = await Promise.all([
+        supabase.from('wcf_players').select('*', { count: 'exact', head: true }),
+        supabase.from('wcf_players').select('*', { count: 'exact', head: true }).eq('history_imported', true),
+      ])
+      setStats({
+        total: total || 0,
+        imported: imported || 0,
+        pending: (total || 0) - (imported || 0),
+      })
+    }
+    load()
+  }, [])
+
+  return (
+    <div>
+      <h2 className="ghl" style={{ fontSize: 20, fontWeight: 700, color: G, marginBottom: 20 }}>Import Queue</h2>
+      {stats ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, maxWidth: 600 }}>
+          {[
+            { label: 'Total Players', value: stats.total.toLocaleString(), color: G },
+            { label: 'History Imported', value: stats.imported.toLocaleString(), color: '#16a34a' },
+            { label: 'Pending Import', value: stats.pending.toLocaleString(), color: '#d97706' },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{ background: 'white', border: '1.5px solid #ede9e2', borderRadius: 12, padding: '20px 22px' }}>
+              <div className="gmono" style={{ fontSize: 28, fontWeight: 500, color, lineHeight: 1 }}>{value}</div>
+              <div className="gsans" style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="gsans" style={{ color: '#9ca3af' }}>Loading…</div>
+      )}
+      <p className="gsans" style={{ fontSize: 13, color: '#9ca3af', marginTop: 20 }}>
+        Batch import runs 4×/hour automatically via GitHub Actions.
+      </p>
+    </div>
+  )
+}
+
+// ── Users Section ─────────────────────────────────────────────────────────────
+
+function UsersSection() {
+  const [users, setUsers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role, dgrade, created_at, wcf_player_id')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      setUsers(data || [])
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const updateRole = async (userId: string, role: string) => {
+    await supabase.from('profiles').update({ role }).eq('id', userId)
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u))
+  }
+
+  return (
+    <div>
+      <h2 className="ghl" style={{ fontSize: 20, fontWeight: 700, color: G, marginBottom: 20 }}>
+        Users ({users.length})
+      </h2>
+      {loading ? (
+        <div className="gsans" style={{ color: '#9ca3af' }}>Loading…</div>
+      ) : (
+        <div style={{ background: 'white', border: '1.5px solid #ede9e2', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 120px', padding: '10px 18px', background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #ede9e2' }}>
+            {['Name', 'dGrade', 'WCF', 'Role'].map(h => (
+              <span key={h} className="gsans" style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+            ))}
+          </div>
+          {users.map((u, idx) => (
+            <div key={u.id} className="adm-row" style={{
+              display: 'grid', gridTemplateColumns: '1fr 80px 80px 120px',
+              padding: '10px 18px', alignItems: 'center',
+              borderBottom: idx < users.length - 1 ? '1px solid #f3f0eb' : undefined,
+            }}>
+              <div>
+                <div className="gsans" style={{ fontSize: 13, fontWeight: 600, color: G }}>
+                  {u.first_name || ''} {u.last_name || ''}
+                  {!u.first_name && !u.last_name && <span style={{ color: '#9ca3af' }}>Anonymous</span>}
+                </div>
+                <div className="gsans" style={{ fontSize: 11, color: '#9ca3af' }}>
+                  {new Date(u.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </div>
+              </div>
+              <span className="gmono" style={{ fontSize: 13, color: '#374151' }}>{u.dgrade || '—'}</span>
+              <span style={{ fontSize: 13 }}>{u.wcf_player_id ? '✅' : '—'}</span>
+              <select
+                value={u.role || 'user'}
+                onChange={e => updateRole(u.id, e.target.value)}
+                className="gsans"
+                style={{
+                  fontSize: 12, padding: '4px 8px', borderRadius: 6,
+                  border: '1px solid #e5e7eb', background: 'white', color: '#374151', cursor: 'pointer',
+                }}
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
