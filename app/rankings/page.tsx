@@ -994,108 +994,121 @@ export default function RankingsPage() {
           )
         })()}
 
-        {/* ── COUNTRY STATS ── */}
+        {/* ── COUNTRY RANKINGS ── */}
         {activeTab === 'Country Rankings' && !loading && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
               <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)' }}>Click column headers to sort. Active = played a ranked game in the last 12 months.</p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={downloadCountryCSV}
-                  style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-                  ↓ CSV
-                </button>
-                <button onClick={() => setCompareMode(!compareMode)}
-                  style={{ padding: '5px 14px', borderRadius: 7, fontSize: 13, fontWeight: 500, border: `1px solid ${compareMode ? '#2563eb' : '#d5cfc5'}`, background: compareMode ? '#2563eb' : 'white', color: compareMode ? 'white' : '#374151', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-                  {compareMode ? 'Hide Compare' : 'Compare to Past'}
-                </button>
-              </div>
+              <button onClick={downloadCountryCSV}
+                style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                ↓ CSV
+              </button>
             </div>
-            {compareMode && (
-              <div style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-                {availableSnapshots.length === 0 ? (
-                  <p className="gsans" style={{ fontSize: 13, color: '#1d4ed8' }}>No historical snapshots available yet. Monthly snapshots are stored on the 1st of each month. The first snapshot will be taken 1 Apr 2026.</p>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <span className="gsans" style={{ fontSize: 13, color: '#1d4ed8' }}>Compare current stats to:</span>
-                    <select value={compareDate} onChange={(e) => setCompareDate(e.target.value)}
-                      style={{ border: '1px solid rgba(37,99,235,0.3)', borderRadius: 6, padding: '4px 8px', fontSize: 13, color: G, background: 'white', fontFamily: 'DM Sans, sans-serif' }}>
-                      {availableSnapshots.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="rnk-card">
-              <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
-                    <th style={{ ...TH('left'), width: 36 }}>#</th>
-                    <th style={TH('left')}>Country</th>
-                    <th style={TH('right', true)} onClick={() => handleCountrySort('total_players')}>Total Players{countryArrow('total_players')}</th>
-                    <th style={TH('right', true)} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
-                    <th style={TH('right', true)} onClick={() => handleCountrySort('avg_top6_dgrade')}>Top 6 Active Avg{countryArrow('avg_top6_dgrade')}</th>
-                    <th style={TH('right', true)} onClick={() => handleCountrySort('avg_top6_alltime_dgrade')}>Top 6 All Time Avg{countryArrow('avg_top6_alltime_dgrade')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {countryStats.length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
-                  ) : countryStats.map((row, i) => {
-                    const comp = compareMode ? getCompareRow(row.country) : null
-                    return (
-                      <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
-                        <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.4)', fontSize: 12 }}>{i + 1}</td>
-                        <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
-                          <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
-                        </td>
-                        <td style={TD('right', true)}>
-                          {row.total_players}{comp && renderDiff(row.total_players, comp.total_players)}
-                        </td>
-                        <td style={TD('right', true)}>
-                          {row.active_players}{comp && renderDiff(row.active_players, comp.active_players)}
-                        </td>
-                        <td style={{ ...TD('right', true), fontWeight: 700, color: G, position: 'relative' }}>
-                          <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'active' ? null : { country: row.country, type: 'active' })}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
-                            {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
-                            {comp && comp.avg_top6_dgrade && renderDiff(Math.round(row.avg_top6_dgrade), Math.round(comp.avg_top6_dgrade))}
-                            {row.top6_active && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
-                          </button>
-                          {tooltip?.country === row.country && tooltip?.type === 'active' && row.top6_active && (
-                            <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
-                              <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 Active — {getCountryName(row.country)}</p>
-                              {row.top6_active.map((p: any, idx: number) => (
-                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
-                                  <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
-                                  <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ ...TD('right', true), fontWeight: 600, position: 'relative' }}>
-                          <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'alltime' ? null : { country: row.country, type: 'alltime' })}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
-                            {row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '—'}
-                            {row.top6_alltime && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
-                          </button>
-                          {tooltip?.country === row.country && tooltip?.type === 'alltime' && row.top6_alltime && (
-                            <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
-                              <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 All Time — {getCountryName(row.country)}</p>
-                              {row.top6_alltime.map((p: any, idx: number) => (
-                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
-                                  <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
-                                  <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, alignItems: 'start' }}>
+
+              {/* ── Table 1: Player Counts ── */}
+              <div>
+                <div style={{ marginBottom: 10 }}>
+                  <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Player Counts</h3>
+                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Total registered and recently active players by country.</p>
+                </div>
+                <div className="rnk-card">
+                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                        <th style={{ ...TH('left'), width: 32 }}>#</th>
+                        <th style={TH('left')}>Country</th>
+                        <th style={TH('right', true)} onClick={() => handleCountrySort('total_players')}>Total{countryArrow('total_players')}</th>
+                        <th style={TH('right', true)} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {countryStats.length === 0 ? (
+                        <tr><td colSpan={4} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
+                      ) : countryStats.map((row, i) => (
+                        <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                          <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 12 }}>{i + 1}</td>
+                          <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
+                            <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
+                          </td>
+                          <td style={TD('right', true)}>{row.total_players}</td>
+                          <td style={{ ...TD('right', true), fontWeight: 600, color: '#16a34a' }}>{row.active_players}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ── Table 2: WCF Team Seeding ── */}
+              <div>
+                <div style={{ marginBottom: 10 }}>
+                  <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>WCF Team Seeding</h3>
+                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Top 6 average dGrade — used by WCF for team event seeding. Click ▾ for player breakdown.</p>
+                </div>
+                <div className="rnk-card">
+                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                        <th style={{ ...TH('left'), width: 32 }}>#</th>
+                        <th style={TH('left')}>Country</th>
+                        <th style={TH('right', true)} onClick={() => handleCountrySort('avg_top6_dgrade')}>Active Avg{countryArrow('avg_top6_dgrade')}</th>
+                        <th style={TH('right', true)} onClick={() => handleCountrySort('avg_top6_alltime_dgrade')}>All Time Avg{countryArrow('avg_top6_alltime_dgrade')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {countryStats.length === 0 ? (
+                        <tr><td colSpan={4} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
+                      ) : [...countryStats].sort((a, b) => (b.avg_top6_dgrade || 0) - (a.avg_top6_dgrade || 0)).map((row, i) => (
+                        <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                          <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 12 }}>{i + 1}</td>
+                          <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
+                            <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
+                          </td>
+                          <td style={{ ...TD('right', true), fontWeight: 700, color: G, position: 'relative' }}>
+                            <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'active' ? null : { country: row.country, type: 'active' })}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
+                              {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
+                              {row.top6_active && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
+                            </button>
+                            {tooltip?.country === row.country && tooltip?.type === 'active' && row.top6_active && (
+                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
+                                <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 Active — {getCountryName(row.country)}</p>
+                                {row.top6_active.map((p: any, idx: number) => (
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
+                                    <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
+                                    <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ ...TD('right', true), fontWeight: 600, position: 'relative' }}>
+                            <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'alltime' ? null : { country: row.country, type: 'alltime' })}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
+                              {row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '—'}
+                              {row.top6_alltime && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
+                            </button>
+                            {tooltip?.country === row.country && tooltip?.type === 'alltime' && row.top6_alltime && (
+                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
+                                <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 All Time — {getCountryName(row.country)}</p>
+                                {row.top6_alltime.map((p: any, idx: number) => (
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
+                                    <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
+                                    <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
