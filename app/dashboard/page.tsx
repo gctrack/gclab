@@ -414,13 +414,13 @@ export default function DashboardPage() {
               const uniqueOpponents = [...new Set(gms.map((g: any) =>
                 `${(g.opponent_first_name||'').trim()}|||${(g.opponent_last_name||'').trim()}`.toLowerCase()
               ))]
-              const oppFirstNames = [...new Set(gms.map((g: any) => (g.opponent_first_name||'').trim()))]
+              const oppLastNames = [...new Set(gms.map((g: any) => (g.opponent_last_name||'').trim()))]
 
-              // Only fetch the players who appear as opponents — avoids 11k row limit issue
+              // Fetch by last name (more unique than first name - avoids wrong player overwriting map)
               const { data: playerData } = await supabase
                 .from('wcf_players')
                 .select('wcf_first_name, wcf_last_name, country')
-                .in('wcf_first_name', oppFirstNames)
+                .in('wcf_last_name', oppLastNames)
 
               if (playerData) {
                 const playerMap: Record<string, string> = {}
