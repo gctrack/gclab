@@ -188,8 +188,24 @@ function SyncActivityLog() {
 
   useEffect(() => {
     load()
-    const interval = setInterval(load, 60_000)
-    return () => clearInterval(interval)
+
+    // Schedule next auto-refresh at 8:00 AM
+    const scheduleNext = () => {
+      const now = new Date()
+      const next8am = new Date()
+      next8am.setHours(8, 0, 0, 0)
+      if (next8am <= now) next8am.setDate(next8am.getDate() + 1)
+      const msUntil8am = next8am.getTime() - now.getTime()
+      return setTimeout(() => {
+        load()
+        // After firing, schedule the next day
+        const daily = setInterval(load, 24 * 60 * 60 * 1000)
+        return () => clearInterval(daily)
+      }, msUntil8am)
+    }
+
+    const timeout = scheduleNext()
+    return () => clearTimeout(timeout)
   }, [load])
 
   const filteredChanges = changes.filter(c => {
@@ -216,7 +232,7 @@ function SyncActivityLog() {
             Sync Activity Log
           </h2>
           <p className="gsans" style={{ margin: '3px 0 0', fontSize: 13, color: '#9ca3af' }}>
-            Last 7 days · refreshes every minute
+            Last 7 days · auto-refreshes at 8am daily
           </p>
         </div>
         <button onClick={load} disabled={loading} className="gsans" style={{
