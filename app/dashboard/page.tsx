@@ -741,11 +741,11 @@ export default function DashboardPage() {
                         {recentForm.map((g: any, i: number) => (
                           <div key={i} title={`${g.result === 'win' ? 'W' : 'L'} ${g.player_score}–${g.opponent_score} vs ${g.opponent_first_name} ${g.opponent_last_name}`} style={{
                             width: 36, height: 36, borderRadius: 8,
-                            background: g.result === 'win' ? '#d8f8e4' : '#fee2e2',
-                            border: `1px solid ${g.result === 'win' ? '#bbf7d0' : '#fecaca'}`,
+                            background: g.result === 'win' ? '#bbf7d0' : '#fecaca',
+                            border: `1px solid ${g.result === 'win' ? '#86efac' : '#fca5a5'}`,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: 13, fontWeight: 700,
-                            color: g.result === 'win' ? '#16a34a' : '#dc2626',
+                            color: g.result === 'win' ? '#15803d' : '#b91c1c',
                             fontFamily: 'DM Mono, monospace',
                           }}>
                             {g.result === 'win' ? 'W' : 'L'}
@@ -812,9 +812,9 @@ export default function DashboardPage() {
                               </div>
                               <span className="gmono" style={{ fontSize: 12, color: '#374151' }}>{g.myGradeBefore}</span>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                <span className="gmono" style={{ fontSize: 12, color: '#374151', fontWeight: 600 }}>{g.oppGradeBefore}</span>
+                                <span className="gmono" style={{ fontSize: 12, color: '#374151' }}>{g.oppGradeBefore}</span>
                                 {g.diff > 0 && (
-                                  <span className="gsans" style={{ fontSize: 10, color: '#9ca3af', background: '#f0ece4', border: '1px solid #ddd8d0', borderRadius: 4, padding: '1px 5px' }}>+{g.diff}</span>
+                                  <span className="gsans" style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>+{g.diff}</span>
                                 )}
                               </div>
                               <span className="gmono" style={{ fontSize: 12, color: '#16a34a', fontWeight: 700 }}>{g.player_score ?? 0}–{g.opponent_score ?? 0}</span>
