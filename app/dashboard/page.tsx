@@ -741,11 +741,11 @@ export default function DashboardPage() {
                         {recentForm.map((g: any, i: number) => (
                           <div key={i} title={`${g.result === 'win' ? 'W' : 'L'} ${g.player_score}–${g.opponent_score} vs ${g.opponent_first_name} ${g.opponent_last_name}`} style={{
                             width: 36, height: 36, borderRadius: 8,
-                            background: g.result === 'win' ? '#bbf7d0' : '#fecaca',
-                            border: `1px solid ${g.result === 'win' ? '#86efac' : '#fca5a5'}`,
+                            background: g.result === 'win' ? '#16a34a' : '#dc2626',
+                            border: 'none',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: 13, fontWeight: 700,
-                            color: g.result === 'win' ? '#15803d' : '#b91c1c',
+                            color: 'white',
                             fontFamily: 'DM Mono, monospace',
                           }}>
                             {g.result === 'win' ? 'W' : 'L'}
