@@ -9,6 +9,20 @@ Golf croquet analytics web app. Players link their WCF (World Croquet Federation
 
 ---
 
+## Strategic Direction
+
+Two products, one codebase, one Vercel project, one database:
+
+**gcrankings.com** — Free public rankings resource for the GC community. WCF rankings, leaderboards, player search, grade history, country stats. No login required. Opt-in account creation unlocks the personal dashboard.
+
+**gclab.app** — Personal performance tool. Same account, same dashboard. Adds game logging (including Apple Watch tap input), personal trend analysis, and deeper analytics.
+
+**Current phase:** Finish and polish GCLab before splitting. Apply consistent design across all pages, work through the cleanup list, then introduce gcrankings.com as a second entry point to the same codebase. Do NOT split the codebase or database — two Vercel custom domains, one Next.js project.
+
+**One account** works across both domains. A user who signs up on gcrankings.com gets the same dashboard as gclab.app.
+
+---
+
 ## Stack
 - Next.js 16, TypeScript, Tailwind v4
 - Supabase (Postgres + Auth)
@@ -134,17 +148,31 @@ lib/
 
 ## Pending Work
 
-- Apply cream header style to Compare, Profile, Rankings, Leaderboards pages
-- WCF ranking page fixes (user to paste page)
-- Mobile viewing audit
-- Footer contact link: admin@gclab.app
-- gcrankings.com → DNS CNAME to gclab.app + Vercel custom domain
+### Phase 1 — Polish & Cleanup (current focus)
+- Apply Midnight Lawn design (cream header, Option D cards) to: Compare, Profile, Rankings, Leaderboards pages
+- Work through user's list of page-level tweaks (user will paste each page)
+- Mobile viewing audit across all pages
+- Footer contact link: admin@gclab.app (once email is set up)
+
+### Phase 2 — Feature Completion
 - Message board categories: Equipment For Sale, Event Notices, General Discussion, Tactical Talk, Rules Discussion
 - Admin: delete posts on message board
 - Community Manager role — assignable by admin
-- Re-import Jana Saeed and Rania Gabr (is_imported was false pre-fix)
-- Re-import players affected by loss-row regex fix (many have no loss records)
-- Jodie Rugart bad DB records cleanup
 - Profile career stats view
-- Game logging UI
-- Batch import progress in admin panel
+- Batch import progress visible in admin panel
+
+### Phase 3 — GCLab Core (personal performance)
+- Game logging UI (manual entry)
+- Apple Watch app for tap-to-log shots during play
+- Personal trend analysis and performance insights
+
+### Phase 4 — gcrankings.com Split
+- Add gcrankings.com as second Vercel custom domain
+- Build gcrankings-specific homepage and nav (rankings-first, no login prompt)
+- Context-aware nav branding based on domain
+- Seamless cross-domain sign-in handoff
+
+### Data Fixes (background)
+- Jodie Rugart bad DB records cleanup
+- Re-import Jana Saeed and Rania Gabr (is_imported was false pre-fix)
+- Re-import players with missing loss records (loss-row regex fix)
