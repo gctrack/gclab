@@ -18,21 +18,16 @@ const ML = `
   .ghl   { font-family: 'Playfair Display', serif; }
   .gmono { font-family: 'DM Mono', monospace; }
   .gsans { font-family: 'DM Sans', sans-serif; }
-  .gtab-dark {
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.14);
-    color: rgba(232,224,208,0.45);
-    padding: 5px 14px; border-radius: 6px;
-    font-size: 13px; cursor: pointer;
+  .rnk-tab {
+    padding: 7px 16px; font-size: 13px; font-weight: 500;
     font-family: 'DM Sans', sans-serif;
-    transition: all 0.15s;
+    color: rgba(13,40,24,0.5);
+    border: 1px solid #ddd8ce; border-bottom: none;
+    background: #ede9e1; cursor: pointer;
+    border-radius: 8px 8px 0 0; transition: all 0.15s;
   }
-  .gtab-dark.on {
-    background: rgba(74,222,128,0.15);
-    border-color: rgba(74,222,128,0.4);
-    color: #4ade80;
-  }
-  .gtab-dark:hover { border-color: rgba(74,222,128,0.3); color: rgba(232,224,208,0.8); }
+  .rnk-tab.on { background: #f5f2ec; color: #0d2818; border-color: #ccc7bc; font-weight: 600; }
+  .rnk-tab:hover { background: #f0ece4; color: rgba(13,40,24,0.75); }
   .rnk-card { background: #faf9f7; border: 1px solid #e5e1d8; border-radius: 16px; overflow: hidden; }
   .rnk-row:hover { background: rgba(13,40,24,0.03) !important; }
   .rnk-link { color: #16a34a; text-decoration: none; }
@@ -44,12 +39,13 @@ const ML = `
   }
   .rnk-pill.on { border-color: #4ade80; background: rgba(74,222,128,0.12); color: #16a34a; }
   @media (max-width: 768px) {
-    .rnk-pad  { padding: 24px 20px !important; }
-    .rnk-hero { padding: 28px 20px 24px !important; }
+    .rnk-pad    { padding: 24px 20px !important; }
+    .rnk-header { padding: 20px 20px 0 !important; }
+    .rnk-tab    { padding: 6px 12px; font-size: 12px; }
   }
 `
 
-const TABS = ['Rankings', 'Movers', 'New Players', 'Country Stats', 'Historical Rankings']
+const TABS = ['Rankings', 'Movers', 'New Players', 'Country Rankings', 'Historical Rankings']
 const MOVER_PERIODS = [
   { label: '7 days', days: 7 },
   { label: '30 days', days: 30 },
@@ -58,6 +54,7 @@ const MOVER_PERIODS = [
   { label: 'All Time', days: 0 },
 ]
 const PAGE_SIZES = [50, 100, 200]
+const NEW_PLAYER_PAGE_SIZE = 50
 const FIRST_SYNC_DATE = '2026-03-02'
 const NEW_PLAYERS_SINCE = '2026-03-03T00:00:00Z'
 
@@ -93,12 +90,19 @@ export default function RankingsPage() {
   const [pageSize, setPageSize] = useState(50)
   const [sortKey, setSortKey] = useState<SortKey>('dgrade')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [rnkSearch, setRnkSearch] = useState('')
+  const [rnkSuggestions, setRnkSuggestions] = useState<any[]>([])
+  const [highlightedPlayerId, setHighlightedPlayerId] = useState<string | null>(null)
+  const highlightRef = useRef<HTMLTableRowElement | null>(null)
+  const [showColMenu, setShowColMenu] = useState(false)
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['alltime', 'country', 'dgrade', 'games', 'winpct', 'lastactive']))
 
   const [movers, setMovers] = useState<{ gains: any[], losses: any[] }>({ gains: [], losses: [] })
   const [moverPeriod, setMoverPeriod] = useState(7)
 
   const [newPlayers, setNewPlayers] = useState<any[]>([])
-  const [newPlayerDays, setNewPlayerDays] = useState(30)
+  const [newPlayerDays, setNewPlayerDays] = useState(7)
+  const [newPlayerPage, setNewPlayerPage] = useState(0)
   const [newPlayerCountry, setNewPlayerCountry] = useState('')
   const [countryList, setCountryList] = useState<string[]>([])
 
@@ -118,7 +122,11 @@ export default function RankingsPage() {
   const [showDgrade, setShowDgrade] = useState(true)
   const [showEgrade, setShowEgrade] = useState(false)
   const [showRanking, setShowRanking] = useState(true)
-  const [historyRange, setHistoryRange] = useState('5y')
+  const [historyRange, setHistoryRange] = useState('all')
+  const [recentPlayers, setRecentPlayers] = useState<any[]>(() => {
+    if (typeof window === 'undefined') return []
+    try { return JSON.parse(localStorage.getItem('gclab_recent_players') || '[]') } catch { return [] }
+  })
   const [historyFrom, setHistoryFrom] = useState('')
   const [historyTo, setHistoryTo] = useState('')
   const [lastSyncDate, setLastSyncDate] = useState<string | null>(null)
@@ -168,13 +176,9 @@ export default function RankingsPage() {
 
   useEffect(() => { if (activeTab === 'Rankings') loadRankings() }, [activeTab, activeOnly, rankingsPage, pageSize, sortKey, sortDir])
   useEffect(() => { if (activeTab === 'Movers') loadMovers() }, [activeTab, moverPeriod])
-  useEffect(() => { if (activeTab === 'New Players') loadNewPlayers() }, [activeTab, newPlayerDays, newPlayerCountry])
-  useEffect(() => { if (activeTab === 'Country Stats') loadCountryStats() }, [activeTab])
-  useEffect(() => {
-    if (activeTab === 'Historical Rankings' && currentUserProfile?.wcf_player_id && !selectedPlayer) {
-      loadPlayerHistory(currentUserProfile.wcf_player_id)
-    }
-  }, [activeTab, currentUserProfile])
+  useEffect(() => { if (activeTab === 'New Players') { setNewPlayerPage(0); loadNewPlayers() } }, [activeTab, newPlayerDays, newPlayerCountry])
+  useEffect(() => { if (activeTab === 'Country Rankings') loadCountryStats() }, [activeTab])
+  // Historical Rankings no longer auto-loads the signed-in user
   useEffect(() => { if (selectedPlayer) fetchHistory(selectedPlayer.id) }, [historyRange, historyFrom, historyTo])
   useEffect(() => { if (compareMode) loadCompareStats() }, [compareMode, compareDate])
 
@@ -270,7 +274,7 @@ export default function RankingsPage() {
       .from('wcf_players')
       .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url, created_at')
       .gte('created_at', sinceDate)
-      .order('world_ranking', { ascending: true })
+      .order('created_at', { ascending: false })
     if (newPlayerCountry) query = query.eq('country', newPlayerCountry)
     const { data } = await query
     setNewPlayers(data || [])
@@ -373,6 +377,10 @@ export default function RankingsPage() {
     setSearchQuery(`${player.wcf_first_name} ${player.wcf_last_name}`)
     setSearchSuggestions([])
     await fetchHistory(player.id)
+    // Save to recent players (max 5, no duplicates)
+    const updated = [player, ...recentPlayers.filter((p: any) => p.id !== player.id)].slice(0, 5)
+    setRecentPlayers(updated)
+    try { localStorage.setItem('gclab_recent_players', JSON.stringify(updated)) } catch {}
   }
 
   const handleSearchQueryChange = (value: string) => {
@@ -634,21 +642,25 @@ export default function RankingsPage() {
       <style dangerouslySetInnerHTML={{ __html: ML }}/>
       <GCLabNav role={userRole} currentPath="/rankings"/>
 
-      {/* ── Dark hero header ──────────────────────────────────────────────── */}
-      <div style={{ background: G, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 20% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)' }}/>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(255,255,255,0.014) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.014) 1px,transparent 1px)', backgroundSize: '44px 44px' }}/>
-        <div className="rnk-hero" style={{ padding: '36px 48px 28px', position: 'relative', zIndex: 1, maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(74,222,128,0.09)', border: '1px solid rgba(74,222,128,0.18)', color: LIME, padding: '3px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }} className="gsans">
-            WCF Rankings
+      {/* ── Cream + Lime Accent header ────────────────────────────────────── */}
+      <div style={{ background: '#f5f2ec', borderBottom: '1px solid #ddd8ce' }}>
+        <div className="rnk-header" style={{ padding: '28px 48px 0', maxWidth: 1100, margin: '0 auto' }}>
+          {/* Title row with lime left accent */}
+          <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: 20 }}>
+            <div style={{ width: 4, background: LIME, borderRadius: 2, marginRight: 16, flexShrink: 0 }} />
+            <div>
+              <h1 className="ghl" style={{ fontSize: 'clamp(22px, 2.5vw, 34px)', color: G, fontWeight: 900, margin: '0 0 4px', lineHeight: 1.15 }}>
+                Rankings &amp; Stats
+              </h1>
+              <p className="gsans" style={{ margin: 0, fontSize: 13, color: 'rgba(13,40,24,0.45)' }}>
+                WCF Rankings · Updated daily
+              </p>
+            </div>
           </div>
-          <h1 className="ghl" style={{ fontSize: 'clamp(24px, 3vw, 40px)', color: CREAM, fontWeight: 900, lineHeight: 1.1, marginBottom: 20 }}>
-            Rankings & Stats
-          </h1>
-          {/* Tab pills inside hero */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* Folder-style tabs */}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {TABS.map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`gtab-dark${activeTab === tab ? ' on' : ''}`}>
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`rnk-tab${activeTab === tab ? ' on' : ''}`}>
                 {tab}
               </button>
             ))}
@@ -663,7 +675,8 @@ export default function RankingsPage() {
         {/* ── RANKINGS ── */}
         {activeTab === 'Rankings' && !loading && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+            {/* Toolbar row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)' }}>{rankings.length} players shown</p>
                 <select value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setRankingsPage(0) }}
@@ -674,13 +687,84 @@ export default function RankingsPage() {
                   style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
                   ↓ CSV
                 </button>
+                {/* Column toggles */}
+                <div style={{ position: 'relative' }}>
+                  <button onClick={() => setShowColMenu(v => !v)}
+                    style={{ fontSize: 13, background: showColMenu ? '#f0f9f4' : 'white', border: `1px solid ${showColMenu ? '#4ade80' : '#d5cfc5'}`, color: showColMenu ? '#16a34a' : '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                    ⊞ Columns
+                  </button>
+                  {showColMenu && (
+                    <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', border: '1px solid #e0dbd2', borderRadius: 10, padding: '10px 14px', zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', minWidth: 180 }}>
+                      {[
+                        { key: 'alltime', label: 'All Time Rank' },
+                        { key: 'country', label: 'Country' },
+                        { key: 'dgrade', label: 'dGrade' },
+                        { key: 'egrade', label: 'eGrade' },
+                        { key: 'games', label: 'Games (12mo)' },
+                        { key: 'winpct', label: 'Win% (12mo)' },
+                        { key: 'lastactive', label: 'Last Active' },
+                      ].map(col => (
+                        <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, cursor: 'pointer' }}>
+                          <input type="checkbox" checked={visibleCols.has(col.key)}
+                            onChange={() => {
+                              const next = new Set(visibleCols)
+                              next.has(col.key) ? next.delete(col.key) : next.add(col.key)
+                              setVisibleCols(next)
+                            }} style={{ accentColor: LIME }} />
+                          {col.label}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 7 }}>
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Player search */}
+                <div style={{ position: 'relative' }}>
+                  <input
+                    value={rnkSearch}
+                    onChange={e => {
+                      const v = e.target.value
+                      setRnkSearch(v)
+                      if (v.length < 2) { setRnkSuggestions([]); return }
+                      const lower = v.toLowerCase()
+                      setRnkSuggestions(rankings.filter(p =>
+                        `${p.wcf_first_name} ${p.wcf_last_name}`.toLowerCase().includes(lower)
+                      ).slice(0, 8))
+                    }}
+                    placeholder="Find a player…"
+                    style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #d5cfc5', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, background: 'white', width: 180, outline: 'none' }}
+                  />
+                  {rnkSuggestions.length > 0 && (
+                    <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', border: '1px solid #e0dbd2', borderRadius: 8, zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                      {rnkSuggestions.map(p => (
+                        <button key={p.id} onClick={() => {
+                          setRnkSearch(`${p.wcf_first_name} ${p.wcf_last_name}`)
+                          setRnkSuggestions([])
+                          const idx = rankings.findIndex(r => r.id === p.id)
+                          if (idx >= 0) {
+                            const page = Math.floor(idx / pageSize)
+                            setRankingsPage(page)
+                            setHighlightedPlayerId(p.id)
+                            setTimeout(() => {
+                              highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                            }, 150)
+                          }
+                        }}
+                        style={{ display: 'block', width: '100%', padding: '7px 12px', textAlign: 'left', background: 'none', border: 'none', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, cursor: 'pointer' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ec')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                          {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button onClick={() => { setActiveOnly(true); setRankingsPage(0) }} className={`rnk-pill${activeOnly ? ' on' : ''}`}>
                   Active last 12 months
                 </button>
                 <button onClick={() => { setActiveOnly(false); setRankingsPage(0) }}
-                  style={{ padding: '5px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500, border: `1px solid ${!activeOnly ? '#374151' : '#d5cfc5'}`, background: !activeOnly ? '#374151' : 'white', color: !activeOnly ? 'white' : '#374151', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s' }}>
+                  className={`rnk-pill${!activeOnly ? ' on' : ''}`}>
                   All Time
                 </button>
               </div>
@@ -690,47 +774,60 @@ export default function RankingsPage() {
               <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
-                    <th style={TH('left')}>Active Rank</th>
-                    <th style={TH('left')}>All Time</th>
+                    <th style={TH('left')}>Rank</th>
+                    {visibleCols.has('alltime') && <th style={TH('left')}>All Time</th>}
                     <th style={TH('left', true)} onClick={() => handleRankingSort('wcf_last_name')}>
                       Player{sortArrow('wcf_last_name')}
                     </th>
-                    <th style={TH('left')}>Country</th>
-                    <th style={TH('right', true)} onClick={() => handleRankingSort('dgrade')}>dGrade{sortArrow('dgrade')}</th>
-                    <th style={TH('right', true)} onClick={() => handleRankingSort('egrade')}>eGrade{sortArrow('egrade')}</th>
-                    <th style={TH('right', true)} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>
-                    <th style={TH('right', true)} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>
-                    <th style={TH('right')}>Last Active</th>
+                    {visibleCols.has('country') && <th style={TH('left')}>Country</th>}
+                    {visibleCols.has('dgrade') && <th style={TH('right', true)} onClick={() => handleRankingSort('dgrade')}>dGrade{sortArrow('dgrade')}</th>}
+                    {visibleCols.has('egrade') && <th style={TH('right', true)} onClick={() => handleRankingSort('egrade')}>eGrade{sortArrow('egrade')}</th>}
+                    {visibleCols.has('games') && <th style={TH('right', true)} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>}
+                    {visibleCols.has('winpct') && <th style={TH('right', true)} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>}
+                    {visibleCols.has('lastactive') && <th style={TH('right')}>Last Active</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {rankings.map((player) => (
-                    <tr key={player.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
-                      <td style={{ ...TD('left', true), color: G }}>{activeOnly ? rankings.indexOf(player) + rankingsPage * pageSize + 1 : '—'}</td>
-                      <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.45)' }}>{player.world_ranking}</td>
-                      <td style={TD('left')}>
-                        <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
-                          {player.wcf_first_name} {player.wcf_last_name}
-                        </a>
-                      </td>
-                      <td style={{ ...TD('left'), color: G }}><span style={{ marginRight: 4 }}>{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
-                      <td style={{ ...TD('right', true), fontWeight: 700, color: G, fontSize: 14 }}>{player.dgrade}</td>
-                      <td style={{ ...TD('right', true), fontWeight: 600, color: AMBER }}>{player.egrade || '—'}</td>
-                      <td style={TD('right', true)}>{player.games || '—'}</td>
-                      <td style={TD('right', true)}>{player.win_percentage ? `${player.win_percentage}%` : '—'}</td>
-                      <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{player.last_active_year || '—'}</td>
-                    </tr>
-                  ))}
+                  {rankings.map((player, i) => {
+                    const isHighlighted = player.id === highlightedPlayerId
+                    return (
+                      <tr key={player.id}
+                        ref={isHighlighted ? highlightRef : null}
+                        className="rnk-row"
+                        style={{ borderTop: '1px solid #ede9e2', background: isHighlighted ? 'rgba(74,222,128,0.1)' : 'white', transition: 'background 0.3s' }}>
+                        <td style={{ ...TD('left', true), color: G }}>{activeOnly ? i + rankingsPage * pageSize + 1 : '—'}</td>
+                        {visibleCols.has('alltime') && <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.45)' }}>{player.world_ranking}</td>}
+                        <td style={TD('left')}>
+                          <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
+                            {player.wcf_first_name} {player.wcf_last_name}
+                          </a>
+                        </td>
+                        {visibleCols.has('country') && <td style={{ ...TD('left'), color: G }}><span style={{ marginRight: 4 }}>{getFlag(player.country)}</span>{getCountryName(player.country)}</td>}
+                        {visibleCols.has('dgrade') && <td style={{ ...TD('right', true), fontWeight: 700, color: G, fontSize: 14 }}>{player.dgrade}</td>}
+                        {visibleCols.has('egrade') && <td style={{ ...TD('right', true), fontWeight: 600, color: AMBER }}>{player.egrade || '—'}</td>}
+                        {visibleCols.has('games') && <td style={TD('right', true)}>{player.games || '—'}</td>}
+                        {visibleCols.has('winpct') && <td style={TD('right', true)}>{player.win_percentage ? `${player.win_percentage}%` : '—'}</td>}
+                        {visibleCols.has('lastactive') && <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{player.last_active_year || '—'}</td>}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
-              <button onClick={() => setRankingsPage(p => Math.max(0, p - 1))} disabled={rankingsPage === 0}
-                style={{ fontSize: 13, color: G, padding: '7px 16px', border: '1px solid #d5cfc5', borderRadius: 8, background: 'white', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', opacity: rankingsPage === 0 ? 0.35 : 1 }}>← Previous</button>
-              <span className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.45)' }}>Page {rankingsPage + 1}</span>
-              <button onClick={() => setRankingsPage(p => p + 1)} disabled={rankings.length < pageSize}
-                style={{ fontSize: 13, color: G, padding: '7px 16px', border: '1px solid #d5cfc5', borderRadius: 8, background: 'white', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', opacity: rankings.length < pageSize ? 0.35 : 1 }}>Next →</button>
+            {/* Pagination — bottom */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={() => setRankingsPage(p => Math.max(0, p - 1))} disabled={rankingsPage === 0}
+                  style={{ fontSize: 13, color: G, padding: '7px 16px', border: '1px solid #d5cfc5', borderRadius: 8, background: 'white', cursor: rankingsPage === 0 ? 'default' : 'pointer', fontFamily: 'DM Sans, sans-serif', opacity: rankingsPage === 0 ? 0.35 : 1 }}>← Previous</button>
+                <span className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.45)' }}>Page {rankingsPage + 1}</span>
+                <button onClick={() => setRankingsPage(p => p + 1)} disabled={rankings.length < pageSize}
+                  style={{ fontSize: 13, color: G, padding: '7px 16px', border: '1px solid #d5cfc5', borderRadius: 8, background: 'white', cursor: rankings.length < pageSize ? 'default' : 'pointer', fontFamily: 'DM Sans, sans-serif', opacity: rankings.length < pageSize ? 0.35 : 1 }}>Next →</button>
+              </div>
+              <select value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setRankingsPage(0) }}
+                style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: G, background: 'white', fontFamily: 'DM Sans, sans-serif' }}>
+                {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
+              </select>
             </div>
           </div>
         )}
@@ -745,7 +842,7 @@ export default function RankingsPage() {
                 </button>
               ))}
             </div>
-            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 18 }}>GCLab baseline set 6 Mar 2026 — changes detected by daily sync. Games and Win% show career totals from WCF.</p>
+            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 18 }}>GC Rankings baseline set 6 Mar 2026 — changes detected by daily sync. Games and Win% are for the last 12 months.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
               {[
                 { title: '📈 Biggest Gains', data: movers.gains, positive: true },
@@ -763,8 +860,8 @@ export default function RankingsPage() {
                             <th style={TH('left')}>Player</th>
                             <th style={TH('right')}>Change</th>
                             <th style={TH('right')}>dGrade</th>
-                            <th style={TH('right')}>Games</th>
-                            <th style={TH('right')}>Win%</th>
+                                            <th style={TH('right')}>Games (12 mo)</th>
+                            <th style={TH('right')}>Win% (12 mo)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -794,159 +891,228 @@ export default function RankingsPage() {
         )}
 
         {/* ── NEW PLAYERS ── */}
-        {activeTab === 'New Players' && !loading && (
-          <div>
-            <div style={{ display: 'flex', gap: 7, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              {[30, 90, 180, 365].map(d => (
-                <button key={d} onClick={() => setNewPlayerDays(d)} className={`rnk-pill${newPlayerDays === d ? ' on' : ''}`}>
-                  {d === 30 ? '30 days' : d === 90 ? '90 days' : d === 180 ? '6 months' : '1 year'}
-                </button>
-              ))}
-              <select value={newPlayerCountry} onChange={(e) => setNewPlayerCountry(e.target.value)}
-                style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: G, background: 'white', fontFamily: 'DM Sans, sans-serif' }}>
-                <option value="">All countries</option>
-                {countryList.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>)}
-              </select>
-            </div>
-            <p className="gsans" style={{ fontSize: 13, color: G, marginBottom: 4 }}>{newPlayers.length} new players found</p>
-            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 16 }}>Showing players first recorded by GCLab from 3 Mar 2026 onwards.</p>
-            <div className="rnk-card">
-              <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
-                    <th style={TH('left')}>Player</th>
-                    <th style={TH('left')}>Country</th>
-                    <th style={TH('right')}>dGrade</th>
-                    <th style={TH('right')}>eGrade</th>
-                    <th style={TH('right')}>World Rank</th>
-                    <th style={TH('right')}>First Seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {newPlayers.length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No new players found for this period.</td></tr>
-                  ) : newPlayers.map((player) => (
-                    <tr key={player.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
-                      <td style={TD('left')}>
-                        <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
-                          {player.wcf_first_name} {player.wcf_last_name}
-                        </a>
-                      </td>
-                      <td style={{ ...TD('left'), color: G }}><span style={{ marginRight: 4 }}>{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
-                      <td style={{ ...TD('right', true), fontWeight: 700, color: G }}>{player.dgrade}</td>
-                      <td style={{ ...TD('right', true), fontWeight: 600, color: AMBER }}>{player.egrade || '—'}</td>
-                      <td style={TD('right', true)}>{player.world_ranking}</td>
-                      <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{formatDate(player.created_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ── COUNTRY STATS ── */}
-        {activeTab === 'Country Stats' && !loading && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-              <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)' }}>Click column headers to sort. Active = played a ranked game in the last 12 months.</p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={downloadCountryCSV}
-                  style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-                  ↓ CSV
-                </button>
-                <button onClick={() => setCompareMode(!compareMode)}
-                  style={{ padding: '5px 14px', borderRadius: 7, fontSize: 13, fontWeight: 500, border: `1px solid ${compareMode ? '#2563eb' : '#d5cfc5'}`, background: compareMode ? '#2563eb' : 'white', color: compareMode ? 'white' : '#374151', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-                  {compareMode ? 'Hide Compare' : 'Compare to Past'}
-                </button>
+        {activeTab === 'New Players' && !loading && (() => {
+          const periodLabel = newPlayerDays === 7 ? '7 days' : newPlayerDays === 30 ? '30 days' : newPlayerDays === 90 ? '90 days' : newPlayerDays === 180 ? '6 months' : '1 year'
+          // Country breakdown
+          const countryCounts = newPlayers.reduce((acc: Record<string, number>, p) => {
+            acc[p.country] = (acc[p.country] || 0) + 1
+            return acc
+          }, {})
+          const countryBreakdown = Object.entries(countryCounts)
+            .sort((a, b) => (b[1] as number) - (a[1] as number))
+          // Pagination
+          const totalPages = Math.ceil(newPlayers.length / NEW_PLAYER_PAGE_SIZE)
+          const pageSlice = newPlayers.slice(newPlayerPage * NEW_PLAYER_PAGE_SIZE, (newPlayerPage + 1) * NEW_PLAYER_PAGE_SIZE)
+          return (
+            <div>
+              {/* Filters */}
+              <div style={{ display: 'flex', gap: 7, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+                {[7, 30, 90, 180, 365].map(d => (
+                  <button key={d} onClick={() => setNewPlayerDays(d)} className={`rnk-pill${newPlayerDays === d ? ' on' : ''}`}>
+                    {d === 7 ? '7 days' : d === 30 ? '30 days' : d === 90 ? '90 days' : d === 180 ? '6 months' : '1 year'}
+                  </button>
+                ))}
+                <select value={newPlayerCountry} onChange={(e) => setNewPlayerCountry(e.target.value)}
+                  style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: G, background: 'white', fontFamily: 'DM Sans, sans-serif' }}>
+                  <option value="">All countries</option>
+                  {countryList.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>)}
+                </select>
               </div>
-            </div>
-            {compareMode && (
-              <div style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-                {availableSnapshots.length === 0 ? (
-                  <p className="gsans" style={{ fontSize: 13, color: '#1d4ed8' }}>No historical snapshots available yet. Monthly snapshots are stored on the 1st of each month. The first snapshot will be taken 1 Apr 2026.</p>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <span className="gsans" style={{ fontSize: 13, color: '#1d4ed8' }}>Compare current stats to:</span>
-                    <select value={compareDate} onChange={(e) => setCompareDate(e.target.value)}
-                      style={{ border: '1px solid rgba(37,99,235,0.3)', borderRadius: 6, padding: '4px 8px', fontSize: 13, color: G, background: 'white', fontFamily: 'DM Sans, sans-serif' }}>
-                      {availableSnapshots.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
+
+              {/* Hero card */}
+              <div className="rnk-card" style={{ padding: '20px 24px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+                <div>
+                  <div className="gmono" style={{ fontSize: 48, fontWeight: 700, color: G, lineHeight: 1 }}>{newPlayers.length}</div>
+                  <div className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)', marginTop: 4 }}>
+                    new player{newPlayers.length !== 1 ? 's' : ''} added in the last {periodLabel}
+                  </div>
+                </div>
+                {countryBreakdown.length > 0 && (
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div className="gsans" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(13,40,24,0.4)', marginBottom: 8 }}>By Country</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
+                      {countryBreakdown.map(([country, count]) => (
+                        <div key={country} className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.7)', whiteSpace: 'nowrap' }}>
+                          {getFlag(country)} {getCountryName(country)} <span className="gmono" style={{ fontWeight: 600, color: G }}>{count as number}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-            )}
-            <div className="rnk-card">
-              <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
-                    <th style={{ ...TH('left'), width: 36 }}>#</th>
-                    <th style={TH('left')}>Country</th>
-                    <th style={TH('right', true)} onClick={() => handleCountrySort('total_players')}>Total Players{countryArrow('total_players')}</th>
-                    <th style={TH('right', true)} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
-                    <th style={TH('right', true)} onClick={() => handleCountrySort('avg_top6_dgrade')}>Top 6 Active Avg{countryArrow('avg_top6_dgrade')}</th>
-                    <th style={TH('right', true)} onClick={() => handleCountrySort('avg_top6_alltime_dgrade')}>Top 6 All Time Avg{countryArrow('avg_top6_alltime_dgrade')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {countryStats.length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
-                  ) : countryStats.map((row, i) => {
-                    const comp = compareMode ? getCompareRow(row.country) : null
-                    return (
-                      <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
-                        <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.4)', fontSize: 12 }}>{i + 1}</td>
-                        <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
-                          <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
+
+              <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 16 }}>
+                Players first recorded by GC Rankings from 3 Mar 2026 onwards. Sorted by date added.
+                {totalPages > 1 && ` Showing ${newPlayerPage * NEW_PLAYER_PAGE_SIZE + 1}–${Math.min((newPlayerPage + 1) * NEW_PLAYER_PAGE_SIZE, newPlayers.length)} of ${newPlayers.length}.`}
+              </p>
+
+              {/* Player table */}
+              <div className="rnk-card">
+                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                      <th style={TH('left')}>Player</th>
+                      <th style={TH('left')}>Country</th>
+                      <th style={TH('right')}>dGrade</th>
+                      <th style={TH('right')}>eGrade</th>
+                      <th style={TH('right')}>World Rank</th>
+                      <th style={TH('right')}>First Seen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageSlice.length === 0 ? (
+                      <tr><td colSpan={6} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No new players found for this period.</td></tr>
+                    ) : pageSlice.map((player) => (
+                      <tr key={player.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                        <td style={TD('left')}>
+                          <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
+                            {player.wcf_first_name} {player.wcf_last_name}
+                          </a>
                         </td>
-                        <td style={TD('right', true)}>
-                          {row.total_players}{comp && renderDiff(row.total_players, comp.total_players)}
-                        </td>
-                        <td style={TD('right', true)}>
-                          {row.active_players}{comp && renderDiff(row.active_players, comp.active_players)}
-                        </td>
-                        <td style={{ ...TD('right', true), fontWeight: 700, color: G, position: 'relative' }}>
-                          <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'active' ? null : { country: row.country, type: 'active' })}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
-                            {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
-                            {comp && comp.avg_top6_dgrade && renderDiff(Math.round(row.avg_top6_dgrade), Math.round(comp.avg_top6_dgrade))}
-                            {row.top6_active && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
-                          </button>
-                          {tooltip?.country === row.country && tooltip?.type === 'active' && row.top6_active && (
-                            <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
-                              <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 Active — {getCountryName(row.country)}</p>
-                              {row.top6_active.map((p: any, idx: number) => (
-                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
-                                  <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
-                                  <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ ...TD('right', true), fontWeight: 600, position: 'relative' }}>
-                          <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'alltime' ? null : { country: row.country, type: 'alltime' })}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
-                            {row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '—'}
-                            {row.top6_alltime && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
-                          </button>
-                          {tooltip?.country === row.country && tooltip?.type === 'alltime' && row.top6_alltime && (
-                            <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
-                              <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 All Time — {getCountryName(row.country)}</p>
-                              {row.top6_alltime.map((p: any, idx: number) => (
-                                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
-                                  <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
-                                  <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
+                        <td style={{ ...TD('left'), color: G }}><span style={{ marginRight: 4 }}>{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
+                        <td style={{ ...TD('right', true), fontWeight: 700, color: G }}>{player.dgrade}</td>
+                        <td style={{ ...TD('right', true), fontWeight: 600, color: AMBER }}>{player.egrade || '—'}</td>
+                        <td style={TD('right', true)}>{player.world_ranking}</td>
+                        <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{formatDate(player.created_at)}</td>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16 }}>
+                  <button onClick={() => setNewPlayerPage(p => Math.max(0, p - 1))} disabled={newPlayerPage === 0}
+                    style={{ padding: '5px 14px', borderRadius: 7, border: '1px solid #d5cfc5', background: 'white', fontSize: 13, cursor: newPlayerPage === 0 ? 'default' : 'pointer', color: newPlayerPage === 0 ? 'rgba(13,40,24,0.3)' : G, fontFamily: 'DM Sans, sans-serif' }}>
+                    ← Prev
+                  </button>
+                  <span className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)' }}>Page {newPlayerPage + 1} of {totalPages}</span>
+                  <button onClick={() => setNewPlayerPage(p => Math.min(totalPages - 1, p + 1))} disabled={newPlayerPage === totalPages - 1}
+                    style={{ padding: '5px 14px', borderRadius: 7, border: '1px solid #d5cfc5', background: 'white', fontSize: 13, cursor: newPlayerPage === totalPages - 1 ? 'default' : 'pointer', color: newPlayerPage === totalPages - 1 ? 'rgba(13,40,24,0.3)' : G, fontFamily: 'DM Sans, sans-serif' }}>
+                    Next →
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
+        {/* ── COUNTRY RANKINGS ── */}
+        {activeTab === 'Country Rankings' && !loading && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+              <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)' }}>Click column headers to sort. Active = played a ranked game in the last 12 months.</p>
+              <button onClick={downloadCountryCSV}
+                style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                ↓ CSV
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, alignItems: 'start' }}>
+
+              {/* ── Table 1: Player Counts ── */}
+              <div>
+                <div style={{ marginBottom: 10 }}>
+                  <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Player Counts</h3>
+                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Total registered and recently active players by country.</p>
+                </div>
+                <div className="rnk-card">
+                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                        <th style={{ ...TH('left'), width: 32 }}>#</th>
+                        <th style={TH('left')}>Country</th>
+                        <th style={TH('right', true)} onClick={() => handleCountrySort('total_players')}>Total{countryArrow('total_players')}</th>
+                        <th style={TH('right', true)} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {countryStats.length === 0 ? (
+                        <tr><td colSpan={4} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
+                      ) : countryStats.map((row, i) => (
+                        <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                          <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 12 }}>{i + 1}</td>
+                          <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
+                            <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
+                          </td>
+                          <td style={TD('right', true)}>{row.total_players}</td>
+                          <td style={{ ...TD('right', true), fontWeight: 600, color: '#16a34a' }}>{row.active_players}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ── Table 2: WCF Team Seeding ── */}
+              <div>
+                <div style={{ marginBottom: 10 }}>
+                  <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>WCF Team Seeding</h3>
+                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Top 6 average dGrade — used by WCF for team event seeding. Click ▾ for player breakdown.</p>
+                </div>
+                <div className="rnk-card">
+                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                        <th style={{ ...TH('left'), width: 32 }}>#</th>
+                        <th style={TH('left')}>Country</th>
+                        <th style={TH('right', true)} onClick={() => handleCountrySort('avg_top6_dgrade')}>Active Avg{countryArrow('avg_top6_dgrade')}</th>
+                        <th style={TH('right', true)} onClick={() => handleCountrySort('avg_top6_alltime_dgrade')}>All Time Avg{countryArrow('avg_top6_alltime_dgrade')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {countryStats.length === 0 ? (
+                        <tr><td colSpan={4} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
+                      ) : [...countryStats].sort((a, b) => (b.avg_top6_dgrade || 0) - (a.avg_top6_dgrade || 0)).map((row, i) => (
+                        <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                          <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 12 }}>{i + 1}</td>
+                          <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
+                            <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
+                          </td>
+                          <td style={{ ...TD('right', true), fontWeight: 700, color: G, position: 'relative' }}>
+                            <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'active' ? null : { country: row.country, type: 'active' })}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
+                              {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
+                              {row.top6_active && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
+                            </button>
+                            {tooltip?.country === row.country && tooltip?.type === 'active' && row.top6_active && (
+                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
+                                <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 Active — {getCountryName(row.country)}</p>
+                                {row.top6_active.map((p: any, idx: number) => (
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
+                                    <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
+                                    <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ ...TD('right', true), fontWeight: 600, position: 'relative' }}>
+                            <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'alltime' ? null : { country: row.country, type: 'alltime' })}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
+                              {row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '—'}
+                              {row.top6_alltime && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
+                            </button>
+                            {tooltip?.country === row.country && tooltip?.type === 'alltime' && row.top6_alltime && (
+                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
+                                <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 All Time — {getCountryName(row.country)}</p>
+                                {row.top6_alltime.map((p: any, idx: number) => (
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
+                                    <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
+                                    <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
@@ -954,50 +1120,81 @@ export default function RankingsPage() {
         {/* ── HISTORICAL RANKINGS ── */}
         {activeTab === 'Historical Rankings' && (
           <div>
+            {/* Admin import count */}
             {userRole === 'super_admin' && importedCount !== null && totalPlayers !== null && (
               <div className="gsans" style={{ fontSize: 11, color: 'rgba(13,40,24,0.4)', textAlign: 'right', marginBottom: 8 }}>
                 📥 {importedCount.toLocaleString()} of {totalPlayers.toLocaleString()} players history imported
               </div>
             )}
 
-            {/* Search box */}
-            <div className="rnk-card" style={{ padding: '20px 24px', marginBottom: 20 }}>
-              <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, marginBottom: 12 }}>Search any player</h3>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-                  <input type="text" placeholder="Type a name…" value={searchQuery} onChange={(e) => handleSearchQueryChange(e.target.value)}
-                    style={{ width: '100%', border: '1px solid #d5cfc5', borderRadius: 8, padding: '9px 14px', fontSize: 14, color: G, fontFamily: 'DM Sans, sans-serif', background: 'white', outline: 'none', boxSizing: 'border-box' }} />
-                  {searchSuggestions.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'white', border: '1px solid #e5e1d8', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', marginTop: 4, maxHeight: 240, overflowY: 'auto' }}>
-                      {searchSuggestions.map((player) => (
-                        <button key={player.id} onClick={() => handleSelectPlayer(player)}
-                          style={{ width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', borderBottom: '1px solid #f0ece4', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'DM Sans, sans-serif' }}>
-                          <span style={{ color: G, fontWeight: 500 }}>{player.wcf_first_name} {player.wcf_last_name}</span>
-                          <span style={{ color: 'rgba(13,40,24,0.4)', fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{getFlag(player.country)} #{player.world_ranking} · {player.dgrade}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+            {/* ── Search area ── */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ position: 'relative', maxWidth: 520 }}>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'rgba(13,40,24,0.35)', fontSize: 16, pointerEvents: 'none' }}>⌕</span>
+                  <input type="text" placeholder="Search any player by name…" value={searchQuery}
+                    onChange={(e) => handleSearchQueryChange(e.target.value)}
+                    style={{ width: '100%', border: '1.5px solid #ccc7bc', borderRadius: 10, padding: '11px 14px 11px 38px', fontSize: 15, color: G, fontFamily: 'DM Sans, sans-serif', background: 'white', outline: 'none', boxSizing: 'border-box', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+                    onFocus={e => (e.target.style.borderColor = LIME)}
+                    onBlur={e => (e.target.style.borderColor = '#ccc7bc')}
+                  />
                 </div>
-                {currentUserProfile?.wcf_player_id && (
-                  <button onClick={handleShowMyHistory}
-                    style={{ padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', color: '#16a34a', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap' }}>
-                    Show My History
-                  </button>
+                {searchSuggestions.length > 0 && (
+                  <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, zIndex: 100, background: 'white', border: '1px solid #e0dbd2', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.12)', marginTop: 2, maxHeight: 280, overflowY: 'auto' }}>
+                    {searchSuggestions.map((player) => (
+                      <button key={player.id} onClick={() => handleSelectPlayer(player)}
+                        style={{ width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: 13, background: 'none', border: 'none', borderBottom: '1px solid #f0ece4', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'DM Sans, sans-serif' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ec')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        <span style={{ color: G, fontWeight: 500 }}>{player.wcf_first_name} {player.wcf_last_name}</span>
+                        <span style={{ color: 'rgba(13,40,24,0.4)', fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{getFlag(player.country)} #{player.world_ranking} · {player.dgrade}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
+
+              {/* Recent searches */}
+              {!selectedPlayer && recentPlayers.length > 0 && !searchQuery && (
+                <div style={{ marginTop: 12 }}>
+                  <span className="gsans" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(13,40,24,0.4)', marginRight: 8 }}>Recent:</span>
+                  {recentPlayers.map(p => (
+                    <button key={p.id} onClick={() => handleSelectPlayer(p)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginRight: 6, marginBottom: 6, padding: '4px 12px', borderRadius: 20, border: '1px solid #d5cfc5', background: 'white', fontSize: 12, color: G, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = LIME)}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = '#d5cfc5')}>
+                      {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {/* ── Empty state ── */}
+            {!selectedPlayer && (
+              <div className="rnk-card" style={{ padding: '40px 32px', textAlign: 'center' }}>
+                {/* Placeholder chart sketch */}
+                <svg viewBox="0 0 400 120" style={{ width: '100%', maxWidth: 400, margin: '0 auto 20px', display: 'block', opacity: 0.25 }}>
+                  <line x1="40" y1="10" x2="40" y2="90" stroke="#0d2818" strokeWidth="1"/>
+                  <line x1="40" y1="90" x2="380" y2="90" stroke="#0d2818" strokeWidth="1"/>
+                  {[20,40,60,80].map(y => <line key={y} x1="40" y1={y} x2="380" y2={y} stroke="#0d2818" strokeWidth="0.5" strokeDasharray="4,4"/>)}
+                  <polyline points="40,75 90,60 140,50 180,55 220,35 270,20 310,28 360,22" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="40,85 90,80 140,78 180,76 220,72 270,68 310,65 360,60" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeDasharray="3,3"/>
+                </svg>
+                <p className="ghl" style={{ fontSize: 18, color: G, fontWeight: 700, margin: '0 0 8px' }}>Search for a player</p>
+                <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)', margin: 0 }}>
+                  Type any player's name above to see their full grade history, event results, and ranking progression.
+                </p>
+              </div>
+            )}
 
             {selectedPlayer && (
               <div>
                 {/* Player header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-                  <h3 className="ghl" style={{ fontSize: 18, color: G, fontWeight: 700 }}>{getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}</h3>
-                  <span className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.55)' }}>
-                    {getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade}
-                    {selectedPlayer.egrade ? ` · eGrade ${selectedPlayer.egrade}` : ''}
-                    {' '}· World #{selectedPlayer.world_ranking}
-                  </span>
+                  <h3 className="ghl" style={{ fontSize: 20, color: G, fontWeight: 700 }}>
+                    {getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}
+                  </h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
                     {userRole === 'super_admin' && (
                       <button onClick={() => handleManualImport(selectedPlayer)} disabled={manualImporting}
@@ -1012,6 +1209,21 @@ export default function RankingsPage() {
                       {manualImportLog.map((log, i) => <div key={i}>{log}</div>)}
                     </div>
                   )}
+                </div>
+
+                {/* Stat boxes */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 16 }}>
+                  {[
+                    { label: 'dGrade', value: selectedPlayer.dgrade, mono: true, bold: true, color: G },
+                    { label: 'World Rank', value: selectedPlayer.world_ranking ? `#${selectedPlayer.world_ranking}` : '—', mono: true, bold: false, color: 'rgba(13,40,24,0.7)' },
+                    ...(selectedPlayer.egrade ? [{ label: 'eGrade', value: selectedPlayer.egrade, mono: true, bold: false, color: AMBER }] : []),
+                    { label: 'Country', value: `${getFlag(selectedPlayer.country)} ${getCountryName(selectedPlayer.country)}`, mono: false, bold: false, color: 'rgba(13,40,24,0.7)' },
+                  ].map(stat => (
+                    <div key={stat.label} className="rnk-card" style={{ padding: '12px 14px', textAlign: 'center' }}>
+                      <div className={stat.mono ? 'gmono' : 'gsans'} style={{ fontSize: stat.mono ? 22 : 14, fontWeight: stat.bold ? 700 : 600, color: stat.color, lineHeight: 1.2 }}>{stat.value}</div>
+                      <div className="gsans" style={{ fontSize: 10, color: 'rgba(13,40,24,0.4)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{stat.label}</div>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Range + toggle controls */}
@@ -1048,7 +1260,7 @@ export default function RankingsPage() {
 
                 <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 12 }}>
                   {playerHistory.length <= 1 ? 'No history recorded yet.'
-                    : `${playerHistory.filter((h: any) => h.is_imported).length} imported events + ${playerHistory.filter((h: any) => !h.is_imported).length} GCLab tracked points`}
+                    : `${playerHistory.filter((h: any) => h.is_imported).length} imported events + ${playerHistory.filter((h: any) => !h.is_imported).length} GC Rankings tracked points`}
                   {showRanking && playerHistory.some(h => h.world_ranking) && (() => {
                     const firstRank = playerHistory.find(h => h.world_ranking)
                     const label = firstRank ? new Date(firstRank.recorded_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'Mar 2026'
@@ -1061,8 +1273,12 @@ export default function RankingsPage() {
                 {playerHistory.length > 0 && (() => {
                   const eventPoints = playerHistory.filter((h: any) => h.is_imported || (h.event_name && h.event_name !== 'Daily sync'))
                   const syncPoints = playerHistory.filter((h: any) => !h.is_imported && (!h.event_name || h.event_name === 'Daily sync'))
+                  const firstSync = syncPoints.length > 0 ? syncPoints[0] : null
                   const lastSync = syncPoints.length > 0 ? syncPoints[syncPoints.length - 1] : null
-                  const tableRows = [...eventPoints, ...(lastSync ? [lastSync] : [])].sort(
+                  const syncRows = firstSync && lastSync && firstSync.recorded_at !== lastSync.recorded_at
+                    ? [firstSync, lastSync]
+                    : firstSync ? [firstSync] : []
+                  const tableRows = [...eventPoints, ...syncRows].sort(
                     (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
                   )
                   const chronological = [...playerHistory]
@@ -1090,7 +1306,11 @@ export default function RankingsPage() {
                                 <td style={{ padding: '7px 14px', color: 'rgba(13,40,24,0.5)', fontFamily: 'DM Sans, sans-serif' }}>
                                   {h.event_url
                                     ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="rnk-link">{h.event_name || '—'}</a>
-                                    : h.event_name || <span style={{ color: 'rgba(13,40,24,0.35)' }}>{lastSyncDate ? `Last synced ${new Date(lastSyncDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Latest sync'}</span>}
+                                    : h.event_name
+                                      ? h.event_name
+                                      : firstSync && h.recorded_at === firstSync.recorded_at
+                                        ? <span style={{ color: 'rgba(13,40,24,0.35)' }}>First Sync {new Date(h.recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                        : <span style={{ color: 'rgba(13,40,24,0.35)' }}>Latest Sync {lastSyncDate ? new Date(lastSyncDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>}
                                 </td>
                                 <td style={{ padding: '7px 14px', textAlign: 'right', fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace' }}>{h.dgrade_value}</td>
                                 <td style={{ padding: '7px 14px', textAlign: 'right', fontWeight: 700, fontFamily: 'DM Mono, monospace' }}>
