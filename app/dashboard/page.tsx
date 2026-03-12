@@ -410,28 +410,39 @@ export default function DashboardPage() {
           setCountryStats(cs || [])
 
           if (gms && gms.length > 0) {
-            const { data: playerData } = await supabase.from('wcf_players').select('wcf_first_name, wcf_last_name, country')
-            if (playerData) {
-              const playerMap: Record<string, string> = {}
-              playerData.forEach((p: any) => {
-                const key = `${p.wcf_first_name.trim()}|||${p.wcf_last_name.trim()}`.toLowerCase()
-                playerMap[key] = p.country
-              })
-              const countryMap: Record<string, { games: number; wins: number }> = {}
-              gms.forEach((g: any) => {
-                const key = `${(g.opponent_first_name||'').trim()}|||${(g.opponent_last_name||'').trim()}`.toLowerCase()
-                const country = playerMap[key]
-                if (!country) return
-                if (!countryMap[country]) countryMap[country] = { games: 0, wins: 0 }
-                countryMap[country].games++
-                if (g.result === 'win') countryMap[country].wins++
-              })
-              const oppStats = Object.entries(countryMap)
-                .map(([country, s]) => ({ country, games: s.games, wins: s.wins, losses: s.games - s.wins }))
-                .sort((a, b) => b.games - a.games)
-              setOppCountryStats(oppStats)
+              // Build list of unique opponent names from this player's games
+              const uniqueOpponents = [...new Set(gms.map((g: any) =>
+                `${(g.opponent_first_name||'').trim()}|||${(g.opponent_last_name||'').trim()}`.toLowerCase()
+              ))]
+              const oppFirstNames = [...new Set(gms.map((g: any) => (g.opponent_first_name||'').trim()))]
+
+              // Only fetch the players who appear as opponents — avoids 11k row limit issue
+              const { data: playerData } = await supabase
+                .from('wcf_players')
+                .select('wcf_first_name, wcf_last_name, country')
+                .in('wcf_first_name', oppFirstNames)
+
+              if (playerData) {
+                const playerMap: Record<string, string> = {}
+                playerData.forEach((p: any) => {
+                  const key = `${p.wcf_first_name.trim()}|||${p.wcf_last_name.trim()}`.toLowerCase()
+                  playerMap[key] = p.country
+                })
+                const countryMap: Record<string, { games: number; wins: number }> = {}
+                gms.forEach((g: any) => {
+                  const key = `${(g.opponent_first_name||'').trim()}|||${(g.opponent_last_name||'').trim()}`.toLowerCase()
+                  const country = playerMap[key]
+                  if (!country) return
+                  if (!countryMap[country]) countryMap[country] = { games: 0, wins: 0 }
+                  countryMap[country].games++
+                  if (g.result === 'win') countryMap[country].wins++
+                })
+                const oppStats = Object.entries(countryMap)
+                  .map(([country, s]) => ({ country, games: s.games, wins: s.wins, losses: s.games - s.wins }))
+                  .sort((a, b) => b.games - a.games)
+                setOppCountryStats(oppStats)
+              }
             }
-          }
         }
       }
       setLoading(false)
