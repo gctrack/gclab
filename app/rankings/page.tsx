@@ -122,7 +122,11 @@ export default function RankingsPage() {
   const [showDgrade, setShowDgrade] = useState(true)
   const [showEgrade, setShowEgrade] = useState(false)
   const [showRanking, setShowRanking] = useState(true)
-  const [historyRange, setHistoryRange] = useState('5y')
+  const [historyRange, setHistoryRange] = useState('all')
+  const [recentPlayers, setRecentPlayers] = useState<any[]>(() => {
+    if (typeof window === 'undefined') return []
+    try { return JSON.parse(localStorage.getItem('gclab_recent_players') || '[]') } catch { return [] }
+  })
   const [historyFrom, setHistoryFrom] = useState('')
   const [historyTo, setHistoryTo] = useState('')
   const [lastSyncDate, setLastSyncDate] = useState<string | null>(null)
@@ -174,11 +178,7 @@ export default function RankingsPage() {
   useEffect(() => { if (activeTab === 'Movers') loadMovers() }, [activeTab, moverPeriod])
   useEffect(() => { if (activeTab === 'New Players') { setNewPlayerPage(0); loadNewPlayers() } }, [activeTab, newPlayerDays, newPlayerCountry])
   useEffect(() => { if (activeTab === 'Country Rankings') loadCountryStats() }, [activeTab])
-  useEffect(() => {
-    if (activeTab === 'Historical Rankings' && currentUserProfile?.wcf_player_id && !selectedPlayer) {
-      loadPlayerHistory(currentUserProfile.wcf_player_id)
-    }
-  }, [activeTab, currentUserProfile])
+  // Historical Rankings no longer auto-loads the signed-in user
   useEffect(() => { if (selectedPlayer) fetchHistory(selectedPlayer.id) }, [historyRange, historyFrom, historyTo])
   useEffect(() => { if (compareMode) loadCompareStats() }, [compareMode, compareDate])
 
@@ -377,6 +377,10 @@ export default function RankingsPage() {
     setSearchQuery(`${player.wcf_first_name} ${player.wcf_last_name}`)
     setSearchSuggestions([])
     await fetchHistory(player.id)
+    // Save to recent players (max 5, no duplicates)
+    const updated = [player, ...recentPlayers.filter((p: any) => p.id !== player.id)].slice(0, 5)
+    setRecentPlayers(updated)
+    try { localStorage.setItem('gclab_recent_players', JSON.stringify(updated)) } catch {}
   }
 
   const handleSearchQueryChange = (value: string) => {
@@ -1116,50 +1120,81 @@ export default function RankingsPage() {
         {/* ── HISTORICAL RANKINGS ── */}
         {activeTab === 'Historical Rankings' && (
           <div>
+            {/* Admin import count */}
             {userRole === 'super_admin' && importedCount !== null && totalPlayers !== null && (
               <div className="gsans" style={{ fontSize: 11, color: 'rgba(13,40,24,0.4)', textAlign: 'right', marginBottom: 8 }}>
                 📥 {importedCount.toLocaleString()} of {totalPlayers.toLocaleString()} players history imported
               </div>
             )}
 
-            {/* Search box */}
-            <div className="rnk-card" style={{ padding: '20px 24px', marginBottom: 20 }}>
-              <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, marginBottom: 12 }}>Search any player</h3>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-                  <input type="text" placeholder="Type a name…" value={searchQuery} onChange={(e) => handleSearchQueryChange(e.target.value)}
-                    style={{ width: '100%', border: '1px solid #d5cfc5', borderRadius: 8, padding: '9px 14px', fontSize: 14, color: G, fontFamily: 'DM Sans, sans-serif', background: 'white', outline: 'none', boxSizing: 'border-box' }} />
-                  {searchSuggestions.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'white', border: '1px solid #e5e1d8', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', marginTop: 4, maxHeight: 240, overflowY: 'auto' }}>
-                      {searchSuggestions.map((player) => (
-                        <button key={player.id} onClick={() => handleSelectPlayer(player)}
-                          style={{ width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', borderBottom: '1px solid #f0ece4', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'DM Sans, sans-serif' }}>
-                          <span style={{ color: G, fontWeight: 500 }}>{player.wcf_first_name} {player.wcf_last_name}</span>
-                          <span style={{ color: 'rgba(13,40,24,0.4)', fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{getFlag(player.country)} #{player.world_ranking} · {player.dgrade}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+            {/* ── Search area ── */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ position: 'relative', maxWidth: 520 }}>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'rgba(13,40,24,0.35)', fontSize: 16, pointerEvents: 'none' }}>⌕</span>
+                  <input type="text" placeholder="Search any player by name…" value={searchQuery}
+                    onChange={(e) => handleSearchQueryChange(e.target.value)}
+                    style={{ width: '100%', border: '1.5px solid #ccc7bc', borderRadius: 10, padding: '11px 14px 11px 38px', fontSize: 15, color: G, fontFamily: 'DM Sans, sans-serif', background: 'white', outline: 'none', boxSizing: 'border-box', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+                    onFocus={e => (e.target.style.borderColor = LIME)}
+                    onBlur={e => (e.target.style.borderColor = '#ccc7bc')}
+                  />
                 </div>
-                {currentUserProfile?.wcf_player_id && (
-                  <button onClick={handleShowMyHistory}
-                    style={{ padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)', color: '#16a34a', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap' }}>
-                    Show My History
-                  </button>
+                {searchSuggestions.length > 0 && (
+                  <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, zIndex: 100, background: 'white', border: '1px solid #e0dbd2', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.12)', marginTop: 2, maxHeight: 280, overflowY: 'auto' }}>
+                    {searchSuggestions.map((player) => (
+                      <button key={player.id} onClick={() => handleSelectPlayer(player)}
+                        style={{ width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: 13, background: 'none', border: 'none', borderBottom: '1px solid #f0ece4', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'DM Sans, sans-serif' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ec')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                        <span style={{ color: G, fontWeight: 500 }}>{player.wcf_first_name} {player.wcf_last_name}</span>
+                        <span style={{ color: 'rgba(13,40,24,0.4)', fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{getFlag(player.country)} #{player.world_ranking} · {player.dgrade}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
+
+              {/* Recent searches */}
+              {!selectedPlayer && recentPlayers.length > 0 && !searchQuery && (
+                <div style={{ marginTop: 12 }}>
+                  <span className="gsans" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(13,40,24,0.4)', marginRight: 8 }}>Recent:</span>
+                  {recentPlayers.map(p => (
+                    <button key={p.id} onClick={() => handleSelectPlayer(p)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginRight: 6, marginBottom: 6, padding: '4px 12px', borderRadius: 20, border: '1px solid #d5cfc5', background: 'white', fontSize: 12, color: G, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = LIME)}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = '#d5cfc5')}>
+                      {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {/* ── Empty state ── */}
+            {!selectedPlayer && (
+              <div className="rnk-card" style={{ padding: '40px 32px', textAlign: 'center' }}>
+                {/* Placeholder chart sketch */}
+                <svg viewBox="0 0 400 120" style={{ width: '100%', maxWidth: 400, margin: '0 auto 20px', display: 'block', opacity: 0.25 }}>
+                  <line x1="40" y1="10" x2="40" y2="90" stroke="#0d2818" strokeWidth="1"/>
+                  <line x1="40" y1="90" x2="380" y2="90" stroke="#0d2818" strokeWidth="1"/>
+                  {[20,40,60,80].map(y => <line key={y} x1="40" y1={y} x2="380" y2={y} stroke="#0d2818" strokeWidth="0.5" strokeDasharray="4,4"/>)}
+                  <polyline points="40,75 90,60 140,50 180,55 220,35 270,20 310,28 360,22" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="40,85 90,80 140,78 180,76 220,72 270,68 310,65 360,60" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeDasharray="3,3"/>
+                </svg>
+                <p className="ghl" style={{ fontSize: 18, color: G, fontWeight: 700, margin: '0 0 8px' }}>Search for a player</p>
+                <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)', margin: 0 }}>
+                  Type any player's name above to see their full grade history, event results, and ranking progression.
+                </p>
+              </div>
+            )}
 
             {selectedPlayer && (
               <div>
                 {/* Player header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-                  <h3 className="ghl" style={{ fontSize: 18, color: G, fontWeight: 700 }}>{getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}</h3>
-                  <span className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.55)' }}>
-                    {getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade}
-                    {selectedPlayer.egrade ? ` · eGrade ${selectedPlayer.egrade}` : ''}
-                    {' '}· World #{selectedPlayer.world_ranking}
-                  </span>
+                  <h3 className="ghl" style={{ fontSize: 20, color: G, fontWeight: 700 }}>
+                    {getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}
+                  </h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
                     {userRole === 'super_admin' && (
                       <button onClick={() => handleManualImport(selectedPlayer)} disabled={manualImporting}
@@ -1174,6 +1209,21 @@ export default function RankingsPage() {
                       {manualImportLog.map((log, i) => <div key={i}>{log}</div>)}
                     </div>
                   )}
+                </div>
+
+                {/* Stat boxes */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 16 }}>
+                  {[
+                    { label: 'dGrade', value: selectedPlayer.dgrade, mono: true, bold: true, color: G },
+                    { label: 'World Rank', value: selectedPlayer.world_ranking ? `#${selectedPlayer.world_ranking}` : '—', mono: true, bold: false, color: 'rgba(13,40,24,0.7)' },
+                    ...(selectedPlayer.egrade ? [{ label: 'eGrade', value: selectedPlayer.egrade, mono: true, bold: false, color: AMBER }] : []),
+                    { label: 'Country', value: `${getFlag(selectedPlayer.country)} ${getCountryName(selectedPlayer.country)}`, mono: false, bold: false, color: 'rgba(13,40,24,0.7)' },
+                  ].map(stat => (
+                    <div key={stat.label} className="rnk-card" style={{ padding: '12px 14px', textAlign: 'center' }}>
+                      <div className={stat.mono ? 'gmono' : 'gsans'} style={{ fontSize: stat.mono ? 22 : 14, fontWeight: stat.bold ? 700 : 600, color: stat.color, lineHeight: 1.2 }}>{stat.value}</div>
+                      <div className="gsans" style={{ fontSize: 10, color: 'rgba(13,40,24,0.4)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{stat.label}</div>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Range + toggle controls */}
@@ -1210,7 +1260,7 @@ export default function RankingsPage() {
 
                 <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 12 }}>
                   {playerHistory.length <= 1 ? 'No history recorded yet.'
-                    : `${playerHistory.filter((h: any) => h.is_imported).length} imported events + ${playerHistory.filter((h: any) => !h.is_imported).length} GCLab tracked points`}
+                    : `${playerHistory.filter((h: any) => h.is_imported).length} imported events + ${playerHistory.filter((h: any) => !h.is_imported).length} GC Rankings tracked points`}
                   {showRanking && playerHistory.some(h => h.world_ranking) && (() => {
                     const firstRank = playerHistory.find(h => h.world_ranking)
                     const label = firstRank ? new Date(firstRank.recorded_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'Mar 2026'
