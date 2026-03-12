@@ -90,6 +90,12 @@ export default function RankingsPage() {
   const [pageSize, setPageSize] = useState(50)
   const [sortKey, setSortKey] = useState<SortKey>('dgrade')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [rnkSearch, setRnkSearch] = useState('')
+  const [rnkSuggestions, setRnkSuggestions] = useState<any[]>([])
+  const [highlightedPlayerId, setHighlightedPlayerId] = useState<string | null>(null)
+  const highlightRef = useRef<HTMLTableRowElement | null>(null)
+  const [showColMenu, setShowColMenu] = useState(false)
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['alltime', 'country', 'dgrade', 'games', 'winpct', 'lastactive']))
 
   const [movers, setMovers] = useState<{ gains: any[], losses: any[] }>({ gains: [], losses: [] })
   const [moverPeriod, setMoverPeriod] = useState(7)
@@ -665,7 +671,8 @@ export default function RankingsPage() {
         {/* ── RANKINGS ── */}
         {activeTab === 'Rankings' && !loading && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+            {/* Toolbar row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)' }}>{rankings.length} players shown</p>
                 <select value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setRankingsPage(0) }}
@@ -676,13 +683,84 @@ export default function RankingsPage() {
                   style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
                   ↓ CSV
                 </button>
+                {/* Column toggles */}
+                <div style={{ position: 'relative' }}>
+                  <button onClick={() => setShowColMenu(v => !v)}
+                    style={{ fontSize: 13, background: showColMenu ? '#f0f9f4' : 'white', border: `1px solid ${showColMenu ? '#4ade80' : '#d5cfc5'}`, color: showColMenu ? '#16a34a' : '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                    ⊞ Columns
+                  </button>
+                  {showColMenu && (
+                    <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', border: '1px solid #e0dbd2', borderRadius: 10, padding: '10px 14px', zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', minWidth: 180 }}>
+                      {[
+                        { key: 'alltime', label: 'All Time Rank' },
+                        { key: 'country', label: 'Country' },
+                        { key: 'dgrade', label: 'dGrade' },
+                        { key: 'egrade', label: 'eGrade' },
+                        { key: 'games', label: 'Games (12mo)' },
+                        { key: 'winpct', label: 'Win% (12mo)' },
+                        { key: 'lastactive', label: 'Last Active' },
+                      ].map(col => (
+                        <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, cursor: 'pointer' }}>
+                          <input type="checkbox" checked={visibleCols.has(col.key)}
+                            onChange={() => {
+                              const next = new Set(visibleCols)
+                              next.has(col.key) ? next.delete(col.key) : next.add(col.key)
+                              setVisibleCols(next)
+                            }} style={{ accentColor: LIME }} />
+                          {col.label}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 7 }}>
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Player search */}
+                <div style={{ position: 'relative' }}>
+                  <input
+                    value={rnkSearch}
+                    onChange={e => {
+                      const v = e.target.value
+                      setRnkSearch(v)
+                      if (v.length < 2) { setRnkSuggestions([]); return }
+                      const lower = v.toLowerCase()
+                      setRnkSuggestions(rankings.filter(p =>
+                        `${p.wcf_first_name} ${p.wcf_last_name}`.toLowerCase().includes(lower)
+                      ).slice(0, 8))
+                    }}
+                    placeholder="Find a player…"
+                    style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #d5cfc5', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, background: 'white', width: 180, outline: 'none' }}
+                  />
+                  {rnkSuggestions.length > 0 && (
+                    <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', border: '1px solid #e0dbd2', borderRadius: 8, zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                      {rnkSuggestions.map(p => (
+                        <button key={p.id} onClick={() => {
+                          setRnkSearch(`${p.wcf_first_name} ${p.wcf_last_name}`)
+                          setRnkSuggestions([])
+                          const idx = rankings.findIndex(r => r.id === p.id)
+                          if (idx >= 0) {
+                            const page = Math.floor(idx / pageSize)
+                            setRankingsPage(page)
+                            setHighlightedPlayerId(p.id)
+                            setTimeout(() => {
+                              highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                            }, 150)
+                          }
+                        }}
+                        style={{ display: 'block', width: '100%', padding: '7px 12px', textAlign: 'left', background: 'none', border: 'none', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, cursor: 'pointer' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ec')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                          {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button onClick={() => { setActiveOnly(true); setRankingsPage(0) }} className={`rnk-pill${activeOnly ? ' on' : ''}`}>
                   Active last 12 months
                 </button>
                 <button onClick={() => { setActiveOnly(false); setRankingsPage(0) }}
-                  style={{ padding: '5px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500, border: `1px solid ${!activeOnly ? '#374151' : '#d5cfc5'}`, background: !activeOnly ? '#374151' : 'white', color: !activeOnly ? 'white' : '#374151', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s' }}>
+                  className={`rnk-pill${!activeOnly ? ' on' : ''}`}>
                   All Time
                 </button>
               </div>
@@ -692,47 +770,60 @@ export default function RankingsPage() {
               <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
-                    <th style={TH('left')}>Active Rank</th>
-                    <th style={TH('left')}>All Time</th>
+                    <th style={TH('left')}>Rank</th>
+                    {visibleCols.has('alltime') && <th style={TH('left')}>All Time</th>}
                     <th style={TH('left', true)} onClick={() => handleRankingSort('wcf_last_name')}>
                       Player{sortArrow('wcf_last_name')}
                     </th>
-                    <th style={TH('left')}>Country</th>
-                    <th style={TH('right', true)} onClick={() => handleRankingSort('dgrade')}>dGrade{sortArrow('dgrade')}</th>
-                    <th style={TH('right', true)} onClick={() => handleRankingSort('egrade')}>eGrade{sortArrow('egrade')}</th>
-                    <th style={TH('right', true)} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>
-                    <th style={TH('right', true)} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>
-                    <th style={TH('right')}>Last Active</th>
+                    {visibleCols.has('country') && <th style={TH('left')}>Country</th>}
+                    {visibleCols.has('dgrade') && <th style={TH('right', true)} onClick={() => handleRankingSort('dgrade')}>dGrade{sortArrow('dgrade')}</th>}
+                    {visibleCols.has('egrade') && <th style={TH('right', true)} onClick={() => handleRankingSort('egrade')}>eGrade{sortArrow('egrade')}</th>}
+                    {visibleCols.has('games') && <th style={TH('right', true)} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>}
+                    {visibleCols.has('winpct') && <th style={TH('right', true)} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>}
+                    {visibleCols.has('lastactive') && <th style={TH('right')}>Last Active</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {rankings.map((player) => (
-                    <tr key={player.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
-                      <td style={{ ...TD('left', true), color: G }}>{activeOnly ? rankings.indexOf(player) + rankingsPage * pageSize + 1 : '—'}</td>
-                      <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.45)' }}>{player.world_ranking}</td>
-                      <td style={TD('left')}>
-                        <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
-                          {player.wcf_first_name} {player.wcf_last_name}
-                        </a>
-                      </td>
-                      <td style={{ ...TD('left'), color: G }}><span style={{ marginRight: 4 }}>{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
-                      <td style={{ ...TD('right', true), fontWeight: 700, color: G, fontSize: 14 }}>{player.dgrade}</td>
-                      <td style={{ ...TD('right', true), fontWeight: 600, color: AMBER }}>{player.egrade || '—'}</td>
-                      <td style={TD('right', true)}>{player.games || '—'}</td>
-                      <td style={TD('right', true)}>{player.win_percentage ? `${player.win_percentage}%` : '—'}</td>
-                      <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{player.last_active_year || '—'}</td>
-                    </tr>
-                  ))}
+                  {rankings.map((player, i) => {
+                    const isHighlighted = player.id === highlightedPlayerId
+                    return (
+                      <tr key={player.id}
+                        ref={isHighlighted ? highlightRef : null}
+                        className="rnk-row"
+                        style={{ borderTop: '1px solid #ede9e2', background: isHighlighted ? 'rgba(74,222,128,0.1)' : 'white', transition: 'background 0.3s' }}>
+                        <td style={{ ...TD('left', true), color: G }}>{activeOnly ? i + rankingsPage * pageSize + 1 : '—'}</td>
+                        {visibleCols.has('alltime') && <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.45)' }}>{player.world_ranking}</td>}
+                        <td style={TD('left')}>
+                          <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
+                            {player.wcf_first_name} {player.wcf_last_name}
+                          </a>
+                        </td>
+                        {visibleCols.has('country') && <td style={{ ...TD('left'), color: G }}><span style={{ marginRight: 4 }}>{getFlag(player.country)}</span>{getCountryName(player.country)}</td>}
+                        {visibleCols.has('dgrade') && <td style={{ ...TD('right', true), fontWeight: 700, color: G, fontSize: 14 }}>{player.dgrade}</td>}
+                        {visibleCols.has('egrade') && <td style={{ ...TD('right', true), fontWeight: 600, color: AMBER }}>{player.egrade || '—'}</td>}
+                        {visibleCols.has('games') && <td style={TD('right', true)}>{player.games || '—'}</td>}
+                        {visibleCols.has('winpct') && <td style={TD('right', true)}>{player.win_percentage ? `${player.win_percentage}%` : '—'}</td>}
+                        {visibleCols.has('lastactive') && <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{player.last_active_year || '—'}</td>}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
-              <button onClick={() => setRankingsPage(p => Math.max(0, p - 1))} disabled={rankingsPage === 0}
-                style={{ fontSize: 13, color: G, padding: '7px 16px', border: '1px solid #d5cfc5', borderRadius: 8, background: 'white', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', opacity: rankingsPage === 0 ? 0.35 : 1 }}>← Previous</button>
-              <span className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.45)' }}>Page {rankingsPage + 1}</span>
-              <button onClick={() => setRankingsPage(p => p + 1)} disabled={rankings.length < pageSize}
-                style={{ fontSize: 13, color: G, padding: '7px 16px', border: '1px solid #d5cfc5', borderRadius: 8, background: 'white', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', opacity: rankings.length < pageSize ? 0.35 : 1 }}>Next →</button>
+            {/* Pagination — bottom */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={() => setRankingsPage(p => Math.max(0, p - 1))} disabled={rankingsPage === 0}
+                  style={{ fontSize: 13, color: G, padding: '7px 16px', border: '1px solid #d5cfc5', borderRadius: 8, background: 'white', cursor: rankingsPage === 0 ? 'default' : 'pointer', fontFamily: 'DM Sans, sans-serif', opacity: rankingsPage === 0 ? 0.35 : 1 }}>← Previous</button>
+                <span className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.45)' }}>Page {rankingsPage + 1}</span>
+                <button onClick={() => setRankingsPage(p => p + 1)} disabled={rankings.length < pageSize}
+                  style={{ fontSize: 13, color: G, padding: '7px 16px', border: '1px solid #d5cfc5', borderRadius: 8, background: 'white', cursor: rankings.length < pageSize ? 'default' : 'pointer', fontFamily: 'DM Sans, sans-serif', opacity: rankings.length < pageSize ? 0.35 : 1 }}>Next →</button>
+              </div>
+              <select value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setRankingsPage(0) }}
+                style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: G, background: 'white', fontFamily: 'DM Sans, sans-serif' }}>
+                {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
+              </select>
             </div>
           </div>
         )}
