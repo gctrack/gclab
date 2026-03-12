@@ -18,21 +18,16 @@ const ML = `
   .ghl   { font-family: 'Playfair Display', serif; }
   .gmono { font-family: 'DM Mono', monospace; }
   .gsans { font-family: 'DM Sans', sans-serif; }
-  .gtab-dark {
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.14);
-    color: rgba(232,224,208,0.45);
-    padding: 5px 14px; border-radius: 6px;
-    font-size: 13px; cursor: pointer;
+  .rnk-tab {
+    padding: 7px 16px; font-size: 13px; font-weight: 500;
     font-family: 'DM Sans', sans-serif;
-    transition: all 0.15s;
+    color: rgba(13,40,24,0.5);
+    border: 1px solid #ddd8ce; border-bottom: none;
+    background: #ede9e1; cursor: pointer;
+    border-radius: 8px 8px 0 0; transition: all 0.15s;
   }
-  .gtab-dark.on {
-    background: rgba(74,222,128,0.15);
-    border-color: rgba(74,222,128,0.4);
-    color: #4ade80;
-  }
-  .gtab-dark:hover { border-color: rgba(74,222,128,0.3); color: rgba(232,224,208,0.8); }
+  .rnk-tab.on { background: #f5f2ec; color: #0d2818; border-color: #ccc7bc; font-weight: 600; }
+  .rnk-tab:hover { background: #f0ece4; color: rgba(13,40,24,0.75); }
   .rnk-card { background: #faf9f7; border: 1px solid #e5e1d8; border-radius: 16px; overflow: hidden; }
   .rnk-row:hover { background: rgba(13,40,24,0.03) !important; }
   .rnk-link { color: #16a34a; text-decoration: none; }
@@ -44,12 +39,13 @@ const ML = `
   }
   .rnk-pill.on { border-color: #4ade80; background: rgba(74,222,128,0.12); color: #16a34a; }
   @media (max-width: 768px) {
-    .rnk-pad  { padding: 24px 20px !important; }
-    .rnk-hero { padding: 28px 20px 24px !important; }
+    .rnk-pad    { padding: 24px 20px !important; }
+    .rnk-header { padding: 20px 20px 0 !important; }
+    .rnk-tab    { padding: 6px 12px; font-size: 12px; }
   }
 `
 
-const TABS = ['Rankings', 'Movers', 'New Players', 'Country Stats', 'Historical Rankings']
+const TABS = ['Rankings', 'Movers', 'New Players', 'Country Rankings', 'Historical Rankings']
 const MOVER_PERIODS = [
   { label: '7 days', days: 7 },
   { label: '30 days', days: 30 },
@@ -58,6 +54,7 @@ const MOVER_PERIODS = [
   { label: 'All Time', days: 0 },
 ]
 const PAGE_SIZES = [50, 100, 200]
+const NEW_PLAYER_PAGE_SIZE = 50
 const FIRST_SYNC_DATE = '2026-03-02'
 const NEW_PLAYERS_SINCE = '2026-03-03T00:00:00Z'
 
@@ -98,7 +95,8 @@ export default function RankingsPage() {
   const [moverPeriod, setMoverPeriod] = useState(7)
 
   const [newPlayers, setNewPlayers] = useState<any[]>([])
-  const [newPlayerDays, setNewPlayerDays] = useState(30)
+  const [newPlayerDays, setNewPlayerDays] = useState(7)
+  const [newPlayerPage, setNewPlayerPage] = useState(0)
   const [newPlayerCountry, setNewPlayerCountry] = useState('')
   const [countryList, setCountryList] = useState<string[]>([])
 
@@ -168,8 +166,8 @@ export default function RankingsPage() {
 
   useEffect(() => { if (activeTab === 'Rankings') loadRankings() }, [activeTab, activeOnly, rankingsPage, pageSize, sortKey, sortDir])
   useEffect(() => { if (activeTab === 'Movers') loadMovers() }, [activeTab, moverPeriod])
-  useEffect(() => { if (activeTab === 'New Players') loadNewPlayers() }, [activeTab, newPlayerDays, newPlayerCountry])
-  useEffect(() => { if (activeTab === 'Country Stats') loadCountryStats() }, [activeTab])
+  useEffect(() => { if (activeTab === 'New Players') { setNewPlayerPage(0); loadNewPlayers() } }, [activeTab, newPlayerDays, newPlayerCountry])
+  useEffect(() => { if (activeTab === 'Country Rankings') loadCountryStats() }, [activeTab])
   useEffect(() => {
     if (activeTab === 'Historical Rankings' && currentUserProfile?.wcf_player_id && !selectedPlayer) {
       loadPlayerHistory(currentUserProfile.wcf_player_id)
@@ -270,7 +268,7 @@ export default function RankingsPage() {
       .from('wcf_players')
       .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url, created_at')
       .gte('created_at', sinceDate)
-      .order('world_ranking', { ascending: true })
+      .order('created_at', { ascending: false })
     if (newPlayerCountry) query = query.eq('country', newPlayerCountry)
     const { data } = await query
     setNewPlayers(data || [])
@@ -634,21 +632,25 @@ export default function RankingsPage() {
       <style dangerouslySetInnerHTML={{ __html: ML }}/>
       <GCLabNav role={userRole} currentPath="/rankings"/>
 
-      {/* ── Dark hero header ──────────────────────────────────────────────── */}
-      <div style={{ background: G, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 20% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)' }}/>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(255,255,255,0.014) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.014) 1px,transparent 1px)', backgroundSize: '44px 44px' }}/>
-        <div className="rnk-hero" style={{ padding: '36px 48px 28px', position: 'relative', zIndex: 1, maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(74,222,128,0.09)', border: '1px solid rgba(74,222,128,0.18)', color: LIME, padding: '3px 12px', borderRadius: 20, fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }} className="gsans">
-            WCF Rankings
+      {/* ── Cream + Lime Accent header ────────────────────────────────────── */}
+      <div style={{ background: '#f5f2ec', borderBottom: '1px solid #ddd8ce' }}>
+        <div className="rnk-header" style={{ padding: '28px 48px 0', maxWidth: 1100, margin: '0 auto' }}>
+          {/* Title row with lime left accent */}
+          <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: 20 }}>
+            <div style={{ width: 4, background: LIME, borderRadius: 2, marginRight: 16, flexShrink: 0 }} />
+            <div>
+              <h1 className="ghl" style={{ fontSize: 'clamp(22px, 2.5vw, 34px)', color: G, fontWeight: 900, margin: '0 0 4px', lineHeight: 1.15 }}>
+                Rankings &amp; Stats
+              </h1>
+              <p className="gsans" style={{ margin: 0, fontSize: 13, color: 'rgba(13,40,24,0.45)' }}>
+                WCF Rankings · Updated daily
+              </p>
+            </div>
           </div>
-          <h1 className="ghl" style={{ fontSize: 'clamp(24px, 3vw, 40px)', color: CREAM, fontWeight: 900, lineHeight: 1.1, marginBottom: 20 }}>
-            Rankings & Stats
-          </h1>
-          {/* Tab pills inside hero */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* Folder-style tabs */}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {TABS.map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`gtab-dark${activeTab === tab ? ' on' : ''}`}>
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`rnk-tab${activeTab === tab ? ' on' : ''}`}>
                 {tab}
               </button>
             ))}
@@ -745,7 +747,7 @@ export default function RankingsPage() {
                 </button>
               ))}
             </div>
-            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 18 }}>GCLab baseline set 6 Mar 2026 — changes detected by daily sync. Games and Win% show career totals from WCF.</p>
+            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 18 }}>GC Rankings baseline set 6 Mar 2026 — changes detected by daily sync. Games and Win% are for the last 12 months.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
               {[
                 { title: '📈 Biggest Gains', data: movers.gains, positive: true },
@@ -763,8 +765,8 @@ export default function RankingsPage() {
                             <th style={TH('left')}>Player</th>
                             <th style={TH('right')}>Change</th>
                             <th style={TH('right')}>dGrade</th>
-                            <th style={TH('right')}>Games</th>
-                            <th style={TH('right')}>Win%</th>
+                                            <th style={TH('right')}>Games (12 mo)</th>
+                            <th style={TH('right')}>Win% (12 mo)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -794,59 +796,115 @@ export default function RankingsPage() {
         )}
 
         {/* ── NEW PLAYERS ── */}
-        {activeTab === 'New Players' && !loading && (
-          <div>
-            <div style={{ display: 'flex', gap: 7, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              {[30, 90, 180, 365].map(d => (
-                <button key={d} onClick={() => setNewPlayerDays(d)} className={`rnk-pill${newPlayerDays === d ? ' on' : ''}`}>
-                  {d === 30 ? '30 days' : d === 90 ? '90 days' : d === 180 ? '6 months' : '1 year'}
-                </button>
-              ))}
-              <select value={newPlayerCountry} onChange={(e) => setNewPlayerCountry(e.target.value)}
-                style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: G, background: 'white', fontFamily: 'DM Sans, sans-serif' }}>
-                <option value="">All countries</option>
-                {countryList.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>)}
-              </select>
-            </div>
-            <p className="gsans" style={{ fontSize: 13, color: G, marginBottom: 4 }}>{newPlayers.length} new players found</p>
-            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 16 }}>Showing players first recorded by GCLab from 3 Mar 2026 onwards.</p>
-            <div className="rnk-card">
-              <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
-                    <th style={TH('left')}>Player</th>
-                    <th style={TH('left')}>Country</th>
-                    <th style={TH('right')}>dGrade</th>
-                    <th style={TH('right')}>eGrade</th>
-                    <th style={TH('right')}>World Rank</th>
-                    <th style={TH('right')}>First Seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {newPlayers.length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No new players found for this period.</td></tr>
-                  ) : newPlayers.map((player) => (
-                    <tr key={player.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
-                      <td style={TD('left')}>
-                        <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
-                          {player.wcf_first_name} {player.wcf_last_name}
-                        </a>
-                      </td>
-                      <td style={{ ...TD('left'), color: G }}><span style={{ marginRight: 4 }}>{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
-                      <td style={{ ...TD('right', true), fontWeight: 700, color: G }}>{player.dgrade}</td>
-                      <td style={{ ...TD('right', true), fontWeight: 600, color: AMBER }}>{player.egrade || '—'}</td>
-                      <td style={TD('right', true)}>{player.world_ranking}</td>
-                      <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{formatDate(player.created_at)}</td>
+        {activeTab === 'New Players' && !loading && (() => {
+          const periodLabel = newPlayerDays === 7 ? '7 days' : newPlayerDays === 30 ? '30 days' : newPlayerDays === 90 ? '90 days' : newPlayerDays === 180 ? '6 months' : '1 year'
+          // Country breakdown
+          const countryCounts = newPlayers.reduce((acc: Record<string, number>, p) => {
+            acc[p.country] = (acc[p.country] || 0) + 1
+            return acc
+          }, {})
+          const countryBreakdown = Object.entries(countryCounts)
+            .sort((a, b) => (b[1] as number) - (a[1] as number))
+          // Pagination
+          const totalPages = Math.ceil(newPlayers.length / NEW_PLAYER_PAGE_SIZE)
+          const pageSlice = newPlayers.slice(newPlayerPage * NEW_PLAYER_PAGE_SIZE, (newPlayerPage + 1) * NEW_PLAYER_PAGE_SIZE)
+          return (
+            <div>
+              {/* Filters */}
+              <div style={{ display: 'flex', gap: 7, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+                {[7, 30, 90, 180, 365].map(d => (
+                  <button key={d} onClick={() => setNewPlayerDays(d)} className={`rnk-pill${newPlayerDays === d ? ' on' : ''}`}>
+                    {d === 7 ? '7 days' : d === 30 ? '30 days' : d === 90 ? '90 days' : d === 180 ? '6 months' : '1 year'}
+                  </button>
+                ))}
+                <select value={newPlayerCountry} onChange={(e) => setNewPlayerCountry(e.target.value)}
+                  style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: G, background: 'white', fontFamily: 'DM Sans, sans-serif' }}>
+                  <option value="">All countries</option>
+                  {countryList.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>)}
+                </select>
+              </div>
+
+              {/* Hero card */}
+              <div className="rnk-card" style={{ padding: '20px 24px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+                <div>
+                  <div className="gmono" style={{ fontSize: 48, fontWeight: 700, color: G, lineHeight: 1 }}>{newPlayers.length}</div>
+                  <div className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)', marginTop: 4 }}>
+                    new player{newPlayers.length !== 1 ? 's' : ''} added in the last {periodLabel}
+                  </div>
+                </div>
+                {countryBreakdown.length > 0 && (
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div className="gsans" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(13,40,24,0.4)', marginBottom: 8 }}>By Country</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
+                      {countryBreakdown.map(([country, count]) => (
+                        <div key={country} className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.7)', whiteSpace: 'nowrap' }}>
+                          {getFlag(country)} {getCountryName(country)} <span className="gmono" style={{ fontWeight: 600, color: G }}>{count as number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 16 }}>
+                Players first recorded by GC Rankings from 3 Mar 2026 onwards. Sorted by date added.
+                {totalPages > 1 && ` Showing ${newPlayerPage * NEW_PLAYER_PAGE_SIZE + 1}–${Math.min((newPlayerPage + 1) * NEW_PLAYER_PAGE_SIZE, newPlayers.length)} of ${newPlayers.length}.`}
+              </p>
+
+              {/* Player table */}
+              <div className="rnk-card">
+                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                      <th style={TH('left')}>Player</th>
+                      <th style={TH('left')}>Country</th>
+                      <th style={TH('right')}>dGrade</th>
+                      <th style={TH('right')}>eGrade</th>
+                      <th style={TH('right')}>World Rank</th>
+                      <th style={TH('right')}>First Seen</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {pageSlice.length === 0 ? (
+                      <tr><td colSpan={6} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No new players found for this period.</td></tr>
+                    ) : pageSlice.map((player) => (
+                      <tr key={player.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                        <td style={TD('left')}>
+                          <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
+                            {player.wcf_first_name} {player.wcf_last_name}
+                          </a>
+                        </td>
+                        <td style={{ ...TD('left'), color: G }}><span style={{ marginRight: 4 }}>{getFlag(player.country)}</span>{getCountryName(player.country)}</td>
+                        <td style={{ ...TD('right', true), fontWeight: 700, color: G }}>{player.dgrade}</td>
+                        <td style={{ ...TD('right', true), fontWeight: 600, color: AMBER }}>{player.egrade || '—'}</td>
+                        <td style={TD('right', true)}>{player.world_ranking}</td>
+                        <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{formatDate(player.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16 }}>
+                  <button onClick={() => setNewPlayerPage(p => Math.max(0, p - 1))} disabled={newPlayerPage === 0}
+                    style={{ padding: '5px 14px', borderRadius: 7, border: '1px solid #d5cfc5', background: 'white', fontSize: 13, cursor: newPlayerPage === 0 ? 'default' : 'pointer', color: newPlayerPage === 0 ? 'rgba(13,40,24,0.3)' : G, fontFamily: 'DM Sans, sans-serif' }}>
+                    ← Prev
+                  </button>
+                  <span className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)' }}>Page {newPlayerPage + 1} of {totalPages}</span>
+                  <button onClick={() => setNewPlayerPage(p => Math.min(totalPages - 1, p + 1))} disabled={newPlayerPage === totalPages - 1}
+                    style={{ padding: '5px 14px', borderRadius: 7, border: '1px solid #d5cfc5', background: 'white', fontSize: 13, cursor: newPlayerPage === totalPages - 1 ? 'default' : 'pointer', color: newPlayerPage === totalPages - 1 ? 'rgba(13,40,24,0.3)' : G, fontFamily: 'DM Sans, sans-serif' }}>
+                    Next →
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* ── COUNTRY STATS ── */}
-        {activeTab === 'Country Stats' && !loading && (
+        {activeTab === 'Country Rankings' && !loading && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
               <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)' }}>Click column headers to sort. Active = played a ranked game in the last 12 months.</p>
@@ -1061,8 +1119,12 @@ export default function RankingsPage() {
                 {playerHistory.length > 0 && (() => {
                   const eventPoints = playerHistory.filter((h: any) => h.is_imported || (h.event_name && h.event_name !== 'Daily sync'))
                   const syncPoints = playerHistory.filter((h: any) => !h.is_imported && (!h.event_name || h.event_name === 'Daily sync'))
+                  const firstSync = syncPoints.length > 0 ? syncPoints[0] : null
                   const lastSync = syncPoints.length > 0 ? syncPoints[syncPoints.length - 1] : null
-                  const tableRows = [...eventPoints, ...(lastSync ? [lastSync] : [])].sort(
+                  const syncRows = firstSync && lastSync && firstSync.recorded_at !== lastSync.recorded_at
+                    ? [firstSync, lastSync]
+                    : firstSync ? [firstSync] : []
+                  const tableRows = [...eventPoints, ...syncRows].sort(
                     (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
                   )
                   const chronological = [...playerHistory]
@@ -1090,7 +1152,11 @@ export default function RankingsPage() {
                                 <td style={{ padding: '7px 14px', color: 'rgba(13,40,24,0.5)', fontFamily: 'DM Sans, sans-serif' }}>
                                   {h.event_url
                                     ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" className="rnk-link">{h.event_name || '—'}</a>
-                                    : h.event_name || <span style={{ color: 'rgba(13,40,24,0.35)' }}>{lastSyncDate ? `Last synced ${new Date(lastSyncDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Latest sync'}</span>}
+                                    : h.event_name
+                                      ? h.event_name
+                                      : firstSync && h.recorded_at === firstSync.recorded_at
+                                        ? <span style={{ color: 'rgba(13,40,24,0.35)' }}>First Sync {new Date(h.recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                        : <span style={{ color: 'rgba(13,40,24,0.35)' }}>Latest Sync {lastSyncDate ? new Date(lastSyncDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>}
                                 </td>
                                 <td style={{ padding: '7px 14px', textAlign: 'right', fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace' }}>{h.dgrade_value}</td>
                                 <td style={{ padding: '7px 14px', textAlign: 'right', fontWeight: 700, fontFamily: 'DM Mono, monospace' }}>
