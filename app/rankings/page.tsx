@@ -411,16 +411,19 @@ export default function RankingsPage() {
     setSearchQuery(`${player.wcf_first_name} ${player.wcf_last_name}`)
     setSearchSuggestions([])
     await fetchHistory(player.id)
-    // Fetch full player data (games, win_percentage) and peak dgrade
-    const [{ data: fullPlayer }, { data: peakData }] = await Promise.all([
+    // Fetch full player data, peak dgrade, and actual game count from wcf_player_games
+    const [{ data: fullPlayer }, { data: peakData }, { count: gameCount }] = await Promise.all([
       supabase.from('wcf_players')
         .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url, games, win_percentage')
         .eq('id', player.id).single(),
       supabase.from('wcf_dgrade_history')
         .select('dgrade_value').eq('wcf_player_id', player.id)
         .order('dgrade_value', { ascending: false }).limit(1),
+      supabase.from('wcf_player_games')
+        .select('id', { count: 'exact', head: true })
+        .eq('wcf_player_id', player.id),
     ])
-    if (fullPlayer) setSelectedPlayer(fullPlayer)
+    if (fullPlayer) setSelectedPlayer({ ...fullPlayer, games: gameCount ?? fullPlayer.games })
     setPeakDgradeAllTime(peakData?.[0]?.dgrade_value || null)
     // Save to recent players (max 5, no duplicates)
     const updated = [player, ...recentPlayers.filter((p: any) => p.id !== player.id)].slice(0, 5)
@@ -1229,41 +1232,41 @@ export default function RankingsPage() {
                       ↓ CSV
                     </button>
                   </div>
-                  <div className="rnk-card" style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', minWidth: 700 }}>
-                      <thead>
-                        <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
-                          <th style={{ ...TH('left'), width: 32 }}>#</th>
-                          <th style={TH('left')}>Country</th>
-                          <th style={{ ...TH('right'), color: '#16a34a' }}>Avg dGrade</th>
-                          {[1,2,3,4,5,6].map(n => (
-                            <th key={n} style={TH('right')}>P{n}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sorted.map((row, i) => {
-                          const players = row.top6_active || []
-                          return (
-                            <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
-                              <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 11 }}>{i + 1}</td>
-                              <td style={{ ...TD('left'), fontWeight: 600, color: G, whiteSpace: 'nowrap' }}>
-                                <span style={{ marginRight: 6 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
-                              </td>
-                              <td style={{ ...TD('right', true), fontWeight: 700, color: '#16a34a' }}>{Math.round(row.avg_top6_dgrade)}</td>
-                              {[0,1,2,3,4,5].map(n => {
-                                const p = players[n]
-                                return (
-                                  <td key={n} style={{ ...TD('right'), whiteSpace: 'nowrap', color: 'rgba(13,40,24,0.65)' }}>
-                                    {p ? <><span style={{ marginRight: 4 }}>{p.last_name}</span><span className="gmono" style={{ fontWeight: 700, color: G, fontSize: 11 }}>{p.dgrade}</span></> : <span style={{ color: 'rgba(13,40,24,0.2)' }}>—</span>}
-                                  </td>
-                                )
-                              })}
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                  <div className="rnk-card" style={{ overflow: 'hidden' }}>
+                    {/* Column header */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '36px 180px 90px 1fr', background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8', alignItems: 'center' }}>
+                      <div style={{ ...TH('left'), width: 36 }}>#</div>
+                      <div style={TH('left')}>Country</div>
+                      <div style={{ ...TH('right'), color: '#16a34a' }}>Avg dGrade</div>
+                      <div style={TH('left')}>Top 6 Players</div>
+                    </div>
+                    {sorted.map((row, i) => {
+                      const players = (row.top6_active || []) as any[]
+                      return (
+                        <div key={row.country} style={{ display: 'grid', gridTemplateColumns: '36px 180px 90px 1fr', borderTop: i === 0 ? 'none' : '1px solid #ede9e2', background: 'white', alignItems: 'start' }}>
+                          {/* Rank */}
+                          <div style={{ padding: '14px 8px 14px 12px', fontSize: 11, color: 'rgba(13,40,24,0.35)', fontFamily: 'DM Mono, monospace' }}>{i + 1}</div>
+                          {/* Country */}
+                          <div style={{ padding: '14px 12px', fontWeight: 600, color: G, fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>
+                            <span style={{ marginRight: 6 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
+                          </div>
+                          {/* Avg dGrade */}
+                          <div style={{ padding: '14px 12px 14px 0', textAlign: 'right', fontWeight: 700, color: '#16a34a', fontFamily: 'DM Mono, monospace', fontSize: 14 }}>{Math.round(row.avg_top6_dgrade)}</div>
+                          {/* 2×3 player grid */}
+                          <div style={{ padding: '10px 12px 10px 4px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px 12px' }}>
+                            {[0,1,2,3,4,5].map(n => {
+                              const p = players[n]
+                              return p ? (
+                                <div key={n} style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                  <span className="gsans" style={{ fontSize: 12, color: G, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.first_name} {p.last_name}</span>
+                                  <span className="gmono" style={{ fontSize: 11, fontWeight: 700, color: 'rgba(13,40,24,0.55)', flexShrink: 0 }}>{p.dgrade}</span>
+                                </div>
+                              ) : null
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )
@@ -1480,7 +1483,7 @@ export default function RankingsPage() {
                                       ? h.event_name
                                       : firstSync && h.recorded_at === firstSync.recorded_at
                                         ? <span style={{ color: 'rgba(13,40,24,0.35)' }}>First Sync {new Date(h.recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                        : <span style={{ color: 'rgba(13,40,24,0.35)' }}>Latest Sync {new Date(h.recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                                        : <span style={{ color: 'rgba(13,40,24,0.35)' }}>Latest Sync {lastSyncDate ? new Date(lastSyncDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(h.recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
                                 </td>
                                 <td style={{ padding: '7px 14px', textAlign: 'right', fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace' }}>{h.dgrade_value}</td>
                                 <td style={{ padding: '7px 14px', textAlign: 'right', fontWeight: 700, fontFamily: 'DM Mono, monospace' }}>
