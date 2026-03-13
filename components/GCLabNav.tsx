@@ -42,7 +42,7 @@ const DESKTOP_TABS = [
   { href: '/rankings',     label: 'WCF Rankings',   public: true  },
   { href: '/leaderboards', label: 'Leaderboards',   public: true  },
   { href: '/compare',      label: 'Compare',        public: true  },
-  { href: '/rankings?tab=Player+History', label: 'Player History', public: true },
+  { href: '/rankings?tab=Player+History', label: 'Player History', public: true, exactMatch: true },
   { href: '/community',    label: 'Community',      public: false },
 ]
 
@@ -78,7 +78,8 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
 
   const isAdmin = role === 'admin' || role === 'super_admin'
 
-  const isActive = (href: string) => {
+  const isActive = (href: string, exactMatch = false) => {
+    if (exactMatch) return false  // sub-tab links never show as active based on path alone
     const base = href.split('?')[0]
     return currentPath === base || currentPath.startsWith(base + '/')
   }
@@ -104,7 +105,7 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
         {/* Desktop tabs */}
         <div className="gcnav-desk">
           {DESKTOP_TABS.map(tab => {
-            const active = isActive(tab.href)
+            const active = isActive(tab.href, (tab as any).exactMatch)
             const locked = !tab.public && !signedIn
             return (
               <a
