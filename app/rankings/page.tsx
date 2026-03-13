@@ -1294,20 +1294,19 @@ export default function RankingsPage() {
         {/* ── COUNTRY RANKINGS ── */}
         {activeTab === 'Country Rankings' && !loading && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 20 }}>
-              <button onClick={downloadCountryCSV}
-                style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-                ↓ CSV
-              </button>
-            </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, alignItems: 'start' }}>
 
               {/* ── Table 1: Country GC Rankings (first) ── */}
               <div>
-                <div style={{ height: 54, marginBottom: 10, overflow: 'hidden' }}>
-                  <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Country GC Rankings</h3>
-                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Countries ranked by average dGrade of their top six eligible players. Click ▾ for breakdown.</p>
+                <div style={{ height: 64, marginBottom: 10, overflow: 'hidden', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div>
+                    <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Country GC Rankings</h3>
+                    <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Countries ranked by average dGrade of their top six eligible players. Click ▾ for breakdown.</p>
+                  </div>
+                  <button onClick={downloadCountryCSV}
+                    style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', flexShrink: 0, marginLeft: 12 }}>
+                    ↓ CSV
+                  </button>
                 </div>
                 <div className="rnk-card" style={{ overflow: 'visible' }}>
                   <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
@@ -1373,7 +1372,7 @@ export default function RankingsPage() {
 
               {/* ── Table 2: Player Counts (second) ── */}
               <div>
-                <div style={{ height: 54, marginBottom: 10, overflow: 'hidden' }}>
+                <div style={{ height: 64, marginBottom: 10, overflow: 'hidden' }}>
                   <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Player Counts</h3>
                   <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Total players in the database and recently active players by country.</p>
                 </div>
