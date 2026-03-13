@@ -38,7 +38,7 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center mb-6">Create your GCLab account</h1>
+        <h1 className="text-2xl font-bold text-center mb-6">Create your GC Rankings account</h1>
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>

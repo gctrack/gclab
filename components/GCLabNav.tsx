@@ -10,12 +10,12 @@ const CREAM = '#e8e0d0'
 
 function Logo() {
   return (
-    <svg width="28" height="34" viewBox="0 0 44 52" fill="none">
-      <rect x="13" y="2" width="18" height="8" rx="2" fill="rgba(74,222,128,0.1)" stroke={LIME} strokeWidth="1.6"/>
-      <path d="M13 10 L2 44 Q0 50 4 51 L40 51 Q44 50 42 44 L31 10 Z" fill="rgba(74,222,128,0.07)" stroke={LIME} strokeWidth="1.6" strokeLinejoin="round"/>
-      <circle cx="14" cy="40" r="6.5" fill="#ef4444"/>
-      <circle cx="30" cy="40" r="6.5" fill="#3b82f6"/>
-      <circle cx="22" cy="29" r="6.5" fill="#eab308"/>
+    <svg width="28" height="30" viewBox="0 0 44 44" fill="none">
+      <rect x="3" y="28" width="10" height="14" rx="2" fill="rgba(74,222,128,0.12)" stroke={LIME} strokeWidth="1.6"/>
+      <rect x="17" y="16" width="10" height="26" rx="2" fill="rgba(74,222,128,0.22)" stroke={LIME} strokeWidth="1.7"/>
+      <rect x="31" y="4" width="10" height="38" rx="2" fill="rgba(74,222,128,0.32)" stroke={LIME} strokeWidth="1.8"/>
+      <polyline points="8,26 22,14 36,2" fill="none" stroke={LIME} strokeWidth="1.5" strokeDasharray="3,2.5" strokeLinecap="round"/>
+      <circle cx="36" cy="2" r="2.5" fill={LIME}/>
     </svg>
   )
 }
@@ -27,23 +27,22 @@ type Props = {
 }
 
 const NAV_LINKS = [
-  { href: '/dashboard',    label: 'Dashboard'            },
-  { href: '/profile',      label: 'My Profile'           },
-  { href: '/rankings',     label: 'WCF Rankings'         },
-  { href: '/leaderboards', label: 'Stats & Leaderboards' },
+  { href: '/rankings',     label: 'Rankings'             },
+  { href: '/leaderboards', label: 'Leaderboards'         },
   { href: '/compare',      label: 'Compare'              },
   { href: '/rankings?tab=Player+History', label: 'Player History' },
   { href: '/community',    label: 'Community'            },
+  { href: '/dashboard',    label: 'Dashboard'            },
 ]
 
 const DESKTOP_TABS = [
-  { href: '/dashboard',    label: 'Dashboard',      public: false },
-  { href: '/profile',      label: 'My Profile',     public: false },
-  { href: '/rankings',     label: 'WCF Rankings',   public: true  },
-  { href: '/leaderboards', label: 'Leaderboards',   public: true  },
-  { href: '/compare',      label: 'Compare',        public: true  },
+  { href: '/rankings',     label: 'Rankings',      public: true  },
+  { href: '/leaderboards', label: 'Leaderboards',  public: true  },
+  { href: '/compare',      label: 'Compare',       public: true  },
   { href: '/rankings?tab=Player+History', label: 'Player History', public: true, exactMatch: true },
-  { href: '/community',    label: 'Community',      public: false },
+  { href: '/community',    label: 'Community',     public: true  },
+  { href: '/dashboard',    label: 'Dashboard',     public: true  },
+  { href: '/profile',      label: 'My Profile',    public: false, hideWhenSignedOut: true },
 ]
 
 const navStyles = `
@@ -53,6 +52,7 @@ const navStyles = `
   .gcnav-desk { display: none; }
   @media (min-width: 900px) { .gcnav-desk { display: flex; align-items: center; gap: 1px; } }
   .gcnav-drop-item:hover { background: rgba(255,255,255,0.06) !important; color: ${CREAM} !important; }
+  .gcnav-lab:hover { background: rgba(74,222,128,0.15) !important; }
 `
 
 export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath = '' }: Props) {
@@ -80,12 +80,10 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
 
   const isActive = (href: string, exactMatch = false) => {
     if (exactMatch) {
-      // Sub-tab links: only active when full path+query matches exactly
       return currentPath === href
     }
     const base = href.split('?')[0]
     const currentBase = currentPath.split('?')[0]
-    // If current URL has a query string that targets a sub-tab, don't highlight parent
     if (currentPath.includes('?') && currentBase === base) return false
     return currentBase === base || currentBase.startsWith(base + '/')
   }
@@ -103,14 +101,16 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
         padding: '0 20px', height: 48,
       }}>
         {/* Logo */}
-        <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0 }}>
+        <a href="/rankings" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0 }}>
           <Logo/>
-          <span className="gcnav-logo" style={{ fontSize: 17, color: CREAM, fontWeight: 700, letterSpacing: '-0.3px' }}>GCLab</span>
+          <span className="gcnav-logo" style={{ fontSize: 17, color: CREAM, fontWeight: 700, letterSpacing: '-0.3px' }}>GC Rankings</span>
         </a>
 
         {/* Desktop tabs */}
         <div className="gcnav-desk">
           {DESKTOP_TABS.map(tab => {
+            // Hide profile entirely when signed out (once auth is confirmed)
+            if ((tab as any).hideWhenSignedOut && authResolved === false) return null
             const active = isActive(tab.href, (tab as any).exactMatch)
             const locked = !tab.public && !signedIn
             return (
@@ -136,6 +136,28 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
               </a>
             )
           })}
+
+          {/* GC Lab — special external item */}
+          <span style={{ width: 1, height: 20, background: 'rgba(74,222,128,0.2)', margin: '0 6px', flexShrink: 0 }}/>
+          <a
+            href="https://gclab.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="gcnav-tab gcnav-lab"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 10px', borderRadius: 6,
+              fontSize: 12, fontWeight: 500,
+              textDecoration: 'none', whiteSpace: 'nowrap',
+              background: 'rgba(74,222,128,0.08)',
+              border: '1px solid rgba(74,222,128,0.25)',
+              color: LIME,
+            }}>
+            <span>⚗️ GC Lab</span>
+            <svg width="8" height="8" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.6 }}>
+              <path d="M1 9L9 1M9 1H3M9 1V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </a>
         </div>
 
         {/* Hamburger */}
@@ -169,6 +191,17 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
               </a>
             ))}
 
+            {/* Profile — only when signed in */}
+            {signedIn && (
+              <a
+                href="/profile"
+                onClick={() => setOpen(false)}
+                className="gcnav-tab gcnav-drop-item"
+                style={{ display: 'flex', alignItems: 'center', padding: '9px 16px', textDecoration: 'none', fontSize: 14, color: isActive('/profile') ? LIME : 'rgba(232,224,208,0.65)', fontWeight: isActive('/profile') ? 600 : 400 }}>
+                My Profile
+              </a>
+            )}
+
             {isAdmin && (
               <>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }}/>
@@ -178,6 +211,21 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
                 </a>
               </>
             )}
+
+            {/* GC Lab — special item */}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }}/>
+            <a
+              href="https://gclab.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+              className="gcnav-tab"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', textDecoration: 'none', fontSize: 14, color: LIME, fontWeight: 500 }}>
+              ⚗️ GC Lab
+              <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.5 }}>
+                <path d="M1 9L9 1M9 1H3M9 1V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </a>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }}/>
             {signedIn ? (

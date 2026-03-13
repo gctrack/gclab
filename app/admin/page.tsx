@@ -461,7 +461,7 @@ export default function AdminPage() {
             Admin Panel
           </div>
           <h1 className="ghl" style={{ fontSize: 32, color: '#e8e0d0', fontWeight: 900, margin: '0 0 6px' }}>
-            GCLab Admin
+            GC Rankings Admin
           </h1>
           <p className="gsans" style={{ fontSize: 14, color: 'rgba(232,224,208,0.5)', margin: '0 0 28px' }}>
             Sync monitoring, imports, user management

@@ -134,10 +134,10 @@ export default function LoginPage() {
                 </svg>
               </div>
               <h1 className="ghl" style={{ color: CREAM, fontSize: 34, margin: '0 0 8px', lineHeight: 1.1 }}>
-                GCLab
+                GC Rankings
               </h1>
               <p className="gsans" style={{ color: 'rgba(232,224,208,0.45)', fontSize: 14, margin: 0 }}>
-                Golf Croquet analytics &amp; intelligence
+                World golf croquet rankings &amp; stats
               </p>
             </div>
 

@@ -336,7 +336,7 @@ export default function CommunityPage() {
               <span className="gsans" style={{ color: LIME, fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Community</span>
             </div>
             <h1 className="ghl" style={{ color: CREAM, fontSize: 38, margin: '0 0 8px', lineHeight: 1.1 }}>Discussions</h1>
-            <p className="gsans" style={{ color: 'rgba(245,240,232,0.5)', margin: 0, fontSize: 14 }}>Members-only Golf Croquet community board</p>
+            <p className="gsans" style={{ color: 'rgba(245,240,232,0.5)', margin: 0, fontSize: 14 }}>Golf Croquet community</p>
           </div>
           {signedIn && (
             <button onClick={() => setShowNewThread(true)} className="gsans"
@@ -348,41 +348,43 @@ export default function CommunityPage() {
       </div>
 
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '28px 24px 60px' }}>
-        {signedIn === false ? (
-          /* Sign in prompt */
-          <div style={{ textAlign: 'center', padding: '80px 24px', background: 'white', borderRadius: 20, border: '1px solid #e5e1d8' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-            <h3 className="ghl" style={{ fontSize: 22, margin: '0 0 8px', color: '#111827' }}>Members Only</h3>
-            <p className="gsans" style={{ color: '#6b7280', fontSize: 14, margin: '0 0 20px' }}>The community board is for GCLab members. Please sign in to participate.</p>
-            <a href="/login" style={{ display: 'inline-block', padding: '11px 24px', background: DARK_GREEN, color: 'white', borderRadius: 10, textDecoration: 'none', fontSize: 14, fontWeight: 600 }} className="gsans">
-              Sign in →
-            </a>
-          </div>
-        ) : (
-          <div style={{ background: 'white', borderRadius: 20, border: '1px solid #e5e1d8', overflow: 'hidden' }}>
-            {activeThread ? (
-              <div style={{ padding: '24px' }}>
-                <ThreadView
-                  thread={activeThread}
-                  posts={posts}
-                  currentUser={currentUser}
-                  onPost={handlePost}
-                  onBack={() => { setActiveThread(null); setPosts([]) }}
-                  loading={postsLoading}
-                />
-              </div>
-            ) : (
-              <>
-                <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e1d8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <h3 className="gsans" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#374151' }}>
-                    {threadsLoading ? 'Loading…' : `${threads.length} discussion${threads.length !== 1 ? 's' : ''}`}
-                  </h3>
-                </div>
-                <ThreadList threads={threads} onSelect={handleSelectThread} currentUser={currentUser}/>
-              </>
-            )}
+
+        {/* Sign-in banner — shown to non-members, doesn't hide content */}
+        {signedIn === false && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'white', border: '1px solid #e5e1d8', borderRadius: 12, padding: '12px 20px', marginBottom: 20, flexWrap: 'wrap' }}>
+            <p className="gsans" style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
+              💬 <strong style={{ color: '#374151' }}>Join the conversation</strong> — create an account to post and reply.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <a href="/signup" className="gsans" style={{ padding: '7px 16px', borderRadius: 8, background: DARK_GREEN, color: 'white', textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>Create account</a>
+              <a href="/login" className="gsans" style={{ padding: '7px 16px', borderRadius: 8, background: 'transparent', color: DARK_GREEN, textDecoration: 'none', fontSize: 13, fontWeight: 500, border: '1px solid #d1d5db' }}>Sign in</a>
+            </div>
           </div>
         )}
+
+        <div style={{ background: 'white', borderRadius: 20, border: '1px solid #e5e1d8', overflow: 'hidden' }}>
+          {activeThread ? (
+            <div style={{ padding: '24px' }}>
+              <ThreadView
+                thread={activeThread}
+                posts={posts}
+                currentUser={currentUser}
+                onPost={handlePost}
+                onBack={() => { setActiveThread(null); setPosts([]) }}
+                loading={postsLoading}
+              />
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e1d8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h3 className="gsans" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#374151' }}>
+                  {threadsLoading ? 'Loading…' : `${threads.length} discussion${threads.length !== 1 ? 's' : ''}`}
+                </h3>
+              </div>
+              <ThreadList threads={threads} onSelect={handleSelectThread} currentUser={currentUser}/>
+            </>
+          )}
+        </div>
       </div>
 
       {showNewThread && <NewThreadModal onClose={() => setShowNewThread(false)} onSubmit={handleNewThread}/>}
