@@ -396,7 +396,7 @@ export default function DashboardPage() {
               .order('event_date', { ascending: true }),
             supabase
               .from('wcf_dgrade_history')
-              .select('recorded_at, dgrade_value, is_imported')
+              .select('recorded_at, dgrade_value, egrade_value, world_ranking, event_name, event_url, is_imported')
               .eq('wcf_player_id', prof.wcf_player_id)
               .order('recorded_at', { ascending: true }),
             supabase
@@ -868,6 +868,74 @@ export default function DashboardPage() {
                   )}
                 </div>
               </div>
+
+              {/* ── Grade History table ── */}
+              {(() => {
+                if (!history.length) return null
+                const sorted = [...history].sort((a: any, b: any) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
+                const firstSync = sorted.find((h: any) => !h.is_imported && (!h.event_name || h.event_name === 'Daily sync'))
+                const lastSync = [...sorted].reverse().find((h: any) => !h.is_imported && (!h.event_name || h.event_name === 'Daily sync'))
+                const eventPoints = sorted.filter((h: any) => h.is_imported || (h.event_name && h.event_name !== 'Daily sync'))
+                const syncRows = firstSync ? (lastSync && lastSync.recorded_at !== firstSync.recorded_at ? [firstSync, lastSync] : [firstSync]) : []
+                const tableRows = [...eventPoints, ...syncRows].sort(
+                  (a: any, b: any) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
+                )
+                const getDiff = (h: any) => {
+                  const idx = sorted.findIndex((x: any) => x.recorded_at === h.recorded_at)
+                  if (idx <= 0) return null
+                  return h.dgrade_value - sorted[idx - 1].dgrade_value
+                }
+                const formatDate = (s: string) => new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                return (
+                  <div style={{ marginBottom: 20 }}>
+                    <div className="dash-light-card">
+                      <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #ede9e2' }}>
+                        <h3 className="ghl" style={{ fontSize: 17, color: G, fontWeight: 700, marginBottom: 2 }}>Grade History</h3>
+                        <p className="gsans" style={{ fontSize: 12, color: '#9ca3af' }}>Event-by-event ranking changes · {eventPoints.length} events imported</p>
+                      </div>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', minWidth: 540 }}>
+                          <thead>
+                            <tr style={{ background: 'rgba(13,40,24,0.03)' }}>
+                              {['Date', 'Event', 'dGrade', 'Change', 'eGrade', 'World Rank'].map((h, i) => (
+                                <th key={h} style={{ padding: '8px 16px', textAlign: i >= 2 ? 'right' : 'left', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9ca3af', fontFamily: 'DM Sans, sans-serif', borderBottom: '1px solid #ede9e2' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tableRows.map((h: any, i: number) => {
+                              const diff = getDiff(h)
+                              const isSync = !h.is_imported && (!h.event_name || h.event_name === 'Daily sync')
+                              const isFst = firstSync && h.recorded_at === firstSync.recorded_at
+                              return (
+                                <tr key={i} className="dash-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                                  <td style={{ padding: '7px 16px', color: '#6b7280', fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap' }}>{formatDate(h.recorded_at)}</td>
+                                  <td style={{ padding: '7px 16px', color: isSync ? '#c4bfb8' : G, fontFamily: 'DM Sans, sans-serif', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {isSync
+                                      ? (isFst ? `First Sync ${formatDate(h.recorded_at)}` : `Latest Sync ${formatDate(h.recorded_at)}`)
+                                      : h.event_url
+                                        ? <a href={h.event_url} target="_blank" rel="noopener noreferrer" style={{ color: '#16a34a', textDecoration: 'none' }}>{h.event_name || '—'}</a>
+                                        : (h.event_name || '—')}
+                                  </td>
+                                  <td style={{ padding: '7px 16px', textAlign: 'right', fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace' }}>{h.dgrade_value}</td>
+                                  <td style={{ padding: '7px 16px', textAlign: 'right', fontWeight: 700, fontFamily: 'DM Mono, monospace' }}>
+                                    {diff === null ? <span style={{ color: '#c4bfb8' }}>—</span>
+                                      : diff > 0 ? <span style={{ color: '#16a34a' }}>↑ +{diff}</span>
+                                      : diff < 0 ? <span style={{ color: '#dc2626' }}>↓ {diff}</span>
+                                      : <span style={{ color: '#c4bfb8' }}>—</span>}
+                                  </td>
+                                  <td style={{ padding: '7px 16px', textAlign: 'right', color: '#d97706', fontFamily: 'DM Mono, monospace' }}>{h.egrade_value || '—'}</td>
+                                  <td style={{ padding: '7px 16px', textAlign: 'right', color: '#6b7280', fontFamily: 'DM Mono, monospace' }}>{h.world_ranking ? `#${h.world_ranking}` : '—'}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
 
               <div style={{ marginBottom: 20 }}>
                 <div className="dash-light-card">
