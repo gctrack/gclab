@@ -68,7 +68,7 @@ const styles = `
 function RankingsLogo() {
   const LIME = '#4ade80'
   return (
-    <svg width="28" height="30" viewBox="0 0 44 44" fill="none">
+    <svg width="36" height="38" viewBox="0 0 44 44" fill="none">
       <rect x="3"  y="28" width="10" height="14" rx="2" fill="#ef4444"/>
       <rect x="17" y="16" width="10" height="26" rx="2" fill="#3b82f6"/>
       <rect x="31" y="4"  width="10" height="38" rx="2" fill="#eab308"/>
@@ -81,7 +81,7 @@ function RankingsLogo() {
 // GCLab beaker logo
 function LabLogo() {
   return (
-    <svg width="24" height="30" viewBox="0 0 44 52" fill="none">
+    <svg width="30" height="38" viewBox="0 0 44 52" fill="none">
       <rect x="13" y="2" width="18" height="8" rx="2" fill="rgba(74,222,128,0.15)" stroke="#4ade80" strokeWidth="1.6"/>
       <path d="M13 10 L2 44 Q0 50 4 51 L40 51 Q44 50 42 44 L31 10 Z" fill="rgba(74,222,128,0.08)" stroke="#4ade80" strokeWidth="1.6" strokeLinejoin="round"/>
       <circle cx="14" cy="40" r="6.5" fill="#ef4444"/>
@@ -172,7 +172,7 @@ function LoginPageInner() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                   <div style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 52, height: 52, borderRadius: 14,
+                    width: 68, height: 68, borderRadius: 16,
                     background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)',
                   }}>
                     <RankingsLogo/>
@@ -191,7 +191,7 @@ function LoginPageInner() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                   <div style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    width: 52, height: 52, borderRadius: 14,
+                    width: 68, height: 68, borderRadius: 16,
                     background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)',
                   }}>
                     <LabLogo/>
