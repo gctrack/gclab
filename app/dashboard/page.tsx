@@ -465,35 +465,102 @@ export default function DashboardPage() {
   )
 
   if (!signedIn) return (
-    <div style={{ minHeight: '100vh', background: '#f5f2ec', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: G, display: 'flex', flexDirection: 'column' }}>
       <style dangerouslySetInnerHTML={{ __html: ML }}/>
       <GCLabNav role="" isSignedIn={false} currentPath="/dashboard"/>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
-        <div style={{ position: 'relative', width: '100%', maxWidth: 520 }}>
-          <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid #e5e1d8', background: 'white', filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #ede9e2', background: '#faf9f7' }}>
-              <div style={{ height: 22, width: 160, background: '#e5e1d8', borderRadius: 4, marginBottom: 8 }}/>
-              <div style={{ height: 14, width: 100, background: '#ede9e2', borderRadius: 4 }}/>
+      <div style={{ flex: 1, padding: '32px 24px 48px', maxWidth: 900, margin: '0 auto', width: '100%' }}>
+
+        {/* Blurred dashboard preview */}
+        <div style={{ position: 'relative', marginBottom: 24 }}>
+          <div style={{ filter: 'blur(5px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.7 }}>
+
+            {/* Fake header */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: LIME, fontWeight: 600, marginBottom: 6 }}>Your Dashboard</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: CREAM, fontFamily: 'DM Serif Display, serif' }}>🏴󠁧󠁢󠁥󠁮󠁧󠁿 Alex Johnson · dGrade 1978 · World #433</div>
             </div>
-            <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
-              {[{ c: '#dcfce7' }, { c: '#dbeafe' }, { c: '#fef3c7' }, { c: '#f3e8ff' }].map(({ c }, i) => (
-                <div key={i} style={{ background: c, borderRadius: 12, padding: 16 }}>
-                  <div style={{ height: 22, width: 64, background: 'rgba(255,255,255,0.7)', borderRadius: 4, marginBottom: 6 }}/>
-                  <div style={{ height: 11, width: 88, background: 'rgba(255,255,255,0.5)', borderRadius: 4 }}/>
+
+            {/* Fake stat cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
+              {[
+                { label: 'Career Games', value: '847', color: LIME },
+                { label: 'Win Rate',     value: '62%',  color: '#60a5fa' },
+                { label: 'Peak Grade',   value: '2,014', color: AMBER },
+                { label: 'Years Active', value: '11',   color: 'rgba(232,224,208,0.7)' },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: '18px 20px' }}>
+                  <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 28, fontWeight: 500, color, lineHeight: 1, marginBottom: 6 }}>{value}</div>
+                  <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.07em', color: CREAM25 }}>{label}</div>
                 </div>
               ))}
             </div>
-          </div>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(6px)', borderRadius: 20 }}>
-            <div style={{ textAlign: 'center', padding: '32px 40px', maxWidth: 360 }}>
-              <div style={{ width: 56, height: 56, background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px', fontSize: 24 }}>🎯</div>
-              <h2 className="ghl" style={{ fontSize: 22, color: G, marginBottom: 8, fontWeight: 900 }}>Your personal dashboard</h2>
-              <p className="gsans" style={{ fontSize: 14, color: '#6b7280', marginBottom: 22, lineHeight: 1.6 }}>Track your grade, career stats, win rates and more. Free to set up in 30 seconds.</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <a href="/login?mode=signup" style={{ background: G, color: LIME, padding: '11px 20px', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none', textAlign: 'center', fontFamily: 'DM Sans, sans-serif' }}>Create free account</a>
-                <a href="/login" style={{ border: '1px solid #d1d5db', color: '#374151', padding: '11px 20px', borderRadius: 8, fontSize: 14, fontWeight: 500, textDecoration: 'none', textAlign: 'center', fontFamily: 'DM Sans, sans-serif' }}>Sign in</a>
+
+            {/* Fake grade chart */}
+            <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 16, marginBottom: 16, overflow: 'hidden' }}>
+              <div style={{ padding: '16px 24px 12px', borderBottom: `1px solid ${CARD_BORDER}` }}>
+                <div style={{ fontFamily: 'DM Serif Display, serif', fontSize: 17, color: CREAM, fontWeight: 700 }}>Grade History</div>
+                <div style={{ fontSize: 12, color: CREAM25, marginTop: 3 }}>2013 – 2026 · 11 years of data</div>
               </div>
-              <p className="gsans" style={{ fontSize: 11, color: '#9ca3af', marginTop: 14 }}>Free · No credit card · 30 seconds</p>
+              <div style={{ padding: '20px 24px 16px' }}>
+                <svg width="100%" height="140" viewBox="0 0 840 140" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#4ade80" stopOpacity="0.25"/>
+                      <stop offset="100%" stopColor="#4ade80" stopOpacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  {[30,60,90,120].map(y => <line key={y} x1="0" y1={y} x2="840" y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>)}
+                  <path d="M20,115 C60,110 100,100 150,88 C200,76 240,62 290,50 C340,38 380,32 420,30 C460,29 490,33 530,42 C570,51 610,66 660,80 C700,91 740,102 800,108 L800,135 L20,135 Z" fill="url(#pg)"/>
+                  <path d="M20,115 C60,110 100,100 150,88 C200,76 240,62 290,50 C340,38 380,32 420,30 C460,29 490,33 530,42 C570,51 610,66 660,80 C700,91 740,102 800,108" fill="none" stroke="#4ade80" strokeWidth="2.5"/>
+                  <circle cx="420" cy="30" r="5" fill="#4ade80"/>
+                </svg>
+              </div>
+            </div>
+
+            {/* Fake win rate bars */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 16, padding: '18px 22px' }}>
+                <div style={{ fontFamily: 'DM Serif Display, serif', fontSize: 15, color: CREAM, marginBottom: 14 }}>Win Rate by Year</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[['2024','71%',71],['2023','65%',65],['2022','58%',58],['2021','74%',74]].map(([yr, pct, w]) => (
+                    <div key={yr} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: CREAM25, width: 32 }}>{yr}</span>
+                      <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 3 }}>
+                        <div style={{ width: `${w}%`, height: '100%', background: LIME, borderRadius: 3 }}/>
+                      </div>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: LIME, width: 32, textAlign: 'right' }}>{pct}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 16, padding: '18px 22px' }}>
+                <div style={{ fontFamily: 'DM Serif Display, serif', fontSize: 15, color: CREAM, marginBottom: 14 }}>Performance vs Grade</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[['2200+','38%',38],['2000–2200','55%',55],['1800–2000','68%',68],['< 1800','84%',84]].map(([band, pct, w]) => (
+                    <div key={band} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: CREAM25, width: 80 }}>{band}</span>
+                      <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 3 }}>
+                        <div style={{ width: `${w}%`, height: '100%', background: '#60a5fa', borderRadius: 3 }}/>
+                      </div>
+                      <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#60a5fa', width: 32, textAlign: 'right' }}>{pct}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA overlay */}
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: 'rgba(13,40,24,0.88)', backdropFilter: 'blur(12px)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 20, padding: '36px 44px', textAlign: 'center', maxWidth: 380, boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}>
+              <div style={{ width: 52, height: 52, background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px', fontSize: 22 }}>📈</div>
+              <h2 className="ghl" style={{ fontSize: 22, color: CREAM, marginBottom: 10, fontWeight: 900, lineHeight: 1.1 }}>Your career, quantified</h2>
+              <p className="gsans" style={{ fontSize: 14, color: CREAM60, marginBottom: 24, lineHeight: 1.65 }}>Grade history, win rates, best wins and opponent breakdowns — all yours in 30 seconds.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <a href="/login?mode=signup" style={{ background: LIME, color: G, padding: '12px 20px', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none', textAlign: 'center', fontFamily: 'DM Sans, sans-serif' }}>Create free account →</a>
+                <a href="/login" style={{ border: '1px solid rgba(232,224,208,0.15)', color: CREAM60, padding: '11px 20px', borderRadius: 8, fontSize: 14, fontWeight: 500, textDecoration: 'none', textAlign: 'center', fontFamily: 'DM Sans, sans-serif' }}>Sign in</a>
+              </div>
+              <p className="gsans" style={{ fontSize: 11, color: CREAM25, marginTop: 14 }}>Free · Takes 30 seconds</p>
             </div>
           </div>
         </div>
