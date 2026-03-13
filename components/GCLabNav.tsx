@@ -79,9 +79,15 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
   const isAdmin = role === 'admin' || role === 'super_admin'
 
   const isActive = (href: string, exactMatch = false) => {
-    if (exactMatch) return false  // sub-tab links never show as active based on path alone
+    if (exactMatch) {
+      // Sub-tab links: only active when full path+query matches exactly
+      return currentPath === href
+    }
     const base = href.split('?')[0]
-    return currentPath === base || currentPath.startsWith(base + '/')
+    const currentBase = currentPath.split('?')[0]
+    // If current URL has a query string that targets a sub-tab, don't highlight parent
+    if (currentPath.includes('?') && currentBase === base) return false
+    return currentBase === base || currentBase.startsWith(base + '/')
   }
 
   const signedIn = authResolved === null ? true : authResolved

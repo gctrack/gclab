@@ -109,6 +109,7 @@ export default function RankingsPage() {
   const [newPlayerPage, setNewPlayerPage] = useState(0)
   const [newPlayerCountry, setNewPlayerCountry] = useState('')
   const [countryList, setCountryList] = useState<string[]>([])
+  const [countryPlayerCounts, setCountryPlayerCounts] = useState<Record<string, number>>({})
 
   const [countryStats, setCountryStats] = useState<any[]>([])
   const [countrySortKey, setCountrySortKey] = useState('avg_top6_alltime_dgrade')
@@ -181,38 +182,44 @@ export default function RankingsPage() {
 
   useEffect(() => { if (activeTab === 'Rankings') loadRankings() }, [activeTab, activeOnly, rankingsPage, pageSize, sortKey, sortDir, filterCountry])
 
-  // Load full country list on mount for the country filter dropdown
+  // Load country list + player counts on mount for the filter dropdown
   useEffect(() => {
     supabase.from('wcf_players')
       .select('country')
-      .order('country')
       .then(({ data }) => {
-        if (data) {
-          const unique = [...new Set(data.map((p: any) => p.country))].filter(Boolean).sort() as string[]
-          setCountryList(unique)
-        }
+        if (!data) return
+        const counts: Record<string, number> = {}
+        data.forEach((p: any) => { if (p.country) counts[p.country] = (counts[p.country] || 0) + 1 })
+        setCountryPlayerCounts(counts)
+        // Sort by player count desc, then alphabetically
+        const sorted = Object.keys(counts).sort((a, b) => {
+          const diff = counts[b] - counts[a]
+          return diff !== 0 ? diff : getCountryName(a).localeCompare(getCountryName(b))
+        })
+        setCountryList(sorted)
       })
   }, [])
 
-  // Fetch last-seen year from actual game dates (wcf_player_games.event_date)
+  // Fetch last game year: one query per visible player (parallel, 1 row each)
+  // Using parallel queries ensures we always get the correct most-recent game
+  // even for players with large game histories.
   useEffect(() => {
     if (rankings.length === 0) { setLastSeenYears({}); return }
-    const ids = rankings.map((p: any) => p.id)
-    supabase.from('wcf_player_games')
-      .select('wcf_player_id, event_date')
-      .in('wcf_player_id', ids)
-      .order('event_date', { ascending: false })
-      .limit(2000)
-      .then(({ data }) => {
-        if (!data) return
-        const map: Record<string, number> = {}
-        for (const row of data) {
-          if (row.event_date && !map[row.wcf_player_id]) {
-            map[row.wcf_player_id] = new Date(row.event_date).getFullYear()
-          }
-        }
-        setLastSeenYears(map)
-      })
+    Promise.all(
+      rankings.map((p: any) =>
+        supabase.from('wcf_player_games')
+          .select('event_date')
+          .eq('wcf_player_id', p.id)
+          .order('event_date', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(({ data }) => ({ id: p.id, year: data?.event_date ? new Date(data.event_date).getFullYear() : null }))
+      )
+    ).then(results => {
+      const map: Record<string, number> = {}
+      for (const r of results) { if (r.year) map[r.id] = r.year }
+      setLastSeenYears(map)
+    })
   }, [rankings])
 
   // Close column menu when clicking outside
@@ -761,7 +768,7 @@ export default function RankingsPage() {
       if (!(e.target as HTMLElement).closest('.relative')) setTooltip(null)
     }}>
       <style dangerouslySetInnerHTML={{ __html: ML }}/>
-      <GCLabNav role={userRole} currentPath="/rankings"/>
+      <GCLabNav role={userRole} currentPath={activeTab === 'Player History' ? '/rankings?tab=Player+History' : '/rankings'}/>
 
       {/* ── Cream + Lime Accent header ────────────────────────────────────── */}
       <div style={{ background: '#f5f2ec', borderBottom: '1px solid #ddd8ce' }}>
@@ -826,7 +833,7 @@ export default function RankingsPage() {
                       { key: 'games', label: 'Games (12mo)' },
                       { key: 'winpct', label: 'Win% (12mo)' },
                       { key: 'lastactive', label: 'Last Active (WCF)' },
-                      { key: 'lastseen', label: 'Last Seen (our DB)' },
+                      { key: 'lastseen', label: 'Last Game (our DB)' },
                     ].map(col => (
                       <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, cursor: 'pointer' }}>
                         <input type="checkbox" checked={visibleCols.has(col.key)}
@@ -909,7 +916,23 @@ export default function RankingsPage() {
                 <select value={filterCountry} onChange={e => { setFilterCountry(e.target.value); setRankingsPage(0) }}
                   style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: filterCountry ? '#16a34a' : 'rgba(13,40,24,0.6)', background: 'white', fontFamily: 'DM Sans, sans-serif', fontWeight: filterCountry ? 600 : 400 }}>
                   <option value="">All Countries</option>
-                  {countryList.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>)}
+                  {(() => {
+                    // Top 8 countries by player count
+                    const top = countryList.slice(0, 8)
+                    const rest = countryList.slice(8).sort((a, b) => getCountryName(a).localeCompare(getCountryName(b)))
+                    return (
+                      <>
+                        <optgroup label="Most Players">
+                          {top.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)} ({countryPlayerCounts[c]})</option>)}
+                        </optgroup>
+                        {rest.length > 0 && (
+                          <optgroup label="Other Countries">
+                            {rest.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>)}
+                          </optgroup>
+                        )}
+                      </>
+                    )
+                  })()}
                 </select>
                 <button onClick={() => { setActiveOnly(true); setRankingsPage(0) }} className={`rnk-pill${activeOnly ? ' on' : ''}`}>
                   Active (12mo)
@@ -936,7 +959,7 @@ export default function RankingsPage() {
                     {visibleCols.has('games') && <th style={TH('right', true)} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>}
                     {visibleCols.has('winpct') && <th style={TH('right', true)} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>}
                     {visibleCols.has('lastactive') && <th style={TH('right')}>Last Active</th>}
-                    {visibleCols.has('lastseen') && <th style={TH('right')}>Last Seen</th>}
+                    {visibleCols.has('lastseen') && <th style={TH('right')}>Last Game</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -955,10 +978,10 @@ export default function RankingsPage() {
                           </a>
                         </td>
                         {visibleCols.has('country') && <td style={{ ...TD('left'), color: G }}><span style={{ marginRight: 4 }}>{getFlag(player.country)}</span>{getCountryName(player.country)}</td>}
-                        {visibleCols.has('dgrade') && <td style={{ ...TD('right', true), fontWeight: 700, color: G, fontSize: 14 }}>{player.dgrade}</td>}
-                        {visibleCols.has('egrade') && <td style={{ ...TD('right', true), fontWeight: 600, color: AMBER }}>{player.egrade || '—'}</td>}
-                        {visibleCols.has('games') && <td style={TD('right', true)}>{player.games || '—'}</td>}
-                        {visibleCols.has('winpct') && <td style={TD('right', true)}>{player.win_percentage ? `${player.win_percentage}%` : '—'}</td>}
+                        {visibleCols.has('dgrade') && <td style={{ ...TD('right', true), fontWeight: sortKey === 'dgrade' ? 700 : 400, color: sortKey === 'dgrade' ? G : 'rgba(13,40,24,0.7)', fontSize: 14 }}>{player.dgrade}</td>}
+                        {visibleCols.has('egrade') && <td style={{ ...TD('right', true), fontWeight: sortKey === 'egrade' ? 700 : 400, color: sortKey === 'egrade' ? AMBER : 'rgba(13,40,24,0.5)' }}>{player.egrade || '—'}</td>}
+                        {visibleCols.has('games') && <td style={{ ...TD('right', true), fontWeight: sortKey === 'games' ? 700 : 400, color: sortKey === 'games' ? G : 'rgba(13,40,24,0.7)' }}>{player.games || '—'}</td>}
+                        {visibleCols.has('winpct') && <td style={{ ...TD('right', true), fontWeight: sortKey === 'win_percentage' ? 700 : 400, color: sortKey === 'win_percentage' ? G : 'rgba(13,40,24,0.7)' }}>{player.win_percentage ? `${player.win_percentage}%` : '—'}</td>}
                         {visibleCols.has('lastactive') && <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{player.last_active_year || '—'}</td>}
                         {visibleCols.has('lastseen') && <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{lastSeenYears[player.id] || '—'}</td>}
                       </tr>
