@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
   @keyframes gclab-blink  { 0%,100%{opacity:1} 50%{opacity:0.2} }
   @keyframes f1 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
@@ -17,7 +17,7 @@ const styles = `
   .f3 { animation: f3 2.9s ease-in-out infinite 1s; }
   .gblink { animation: gclab-blink 2.2s ease-in-out infinite; }
 
-  .ghl  { font-family: 'Playfair Display', serif; }
+  .ghl  { font-family: 'DM Serif Display', serif; }
   .gmono{ font-family: 'DM Mono', monospace; }
 
   .gbtn {

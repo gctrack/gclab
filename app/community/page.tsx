@@ -9,8 +9,8 @@ const CREAM = '#f5f0e8'
 const LIME = '#4ade80'
 
 const ML = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-  .ghl  { font-family: 'Playfair Display', serif; }
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  .ghl  { font-family: 'DM Serif Display', serif; }
   .gsans{ font-family: 'DM Sans', sans-serif; }
   .gmono{ font-family: 'DM Mono', monospace; }
   .post-card { transition: box-shadow 0.15s; }

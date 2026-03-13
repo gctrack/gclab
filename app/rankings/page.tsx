@@ -14,8 +14,8 @@ const CREAM25 = 'rgba(232,224,208,0.25)'
 const AMBER   = '#eab308'
 
 const ML = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-  .ghl   { font-family: 'Playfair Display', serif; }
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  .ghl   { font-family: 'DM Serif Display', serif; }
   .gmono { font-family: 'DM Mono', monospace; }
   .gsans { font-family: 'DM Sans', sans-serif; }
   .rnk-tab {
