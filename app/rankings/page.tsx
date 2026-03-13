@@ -181,20 +181,35 @@ export default function RankingsPage() {
 
   useEffect(() => { if (activeTab === 'Rankings') loadRankings() }, [activeTab, activeOnly, rankingsPage, pageSize, sortKey, sortDir, filterCountry])
 
-  // Fetch last-seen year from history for visible players
+  // Load full country list on mount for the country filter dropdown
+  useEffect(() => {
+    supabase.from('wcf_players')
+      .select('country')
+      .order('country')
+      .then(({ data }) => {
+        if (data) {
+          const unique = [...new Set(data.map((p: any) => p.country))].filter(Boolean).sort() as string[]
+          setCountryList(unique)
+        }
+      })
+  }, [])
+
+  // Fetch last-seen year from actual game dates (wcf_player_games.event_date)
   useEffect(() => {
     if (rankings.length === 0) { setLastSeenYears({}); return }
     const ids = rankings.map((p: any) => p.id)
-    supabase.from('wcf_dgrade_history')
-      .select('wcf_player_id, recorded_at')
+    supabase.from('wcf_player_games')
+      .select('wcf_player_id, event_date')
       .in('wcf_player_id', ids)
-      .order('recorded_at', { ascending: false })
-      .limit(1000)
+      .order('event_date', { ascending: false })
+      .limit(2000)
       .then(({ data }) => {
         if (!data) return
         const map: Record<string, number> = {}
         for (const row of data) {
-          if (!map[row.wcf_player_id]) map[row.wcf_player_id] = new Date(row.recorded_at).getFullYear()
+          if (row.event_date && !map[row.wcf_player_id]) {
+            map[row.wcf_player_id] = new Date(row.event_date).getFullYear()
+          }
         }
         setLastSeenYears(map)
       })
@@ -781,54 +796,54 @@ export default function RankingsPage() {
         {/* ── RANKINGS ── */}
         {activeTab === 'Rankings' && !loading && (
           <div>
-            {/* Toolbar row */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)' }}>{rankings.length} players shown</p>
-                <select value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setRankingsPage(0) }}
-                  style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: G, background: 'white', fontFamily: 'DM Sans, sans-serif' }}>
-                  {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
-                </select>
-                <button onClick={downloadCSV}
-                  style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-                  ↓ Page CSV
+            {/* Toolbar — single unified row */}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+              {/* Left: page size, CSV, columns */}
+              <select value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setRankingsPage(0) }}
+                style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: G, background: 'white', fontFamily: 'DM Sans, sans-serif' }}>
+                {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
+              </select>
+              <button onClick={downloadCSV}
+                style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                ↓ Page
+              </button>
+              <button onClick={downloadAllCSV}
+                style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                ↓ All CSV
+              </button>
+              <div ref={colMenuRef} style={{ position: 'relative' }}>
+                <button onClick={() => setShowColMenu(v => !v)}
+                  style={{ fontSize: 13, background: showColMenu ? '#f0f9f4' : 'white', border: `1px solid ${showColMenu ? '#4ade80' : '#d5cfc5'}`, color: showColMenu ? '#16a34a' : '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                  ⊞ Columns
                 </button>
-                <button onClick={downloadAllCSV}
-                  style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-                  ↓ All CSV
-                </button>
-                {/* Column toggles */}
-                <div ref={colMenuRef} style={{ position: 'relative' }}>
-                  <button onClick={() => setShowColMenu(v => !v)}
-                    style={{ fontSize: 13, background: showColMenu ? '#f0f9f4' : 'white', border: `1px solid ${showColMenu ? '#4ade80' : '#d5cfc5'}`, color: showColMenu ? '#16a34a' : '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-                    ⊞ Columns
-                  </button>
-                  {showColMenu && (
-                    <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', border: '1px solid #e0dbd2', borderRadius: 10, padding: '10px 14px', zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', minWidth: 180 }}>
-                      {[
-                        { key: 'alltime', label: 'All Time Rank' },
-                        { key: 'country', label: 'Country' },
-                        { key: 'dgrade', label: 'dGrade' },
-                        { key: 'egrade', label: 'eGrade' },
-                        { key: 'games', label: 'Games (12mo)' },
-                        { key: 'winpct', label: 'Win% (12mo)' },
-                        { key: 'lastactive', label: 'Last Active (WCF)' },
-                        { key: 'lastseen', label: 'Last Seen (our DB)' },
-                      ].map(col => (
-                        <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, cursor: 'pointer' }}>
-                          <input type="checkbox" checked={visibleCols.has(col.key)}
-                            onChange={() => {
-                              const next = new Set(visibleCols)
-                              next.has(col.key) ? next.delete(col.key) : next.add(col.key)
-                              setVisibleCols(next)
-                            }} style={{ accentColor: LIME }} />
-                          {col.label}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {showColMenu && (
+                  <div style={{ position: 'absolute', top: '110%', left: 0, background: 'white', border: '1px solid #e0dbd2', borderRadius: 10, padding: '10px 14px', zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', minWidth: 180 }}>
+                    {[
+                      { key: 'alltime', label: 'All Time Rank' },
+                      { key: 'country', label: 'Country' },
+                      { key: 'dgrade', label: 'dGrade' },
+                      { key: 'egrade', label: 'eGrade' },
+                      { key: 'games', label: 'Games (12mo)' },
+                      { key: 'winpct', label: 'Win% (12mo)' },
+                      { key: 'lastactive', label: 'Last Active (WCF)' },
+                      { key: 'lastseen', label: 'Last Seen (our DB)' },
+                    ].map(col => (
+                      <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={visibleCols.has(col.key)}
+                          onChange={() => {
+                            const next = new Set(visibleCols)
+                            next.has(col.key) ? next.delete(col.key) : next.add(col.key)
+                            setVisibleCols(next)
+                          }} style={{ accentColor: LIME }} />
+                        {col.label}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
+              {/* Spacer */}
+              <div style={{ flex: 1 }}/>
+              {/* Right: search, country filter, active toggles */}
               <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
                 {/* Player search */}
                 <div style={{ position: 'relative' }}>
