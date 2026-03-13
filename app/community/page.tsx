@@ -566,17 +566,16 @@ export default function CommunityPage() {
       <GCLabNav role={userProfile?.role} isSignedIn={!!signedIn} currentPath="/community"/>
 
       {/* ── Header ── */}
-      <div style={{ background: G, borderBottom: '2px solid #16a34a' }}>
-        <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 24px 28px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 20, padding: '3px 12px', marginBottom: 12 }}>
-              <span style={{ fontSize: 14 }}>🌿</span>
-              <span className="gsans" style={{ color: LIME, fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Community</span>
+      <div style={{ background: '#f5f2ec', borderBottom: '1px solid #ddd8ce' }}>
+        <div style={{ maxWidth: 860, margin: '0 auto', padding: '28px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
+            <div style={{ width: 4, background: LIME, borderRadius: 2, marginRight: 16, flexShrink: 0 }}/>
+            <div>
+              <h1 className="ghl" style={{ color: G, fontSize: 'clamp(22px, 2.5vw, 34px)', margin: '0 0 4px', lineHeight: 1.15 }}>Golf Croquet Community</h1>
+              <p className="gsans" style={{ color: 'rgba(13,40,24,0.45)', margin: 0, fontSize: 13 }}>
+                {threadsLoading ? 'Loading…' : `${threads.length} discussion${threads.length !== 1 ? 's' : ''} across ${CATEGORIES.length} topics`}
+              </p>
             </div>
-            <h1 className="ghl" style={{ color: CREAM, fontSize: 'clamp(24px, 3vw, 36px)', margin: '0 0 6px', lineHeight: 1.1 }}>Golf Croquet Community</h1>
-            <p className="gsans" style={{ color: 'rgba(245,240,232,0.45)', margin: 0, fontSize: 13 }}>
-              {threadsLoading ? 'Loading…' : `${threads.length} discussion${threads.length !== 1 ? 's' : ''} across ${CATEGORIES.length} topics`}
-            </p>
           </div>
           {signedIn && (
             <button onClick={() => setShowNewThread(true)} className="gsans"
