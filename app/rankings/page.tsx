@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
 import { getFlag, countryName as getCountryName } from '@/lib/countries'
+import { trackEvent } from '@/lib/analytics'
 
 // ── Design tokens (matches dashboard) ────────────────────────────────────────
 const G       = '#0d2818'
@@ -575,6 +576,7 @@ export default function RankingsPage() {
     setLookupSearched(false)
     setSearchQuery(`${player.wcf_first_name} ${player.wcf_last_name}`)
     setSearchSuggestions([])
+    trackEvent('player_history_search', { player: `${player.wcf_first_name} ${player.wcf_last_name}` })
     await fetchHistory(player.id)
     // Fetch full player data, peak dgrade, and actual game count from wcf_player_games
     const [{ data: fullPlayer }, { data: peakData }, { count: gameCount }] = await Promise.all([
