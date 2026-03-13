@@ -152,6 +152,9 @@ function HeroCard({ label, sublabel, icon, accentColor, loading, player }: {
 }
 
 // ── Top-10 Table ─────────────────────────────────────────────────────────────
+const PAGE_SIZE = 10
+const MAX_BASE  = 50   // max 5 pages; extended only if position 50 is mid-tie
+
 function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, subText, renderExtra, tieKey }: {
   title: string; icon: string; accentColor: string; rows: any[]; loading: boolean
   renderValue: (row: any) => React.ReactNode
@@ -161,7 +164,7 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
 }) {
   const [page, setPage] = useState(1)
 
-  // Sort: keep primary order (desc by value) but sort ties alphabetically
+  // Sort ties alphabetically, keep value order otherwise
   const sorted = tieKey
     ? [...rows].sort((a, b) => {
         if (b[tieKey] !== a[tieKey]) return b[tieKey] - a[tieKey]
@@ -171,26 +174,26 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
       })
     : rows
 
-  // Dense rank: all rows sharing the same tieKey value get the rank of the first occurrence
+  // Dense rank
   const ranked = sorted.map((r, i) => {
     if (!tieKey) return { ...r, _rank: i + 1 }
     const firstIdx = sorted.findIndex(x => x[tieKey] === r[tieKey])
     return { ...r, _rank: firstIdx + 1 }
   })
 
-  // Count how many rows share each rank (to decide if = prefix is needed)
+  // Count per rank for = prefix
   const rankCounts: Record<number, number> = {}
   for (const r of ranked) rankCounts[r._rank] = (rankCounts[r._rank] || 0) + 1
   const rankLabel = (r: any) => rankCounts[r._rank] > 1 ? `=${r._rank}` : `${r._rank}`
 
-  const page1 = ranked.slice(0, 10)
-  // Overflow: rows beyond position 10 that tie with row at position 10
-  const val10 = tieKey && ranked.length > 10 ? ranked[9][tieKey] : null
-  const overflowTies = val10 != null
-    ? ranked.slice(10).filter(r => r[tieKey!] === val10)
-    : []
+  // Cutoff: first MAX_BASE rows + any overflow tied with position MAX_BASE
+  const base = ranked.slice(0, MAX_BASE)
+  const val50 = tieKey && ranked.length > MAX_BASE ? ranked[MAX_BASE - 1][tieKey] : null
+  const overflow = val50 != null ? ranked.slice(MAX_BASE).filter(r => r[tieKey!] === val50) : []
+  const allRows = [...base, ...overflow]
 
-  const displayed = page === 2 ? overflowTies : page1
+  const totalPages = Math.max(1, Math.ceil(allRows.length / PAGE_SIZE))
+  const displayed  = allRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div className="ldr-card">
@@ -235,23 +238,24 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
               {renderExtra && renderExtra(row)}
             </div>
           ))}
-          {overflowTies.length > 0 && (
-            <div style={{ borderTop: '1px solid #ede9e2', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 18px' }}>
-              <button onClick={() => setPage(1)} className="gsans" style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
-                fontSize: 12, fontWeight: 700,
-                color: page === 1 ? accentColor : 'rgba(13,40,24,0.35)',
-                borderRadius: 4,
-              }}>1</button>
-              <button onClick={() => setPage(2)} className="gsans" style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
-                fontSize: 12, fontWeight: 700,
-                color: page === 2 ? accentColor : 'rgba(13,40,24,0.35)',
-                borderRadius: 4,
-              }}>2</button>
-              <span className="gsans" style={{ fontSize: 11, color: 'rgba(13,40,24,0.3)', marginLeft: 2 }}>
-                {overflowTies.length} more tied at ={overflowTies[0]?._rank}
-              </span>
+          {totalPages > 1 && (
+            <div style={{ borderTop: '1px solid #ede9e2', display: 'flex', alignItems: 'center', gap: 2, padding: '7px 14px' }}>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="gsans" style={{
+                background: 'none', border: 'none', cursor: page === 1 ? 'default' : 'pointer',
+                fontSize: 13, color: page === 1 ? 'rgba(13,40,24,0.2)' : 'rgba(13,40,24,0.45)', padding: '2px 4px',
+              }}>‹</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => setPage(p)} className="gsans" style={{
+                  background: page === p ? accentColor : 'none',
+                  border: 'none', cursor: 'pointer', padding: '2px 7px',
+                  fontSize: 11, fontWeight: 700, borderRadius: 4,
+                  color: page === p ? 'white' : 'rgba(13,40,24,0.4)',
+                }}>{p}</button>
+              ))}
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="gsans" style={{
+                background: 'none', border: 'none', cursor: page === totalPages ? 'default' : 'pointer',
+                fontSize: 13, color: page === totalPages ? 'rgba(13,40,24,0.2)' : 'rgba(13,40,24,0.45)', padding: '2px 4px',
+              }}>›</button>
             </div>
           )}
         </div>
@@ -388,10 +392,10 @@ export default function LeaderboardsPage() {
       { data: games }, { data: winRate }, { data: travelled }, { data: opponents },
       { data: careerRise }, { data: streak }, { data: eventJump }, { data: upsets },
     ] = await Promise.all([
-      supabase.rpc('get_top10_most_games').limit(20),        supabase.rpc('get_top10_win_rate').limit(20),
-      supabase.rpc('get_top10_most_travelled').limit(20),    supabase.rpc('get_top10_most_opponents').limit(20),
-      supabase.rpc('get_top10_career_rise').limit(20),       supabase.rpc('get_top10_longest_win_streak').limit(20),
-      supabase.rpc('get_top10_single_event_jump').limit(20), supabase.rpc('get_top10_upset_wins').limit(20),
+      supabase.rpc('get_top10_most_games').limit(500),        supabase.rpc('get_top10_win_rate').limit(500),
+      supabase.rpc('get_top10_most_travelled').limit(500),    supabase.rpc('get_top10_most_opponents').limit(500),
+      supabase.rpc('get_top10_career_rise').limit(500),       supabase.rpc('get_top10_longest_win_streak').limit(500),
+      supabase.rpc('get_top10_single_event_jump').limit(500), supabase.rpc('get_top10_upset_wins').limit(500),
     ])
     setTop10Games(games || []);        setTop10WinRate(winRate || [])
     setTop10Travelled(travelled || []); setTop10Opponents(opponents || [])
