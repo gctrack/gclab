@@ -250,7 +250,7 @@ export default function HomePage() {
             The lab for<br/><em style={{ fontStyle: 'normal', color: lime }}>Golf Croquet.</em>
           </h1>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: 'rgba(232,224,208,0.6)', maxWidth: 440, marginBottom: 40, fontWeight: 300 }}>
-            Deep analytics, performance grading, shot-by-shot tracking and AI insights — coming for competitive golf croquet players.
+            Deep analytics, performance grading, shot-by-shot tracking and AI insights — coming soon for competitive golf croquet players.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
             <Link href="/login?mode=signup" className="gbtn">
@@ -285,7 +285,19 @@ export default function HomePage() {
       <section className="g-section" style={{ background: '#f5f2ec', padding: '80px 48px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#16a34a', fontWeight: 600, marginBottom: 10 }}>What&apos;s coming</p>
-          <h2 className="ghl" style={{ fontSize: 'clamp(30px,3.5vw,50px)', color: green, lineHeight: 1.08, fontWeight: 900, marginBottom: 16, maxWidth: 560 }}>The most complete analytics platform in the game</h2>
+          <h2 className="ghl" style={{ fontSize: 'clamp(30px,3.5vw,50px)', color: green, lineHeight: 1.08, fontWeight: 900, marginBottom: 16, maxWidth: 560 }}>
+            The{' '}
+            <span style={{ position: 'relative', display: 'inline-block' }}>
+              <s style={{ textDecoration: 'line-through', textDecorationColor: '#ef4444', textDecorationThickness: 3, opacity: 0.45, fontStyle: 'italic' }}>most</s>
+              <span style={{
+                position: 'absolute', top: '-0.55em', left: '50%', transform: 'translateX(-50%)',
+                background: '#eab308', color: '#0d2818', fontSize: '0.38em', fontWeight: 800,
+                padding: '1px 6px', borderRadius: 4, letterSpacing: '0.08em', textTransform: 'uppercase',
+                whiteSpace: 'nowrap', fontFamily: 'DM Sans, sans-serif', rotate: '-4deg',
+              }}>only</span>
+            </span>
+            {' '}complete analytics platform in the game
+          </h2>
           <p style={{ fontSize: 15, color: '#6b7280', marginBottom: 48, fontWeight: 300, maxWidth: 520 }}>GCLab is being built to go far beyond rankings — shot-by-shot data, AI analysis, Apple Watch recording and deep performance insights.</p>
           <div className="g-cg" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
             {COMING.map(({ badge, icon, title, desc }) => (
