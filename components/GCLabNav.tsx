@@ -30,7 +30,7 @@ const NAV_LINKS = [
   { href: '/rankings',     label: 'Rankings'             },
   { href: '/leaderboards', label: 'Leaderboards'         },
   { href: '/compare',      label: 'Compare'              },
-  { href: '/rankings?tab=Player+History', label: 'Player History' },
+  { href: '/rankings?tab=Player+History', label: 'Player History', exactMatch: true },
   { href: '/community',    label: 'Community'            },
   { href: '/dashboard',    label: 'Dashboard'            },
 ]
@@ -188,16 +188,19 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)}/>
           <div style={{ position: 'fixed', right: 12, top: 56, zIndex: 50, background: '#0f2e1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, boxShadow: '0 20px 48px rgba(0,0,0,0.5)', width: 240, padding: '6px 0' }}>
-            {NAV_LINKS.map(link => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="gcnav-tab gcnav-drop-item"
-                style={{ display: 'flex', alignItems: 'center', padding: '9px 16px', textDecoration: 'none', fontSize: 14, color: isActive(link.href) ? LIME : 'rgba(232,224,208,0.65)', fontWeight: isActive(link.href) ? 600 : 400 }}>
-                {link.label}
-              </a>
-            ))}
+            {NAV_LINKS.map(link => {
+              const active = isActive(link.href, (link as any).exactMatch)
+              return (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  className="gcnav-tab gcnav-drop-item"
+                  style={{ display: 'flex', alignItems: 'center', padding: '9px 16px', textDecoration: 'none', fontSize: 14, color: active ? LIME : 'rgba(232,224,208,0.65)', fontWeight: active ? 600 : 400 }}>
+                  {link.label}
+                </a>
+              )
+            })}
 
             {/* Profile — only when signed in */}
             {signedIn && (
