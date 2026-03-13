@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
 
@@ -406,7 +406,7 @@ function SyncActivityLog() {
 export default function AdminPage() {
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'sync' | 'users' | 'import'>('sync')
+  const [activeTab, setActiveTab] = useState<'sync' | 'users' | 'import' | 'analytics'>('sync')
 
   useEffect(() => {
     const init = async () => {
@@ -443,9 +443,10 @@ export default function AdminPage() {
   }
 
   const tabs = [
-    { id: 'sync',   label: '⚡ Sync Log' },
-    { id: 'import', label: '📥 Import Queue' },
-    { id: 'users',  label: '👥 Users' },
+    { id: 'sync',      label: '⚡ Sync Log' },
+    { id: 'import',    label: '📥 Import Queue' },
+    { id: 'users',     label: '👥 Users' },
+    { id: 'analytics', label: '📊 Analytics' },
   ] as const
 
   return (
@@ -503,7 +504,282 @@ export default function AdminPage() {
           <UsersSection />
         )}
 
+        {activeTab === 'analytics' && (
+          <AnalyticsSection />
+        )}
+
       </div>
+    </div>
+  )
+}
+
+// ── Analytics Section ─────────────────────────────────────────────────────────
+
+const FEATURE_LABELS: Record<string, string> = {
+  player_history_search: '🔍 Player History',
+  compare_run:           '⚖️ Compare',
+  thread_created:        '💬 Thread Created',
+  post_created:          '📝 Post Reply',
+  dashboard_view:        '📊 Dashboard',
+}
+
+function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+  return (
+    <div style={{ background: 'white', border: '1.5px solid #ede9e2', borderRadius: 12, padding: '18px 22px' }}>
+      <div className="gmono" style={{ fontSize: 28, fontWeight: 500, color: G, lineHeight: 1 }}>{value}</div>
+      <div className="gsans" style={{ fontSize: 11, color: '#9ca3af', marginTop: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+      {sub && <div className="gsans" style={{ fontSize: 12, color: '#d97706', marginTop: 3 }}>{sub}</div>}
+    </div>
+  )
+}
+
+function TableCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ background: 'white', border: '1.5px solid #ede9e2', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f0eb', background: 'rgba(13,40,24,0.03)' }}>
+        <span className="gsans" style={{ fontWeight: 600, fontSize: 14, color: G }}>{title}</span>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function TRow({ cols, header }: { cols: (string | number)[]; header?: boolean }) {
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: `1fr repeat(${cols.length - 1}, auto)`,
+      gap: 16, padding: '9px 18px', alignItems: 'center',
+      borderBottom: '1px solid #f3f0eb',
+      background: header ? 'rgba(13,40,24,0.03)' : undefined,
+    }}>
+      {cols.map((c, i) => (
+        <span key={i} className={header ? 'gsans' : i === 0 ? 'gsans' : 'gmono'} style={{
+          fontSize: header ? 10 : 13,
+          color: header ? '#9ca3af' : i === 0 ? G : '#374151',
+          textTransform: header ? 'uppercase' : undefined,
+          letterSpacing: header ? '0.06em' : undefined,
+          fontWeight: header ? undefined : i === 0 ? 500 : 600,
+          textAlign: i === 0 ? 'left' : 'right',
+          whiteSpace: 'nowrap',
+        }}>{c}</span>
+      ))}
+    </div>
+  )
+}
+
+function AnalyticsSection() {
+  const [events, setEvents] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [compareSearch, setCompareSearch] = useState('')
+  const [days, setDays] = useState(30)
+
+  const load = useCallback(async (d: number) => {
+    setLoading(true)
+    const cutoff = new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString()
+    const { data } = await supabase
+      .from('analytics_events')
+      .select('event_name, user_id, properties, created_at')
+      .gte('created_at', cutoff)
+      .limit(5000)
+    setEvents(data || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load(days) }, [days, load])
+
+  // ── Aggregations ────────────────────────────────────────────────────────────
+
+  const featureCounts = useMemo(() => {
+    const map: Record<string, { total: number; users: Set<string> }> = {}
+    events.forEach(e => {
+      if (!map[e.event_name]) map[e.event_name] = { total: 0, users: new Set() }
+      map[e.event_name].total++
+      if (e.user_id) map[e.event_name].users.add(e.user_id)
+    })
+    return Object.entries(map)
+      .map(([name, v]) => ({ name, total: v.total, unique: v.users.size }))
+      .sort((a, b) => b.total - a.total)
+  }, [events])
+
+  const topSearched = useMemo(() => {
+    const map: Record<string, { count: number; searchers: Set<string> }> = {}
+    events.filter(e => e.event_name === 'player_history_search').forEach(e => {
+      const p = e.properties?.player; if (!p) return
+      if (!map[p]) map[p] = { count: 0, searchers: new Set() }
+      map[p].count++
+      if (e.user_id) map[p].searchers.add(e.user_id)
+    })
+    return Object.entries(map)
+      .map(([name, v]) => ({ name, count: v.count, unique: v.searchers.size }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20)
+  }, [events])
+
+  const compareEvents = useMemo(() => events.filter(e => e.event_name === 'compare_run'), [events])
+
+  const topDuos = useMemo(() => {
+    const map: Record<string, number> = {}
+    compareEvents.forEach(e => {
+      const a = e.properties?.player_a, b = e.properties?.player_b
+      if (!a || !b) return
+      const key = [a, b].sort().join(' ↔ ')
+      map[key] = (map[key] || 0) + 1
+    })
+    return Object.entries(map)
+      .map(([pair, count]) => ({ pair, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20)
+  }, [compareEvents])
+
+  // Player-specific compare lookup: show all partners of the searched player
+  const playerCompareResults = useMemo(() => {
+    const q = compareSearch.trim().toLowerCase()
+    if (!q) return []
+    const map: Record<string, number> = {}
+    compareEvents.forEach(e => {
+      const a = e.properties?.player_a || ''
+      const b = e.properties?.player_b || ''
+      const aMatch = a.toLowerCase().includes(q)
+      const bMatch = b.toLowerCase().includes(q)
+      if (!aMatch && !bMatch) return
+      const partner = aMatch ? b : a
+      if (!partner) return
+      map[partner] = (map[partner] || 0) + 1
+    })
+    return Object.entries(map)
+      .map(([partner, count]) => ({ partner, count }))
+      .sort((a, b) => b.count - a.count)
+  }, [compareEvents, compareSearch])
+
+  const totalEvents = events.length
+  const uniqueUsers = new Set(events.filter(e => e.user_id).map(e => e.user_id)).size
+  const topFeature = featureCounts[0]
+  const topPlayer  = topSearched[0]
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2 className="ghl" style={{ margin: 0, fontSize: 20, fontWeight: 700, color: G }}>Analytics</h2>
+          <p className="gsans" style={{ margin: '3px 0 0', fontSize: 13, color: '#9ca3af' }}>
+            Feature usage · last {days} days
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[7, 30, 90].map(d => (
+            <button key={d} onClick={() => setDays(d)} className="gsans" style={{
+              padding: '6px 14px', borderRadius: 8, border: `1.5px solid ${days === d ? G : '#e5e7eb'}`,
+              background: days === d ? G : 'white', color: days === d ? 'white' : '#374151',
+              cursor: 'pointer', fontSize: 13, fontWeight: days === d ? 600 : 400,
+            }}>{d}d</button>
+          ))}
+          <button onClick={() => load(days)} disabled={loading} className="gsans" style={{
+            padding: '6px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb',
+            background: 'white', cursor: loading ? 'not-allowed' : 'pointer',
+            fontSize: 13, color: '#374151', opacity: loading ? 0.5 : 1,
+          }}>↻</button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="gsans" style={{ textAlign: 'center', padding: 60, color: '#9ca3af' }}>Loading…</div>
+      ) : (
+        <>
+          {/* Stat cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+            <StatCard label="Total Events" value={totalEvents.toLocaleString()} />
+            <StatCard label="Unique Users" value={uniqueUsers.toLocaleString()} />
+            <StatCard
+              label="Top Feature"
+              value={topFeature ? (FEATURE_LABELS[topFeature.name] ?? topFeature.name) : '—'}
+              sub={topFeature ? `${topFeature.total} uses` : undefined}
+            />
+            <StatCard
+              label="Most Searched Player"
+              value={topPlayer?.name ?? '—'}
+              sub={topPlayer ? `${topPlayer.count} searches` : undefined}
+            />
+          </div>
+
+          {/* Row 1: Feature usage + Most searched players */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+
+            <TableCard title="Feature Usage">
+              <TRow cols={['Feature', 'Uses', 'Users']} header />
+              {featureCounts.length === 0 ? (
+                <div className="gsans" style={{ padding: '20px 18px', color: '#9ca3af', fontSize: 13 }}>No events yet.</div>
+              ) : featureCounts.map(f => (
+                <TRow key={f.name} cols={[FEATURE_LABELS[f.name] ?? f.name, f.total, f.unique]} />
+              ))}
+            </TableCard>
+
+            <TableCard title="Most Searched Players">
+              <TRow cols={['Player', 'Searches', 'By']} header />
+              {topSearched.length === 0 ? (
+                <div className="gsans" style={{ padding: '20px 18px', color: '#9ca3af', fontSize: 13 }}>No searches yet.</div>
+              ) : topSearched.map(p => (
+                <TRow key={p.name} cols={[p.name, p.count, `${p.unique} users`]} />
+              ))}
+            </TableCard>
+          </div>
+
+          {/* Row 2: Compare — top duos + player lookup */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+            <TableCard title="Most Compared Duos">
+              <TRow cols={['Pairing', 'Times']} header />
+              {topDuos.length === 0 ? (
+                <div className="gsans" style={{ padding: '20px 18px', color: '#9ca3af', fontSize: 13 }}>No compare runs yet.</div>
+              ) : topDuos.map(d => (
+                <TRow key={d.pair} cols={[d.pair, d.count]} />
+              ))}
+            </TableCard>
+
+            <div>
+              <TableCard title="Compare — Player Lookup">
+                <div style={{ padding: '12px 18px', borderBottom: '1px solid #f3f0eb' }}>
+                  <input
+                    value={compareSearch}
+                    onChange={e => setCompareSearch(e.target.value)}
+                    placeholder="Type a player name…"
+                    className="gsans"
+                    style={{
+                      width: '100%', padding: '8px 12px', borderRadius: 8,
+                      border: '1.5px solid #e5e7eb', fontSize: 13, color: G,
+                      background: '#fafaf9', outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                  {compareSearch && (
+                    <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0 0' }}>
+                      {playerCompareResults.length > 0
+                        ? `${compareEvents.filter(e => (e.properties?.player_a || '').toLowerCase().includes(compareSearch.toLowerCase()) || (e.properties?.player_b || '').toLowerCase().includes(compareSearch.toLowerCase())).length} total comparisons involving this player`
+                        : 'No comparisons found for this player.'}
+                    </p>
+                  )}
+                </div>
+                {compareSearch && playerCompareResults.length > 0 && (
+                  <>
+                    <TRow cols={['Compared against', 'Times']} header />
+                    {playerCompareResults.map(r => (
+                      <TRow key={r.partner} cols={[r.partner, r.count]} />
+                    ))}
+                  </>
+                )}
+                {!compareSearch && (
+                  <div className="gsans" style={{ padding: '20px 18px', color: '#9ca3af', fontSize: 13 }}>
+                    Search for a player to see all their head-to-head pairings.
+                  </div>
+                )}
+              </TableCard>
+            </div>
+          </div>
+
+          <p className="gsans" style={{ fontSize: 12, color: '#9ca3af', marginTop: 12, textAlign: 'right' }}>
+            {totalEvents.toLocaleString()} events loaded · max 5,000 per query
+          </p>
+        </>
+      )}
     </div>
   )
 }
