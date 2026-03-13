@@ -719,7 +719,7 @@ export default function RankingsPage() {
 
     return (
       <div style={{ position: 'relative' }} onMouseLeave={() => setChartTooltip(null)}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: 400, display: 'block' }} onMouseLeave={() => setChartTooltip(null)}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }} onMouseLeave={() => setChartTooltip(null)}>
           {Array.from({ length: gridLines + 1 }).map((_, i) => {
             const y = padT + (i / gridLines) * chartH
             return <line key={i} x1={padL} y1={y} x2={W - padR} y2={y} stroke="#e5e7eb" strokeWidth="1" />
@@ -773,7 +773,7 @@ export default function RankingsPage() {
           {hasRank && (() => {
             const firstRankPoint = playerHistory.find(h => h.world_ranking)
             const firstRankLabel = firstRankPoint ? new Date(firstRankPoint.recorded_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'Mar 2026'
-            return <text x={W - padR} y={padT - 12} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank (from {firstRankLabel})</text>
+            return <text x={W - padR} y={padT - 12} fontSize="10" fill="#2563eb" textAnchor="end" fontWeight="500">World Rank</text>
           })()}
 
           {showDgrade && playerHistory.length > 1 && (
@@ -1041,8 +1041,9 @@ export default function RankingsPage() {
               </div>
             </div>
 
-            <div className="rnk-card">
-              <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+            <div className="rnk-card" style={{ overflow: 'auto' }}>
+              <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', minWidth: 520, fontSize: 13, borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                     <th style={TH('left')}>Rank</th>
@@ -1086,6 +1087,7 @@ export default function RankingsPage() {
                   })}
                 </tbody>
               </table>
+              </div>{/* /overflow-x:auto */}
             </div>
 
             {/* Pagination — bottom */}
@@ -1116,15 +1118,16 @@ export default function RankingsPage() {
               ))}
             </div>
             <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 18 }}>GC Rankings baseline set 6 Mar 2026 — biggest career dGrade gains and losses tracked by daily sync. Games and Win% are for the last 12 months.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
               {/* Gains */}
               <div>
                 <h3 className="ghl" style={{ fontSize: 15, color: '#16a34a', marginBottom: 12, fontWeight: 700 }}>📈 Biggest Gains</h3>
                 {movers.gains.length === 0 ? (
                   <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.4)' }}>No changes detected yet.</p>
                 ) : (
-                  <div className="rnk-card">
-                    <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                  <div className="rnk-card" style={{ overflow: 'auto' }}>
+                    <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', minWidth: 340, fontSize: 13, borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                           <th style={TH('left')}>Player</th>
@@ -1150,6 +1153,7 @@ export default function RankingsPage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>{/* /overflow-x */}
                   </div>
                 )}
               </div>
@@ -1159,8 +1163,9 @@ export default function RankingsPage() {
                 {movers.losses.length === 0 ? (
                   <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.4)' }}>No changes detected yet.</p>
                 ) : (
-                  <div className="rnk-card">
-                    <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                  <div className="rnk-card" style={{ overflow: 'auto' }}>
+                    <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', minWidth: 340, fontSize: 13, borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                           <th style={TH('left')}>Player</th>
@@ -1186,6 +1191,7 @@ export default function RankingsPage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>{/* /overflow-x */}
                   </div>
                 )}
               </div>
@@ -1251,8 +1257,9 @@ export default function RankingsPage() {
               </p>
 
               {/* Player table */}
-              <div className="rnk-card">
-                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+              <div className="rnk-card" style={{ overflow: 'auto' }}>
+                <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: 360, fontSize: 13, borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                       <th style={TH('left')}>Player</th>
@@ -1282,6 +1289,7 @@ export default function RankingsPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>{/* /overflow-x */}
               </div>
 
               {/* Pagination */}
@@ -1319,8 +1327,9 @@ export default function RankingsPage() {
                     ↓ CSV
                   </button>
                 </div>
-                <div className="rnk-card" style={{ overflow: 'visible' }}>
-                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                <div className="rnk-card" style={{ overflow: 'auto' }}>
+                  <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', minWidth: 380, fontSize: 13, borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                         <th style={{ ...TH('left'), width: 32 }}>#</th>
@@ -1378,6 +1387,7 @@ export default function RankingsPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>{/* /overflow-x */}
                 </div>
               </div>
 
@@ -1387,8 +1397,9 @@ export default function RankingsPage() {
                   <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Player Counts</h3>
                   <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Total players in the database and recently active players by country.</p>
                 </div>
-                <div className="rnk-card">
-                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                <div className="rnk-card" style={{ overflow: 'auto' }}>
+                  <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', minWidth: 320, fontSize: 13, borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                         <th style={{ ...TH('left'), width: 32 }}>#</th>
@@ -1412,6 +1423,7 @@ export default function RankingsPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>{/* /overflow-x */}
                 </div>
               </div>
 
@@ -1675,8 +1687,9 @@ export default function RankingsPage() {
                     return h.dgrade_value - chronological[idx - 1].dgrade_value
                   }
                   return (
-                    <div className="rnk-card">
-                      <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                    <div className="rnk-card" style={{ overflow: 'auto' }}>
+                      <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', minWidth: 440, fontSize: 12, borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                             {['Date', 'Event', 'dGrade', 'Change', 'eGrade', 'World Rank'].map((h, i) => (
@@ -1713,6 +1726,7 @@ export default function RankingsPage() {
                           })}
                         </tbody>
                       </table>
+                      </div>{/* /overflow-x */}
                     </div>
                   )
                 })()}
