@@ -202,14 +202,35 @@ export default function HomePage() {
           <span className="ghl" style={{ fontSize: 17, color: cream, fontWeight: 700, letterSpacing: '-0.3px' }}>GCLab</span>
         </Link>
 
-        <div className="g-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <Link href="/rankings"    className="g-nav-link">Rankings</Link>
-          <Link href="/leaderboards" className="g-nav-link">Leaderboards</Link>
-          <Link href="/compare"     className="g-nav-link">Compare</Link>
-          <Link href="/rankings?tab=historical" className="g-nav-link">Historical</Link>
+        <div className="g-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <Link href="/rankings"                      className="g-nav-link">Rankings</Link>
+          <Link href="/leaderboards"                  className="g-nav-link">Leaderboards</Link>
+          <Link href="/compare"                       className="g-nav-link">Compare</Link>
+          <Link href="/rankings?tab=Player+History"   className="g-nav-link">Player History</Link>
+          <Link href="/community"                     className="g-nav-link">Community</Link>
+          <Link href="/dashboard"                     className="g-nav-link">Dashboard</Link>
         </div>
 
         <div className="g-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* GC Rankings pill */}
+          <a href="https://gcrankings.com" target="_blank" rel="noopener noreferrer" style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+            background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.25)',
+            color: '#4ade80', textDecoration: 'none', whiteSpace: 'nowrap',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 44 44" fill="none">
+              <rect x="3" y="28" width="10" height="14" rx="2" fill="#ef4444"/>
+              <rect x="17" y="16" width="10" height="26" rx="2" fill="#3b82f6"/>
+              <rect x="31" y="4" width="10" height="38" rx="2" fill="#eab308"/>
+              <polyline points="8,26 22,14 36,2" fill="none" stroke="#4ade80" strokeWidth="2" strokeDasharray="3,2.5" strokeLinecap="round"/>
+            </svg>
+            <span>GC Rankings</span>
+            <svg width="8" height="8" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.6 }}>
+              <path d="M1 9L9 1M9 1H3M9 1V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </a>
+          <span style={{ width: 1, height: 16, background: 'rgba(74,222,128,0.2)', flexShrink: 0 }}/>
           <Link href="/login?mode=signup" className="gbtn-sm">Sign Up Free</Link>
           <Link href="/login" className="gbtn-outline">Sign In</Link>
         </div>
@@ -226,17 +247,17 @@ export default function HomePage() {
             Golf Croquet Analytics
           </div>
           <h1 className="ghl" style={{ fontSize: 'clamp(48px,5.5vw,82px)', lineHeight: 1.04, fontWeight: 900, letterSpacing: -1, color: cream, marginBottom: 22 }}>
-            Your game.<br/><em style={{ fontStyle: 'normal', color: lime }}>Measured.</em><br/>Mastered.
+            The lab for<br/><em style={{ fontStyle: 'normal', color: lime }}>Golf Croquet.</em>
           </h1>
           <p style={{ fontSize: 18, lineHeight: 1.65, color: 'rgba(232,224,208,0.6)', maxWidth: 440, marginBottom: 40, fontWeight: 300 }}>
-            World rankings, grade history and head‑to‑head stats for every competitive golf croquet player on earth.
+            Deep analytics, performance grading, shot-by-shot tracking and AI insights — coming for competitive golf croquet players.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-            <Link href="/rankings" className="gbtn">
-              Explore Rankings
+            <Link href="/login?mode=signup" className="gbtn">
+              Get early access
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
             </Link>
-            <Link href="/login?mode=signup" className="gbtn-ghost">Create free account →</Link>
+            <a href="https://gcrankings.com" target="_blank" rel="noopener noreferrer" className="gbtn-ghost">GC Rankings site →</a>
           </div>
         </div>
 
@@ -260,138 +281,50 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── CHART PREVIEW ── */}
-      <section className="g-section" style={{ background: green, padding: '80px 48px' }}>
-        <div style={{ maxWidth: 960, margin: '0 auto' }}>
-          <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: lime, fontWeight: 600, marginBottom: 10 }}>Grade History · Requires free account</p>
-          <h2 className="ghl" style={{ fontSize: 'clamp(30px,3.5vw,52px)', color: cream, lineHeight: 1.08, fontWeight: 900, marginBottom: 8 }}>See your career at a glance</h2>
-          <p style={{ color: 'rgba(232,224,208,0.42)', fontSize: 15, marginBottom: 36, fontWeight: 300 }}>Every grade movement, every event — plotted from day one.</p>
-
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 20, overflow: 'hidden' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 28px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: cream }}>🏴󠁧󠁢󠁥󠁮󠁧󠁿 Your Name</div>
-                <div style={{ fontSize: 12, color: 'rgba(232,224,208,0.42)', marginTop: 3 }}>England · dGrade 1978 · World #433</div>
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {['1Y', '5Y', 'All Time'].map(t => <button key={t} className={`gtab${t === 'All Time' ? ' on' : ''}`}>{t}</button>)}
-              </div>
-            </div>
-
-            {/* Stat strip */}
-            <div className="g-cs" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              {[{ v: '1978', l: 'Current dGrade', g: false }, { v: '2,014', l: 'Peak dGrade', g: true }, { v: '#433', l: 'World Rank', g: false }, { v: '62%', l: 'Career Win %', g: true }, { v: '847', l: 'Career Games', g: false }].map(({ v, l, g }) => (
-                <div key={l} style={{ padding: '14px 20px', borderRight: '1px solid rgba(255,255,255,0.07)', textAlign: 'center' }}>
-                  <div className="gmono" style={{ fontSize: 20, fontWeight: 500, color: g ? lime : cream, lineHeight: 1 }}>{v}</div>
-                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(232,224,208,0.35)', marginTop: 5 }}>{l}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Chart */}
-            <div style={{ padding: '24px 28px 12px' }}>
-              <svg width="100%" height="240" viewBox="0 0 880 240" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="gDg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#4ade80" stopOpacity="0.18"/><stop offset="100%" stopColor="#4ade80" stopOpacity="0"/></linearGradient>
-                  <linearGradient id="gEg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#60a5fa" stopOpacity="0.12"/><stop offset="100%" stopColor="#60a5fa" stopOpacity="0"/></linearGradient>
-                </defs>
-
-                {[40, 80, 120, 160, 200].map(y => <line key={y} x1="0" y1={y} x2="880" y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>)}
-                {([['2100', 38], ['2000', 78], ['1900', 118], ['1800', 158], ['1700', 198]] as [string, number][]).map(([l, y]) => <text key={l} x="8" y={y} fill="rgba(255,255,255,0.2)" fontSize="10" fontFamily="DM Mono,monospace">{l}</text>)}
-                {([['2015', 60], ['2017', 185], ['2019', 310], ['2021', 435], ['2022', 560], ['2024', 685], ['2026', 820]] as [string, number][]).map(([y, x]) => <text key={y} x={x} y="232" fill="rgba(255,255,255,0.22)" fontSize="10" fontFamily="DM Sans,sans-serif" textAnchor="middle">{y}</text>)}
-
-                {/* eGrade */}
-                <path d="M60,185 C80,180 100,172 130,165 C155,158 175,148 200,138 C225,128 240,115 265,102 C290,89 310,82 340,75 C365,70 385,68 410,65 C430,63 445,62 460,64 C480,67 495,72 515,80 C535,88 550,94 575,100 C600,106 620,110 645,118 C665,124 680,130 700,138 C720,146 735,155 755,160 C775,165 795,168 820,170 L820,215 L60,215 Z" fill="url(#gEg)"/>
-                <path d="M60,185 C80,180 100,172 130,165 C155,158 175,148 200,138 C225,128 240,115 265,102 C290,89 310,82 340,75 C365,70 385,68 410,65 C430,63 445,62 460,64 C480,67 495,72 515,80 C535,88 550,94 575,100 C600,106 620,110 645,118 C665,124 680,130 700,138 C720,146 735,155 755,160 C775,165 795,168 820,170" fill="none" stroke="#60a5fa" strokeWidth="1.5" strokeOpacity="0.5" strokeDasharray="4 3"/>
-
-                {/* dGrade */}
-                <path d="M60,192 C80,186 100,178 130,170 C155,162 175,150 200,140 C225,130 240,118 265,106 C290,94 310,85 340,78 C365,72 385,68 410,63 C430,59 445,57 460,60 C480,64 495,70 515,78 C535,86 550,96 575,108 C600,118 620,126 645,134 C665,140 680,148 700,156 C720,164 735,172 755,178 C775,183 795,187 820,190 L820,215 L60,215 Z" fill="url(#gDg)"/>
-                <path d="M60,192 C80,186 100,178 130,170 C155,162 175,150 200,140 C225,130 240,118 265,106 C290,94 310,85 340,78 C365,72 385,68 410,63 C430,59 445,57 460,60 C480,64 495,70 515,78 C535,86 550,96 575,108 C600,118 620,126 645,134 C665,140 680,148 700,156 C720,164 735,172 755,178 C775,183 795,187 820,190" fill="none" stroke="#4ade80" strokeWidth="2.2"/>
-
-                {/* Peak marker */}
-                <line x1="460" y1="57" x2="460" y2="215" stroke="rgba(74,222,128,0.2)" strokeWidth="1" strokeDasharray="3 3"/>
-                <circle cx="460" cy="57" r="5" fill="#4ade80"/>
-                <circle cx="460" cy="57" r="9" fill="none" stroke="#4ade80" strokeWidth="1.5" strokeOpacity="0.4"/>
-                <rect x="468" y="44" width="72" height="20" rx="4" fill="rgba(13,40,24,0.9)" stroke="rgba(74,222,128,0.35)" strokeWidth="1"/>
-                <text x="504" y="57" fill="#4ade80" fontSize="10" fontFamily="DM Mono,monospace" textAnchor="middle" fontWeight="500">Peak 2,014</text>
-
-                {/* Current grade dot */}
-                <circle cx="820" cy="190" r="5" fill="#4ade80"/>
-                <circle cx="820" cy="190" r="9" fill="none" stroke="#4ade80" strokeWidth="1.5" strokeOpacity="0.35"/>
-
-                {/* Event markers — diamond shape, no text */}
-                <EventMarkers/>
-              </svg>
-
-              {/* Legend */}
-              <div style={{ display: 'flex', gap: 20, marginTop: 10, flexWrap: 'wrap' }}>
-                {[
-                  { l: 'dGrade',     c: '#4ade80', shape: 'line'    },
-                  { l: 'eGrade',     c: '#60a5fa', shape: 'dashed'  },
-                  { l: 'Peak grade', c: '#4ade80', shape: 'dot'     },
-                  { l: 'Event',      c: '#eab308', shape: 'diamond' },
-                ].map(({ l, c, shape }) => (
-                  <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgba(232,224,208,0.45)' }}>
-                    {shape === 'dot'     && <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, display: 'inline-block' }}/>}
-                    {shape === 'line'    && <span style={{ display: 'inline-block', width: 20, height: 2, background: c }}/>}
-                    {shape === 'dashed'  && <span style={{ display: 'inline-block', width: 20, height: 0, borderTop: `2px dashed ${c}`, opacity: 0.6 }}/>}
-                    {shape === 'diamond' && (
-                      <svg width="10" height="12" viewBox="0 0 10 12">
-                        <polygon points="5,0 10,6 5,12 0,6" fill={c} opacity="0.8"/>
-                      </svg>
-                    )}
-                    {l}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 22, display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-            <Link href="/login?mode=signup" className="gbtn">See Your Grade History →</Link>
-            <span style={{ color: 'rgba(232,224,208,0.32)', fontSize: 13 }}>Free account · 30 seconds to set up</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FEATURES ── */}
+      {/* ── COMING SOON — lead section ── */}
       <section className="g-section" style={{ background: '#f5f2ec', padding: '80px 48px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-          <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#16a34a', fontWeight: 600, marginBottom: 10 }}>Available now</p>
-          <h2 className="ghl" style={{ fontSize: 'clamp(30px,3.5vw,50px)', color: green, lineHeight: 1.08, fontWeight: 900, marginBottom: 56, maxWidth: 560 }}>Everything you need to understand your game</h2>
-          <div className="g-fg" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
-            {FEATURES.map(({ icon, title, desc, free }) => (
-              <div key={title} className="gfc">
-                <div style={{ fontSize: 26, marginBottom: 14 }}>{icon}</div>
+          <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#16a34a', fontWeight: 600, marginBottom: 10 }}>What&apos;s coming</p>
+          <h2 className="ghl" style={{ fontSize: 'clamp(30px,3.5vw,50px)', color: green, lineHeight: 1.08, fontWeight: 900, marginBottom: 16, maxWidth: 560 }}>The most complete analytics platform in the game</h2>
+          <p style={{ fontSize: 15, color: '#6b7280', marginBottom: 48, fontWeight: 300, maxWidth: 520 }}>GCLab is being built to go far beyond rankings — shot-by-shot data, AI analysis, Apple Watch recording and deep performance insights.</p>
+          <div className="g-cg" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
+            {COMING.map(({ badge, icon, title, desc }) => (
+              <div key={title} className="gfc" style={{ position: 'relative', overflow: 'hidden' }}>
+                <span style={{ position: 'absolute', top: 14, right: 14, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 20, padding: '3px 10px', fontSize: 10, fontWeight: 600, color: '#16a34a', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Coming Soon</span>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', padding: '3px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14 }}>{badge}</div>
+                <div style={{ fontSize: 28, marginBottom: 12 }}>{icon}</div>
                 <h3 className="ghl" style={{ fontSize: 19, color: green, fontWeight: 700, marginBottom: 9 }}>{title}</h3>
                 <p style={{ fontSize: 13, lineHeight: 1.65, color: '#6b7280', fontWeight: 300 }}>{desc}</p>
-                <span style={{ display: 'inline-block', marginTop: 14, fontSize: 10, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: free ? '#f0fdf4' : '#f9fafb', color: free ? '#16a34a' : '#6b7280' }}>
-                  {free ? 'Free · No signup' : 'Requires Free Account'}
-                </span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── COMING SOON ── */}
-      <section className="g-section" style={{ background: green, padding: '80px 48px' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-          <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: lime, fontWeight: 600, marginBottom: 10 }}>On the horizon</p>
-          <h2 className="ghl" style={{ fontSize: 'clamp(30px,3.5vw,52px)', color: cream, lineHeight: 1.08, fontWeight: 900, marginBottom: 16 }}>Coming soon</h2>
-          <p style={{ color: 'rgba(232,224,208,0.42)', fontSize: 15, marginBottom: 48, fontWeight: 300 }}>We&apos;re building the most complete analytics platform in the game.</p>
-          <div className="g-cg" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
-            {COMING.map(({ badge, icon, title, desc }) => (
-              <div key={title} className="gcc">
-                <span style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '3px 10px', fontSize: 10, fontWeight: 600, color: 'rgba(232,224,208,0.28)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Coming Soon</span>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.18)', color: 'rgba(74,222,128,0.65)', padding: '3px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 14 }}>{badge}</div>
-                <div style={{ fontSize: 28, marginBottom: 12 }}>{icon}</div>
-                <h3 className="ghl" style={{ fontSize: 19, color: 'rgba(232,224,208,0.85)', fontWeight: 700, marginBottom: 10 }}>{title}</h3>
-                <p style={{ fontSize: 13, lineHeight: 1.65, color: 'rgba(232,224,208,0.38)', fontWeight: 300 }}>{desc}</p>
-              </div>
-            ))}
+      {/* ── GC RANKINGS BRIDGE ── */}
+      <section className="g-section" style={{ background: green, padding: '64px 48px' }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap' }}>
+          <div>
+            <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: lime, fontWeight: 600, marginBottom: 10 }}>Already live</p>
+            <h2 className="ghl" style={{ fontSize: 'clamp(26px,3vw,44px)', color: cream, lineHeight: 1.08, fontWeight: 900, marginBottom: 12 }}>Rankings, stats & history<br/>are live at GC Rankings</h2>
+            <p style={{ fontSize: 15, color: 'rgba(232,224,208,0.5)', fontWeight: 300, maxWidth: 440 }}>World rankings, grade history, head-to-head comparisons, leaderboards and community — all available now at gcrankings.com.</p>
           </div>
+          <a href="https://gcrankings.com" target="_blank" rel="noopener noreferrer" style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)',
+            padding: '14px 24px', borderRadius: 12, textDecoration: 'none', flexShrink: 0,
+          }}>
+            <svg width="22" height="22" viewBox="0 0 44 44" fill="none">
+              <rect x="3" y="28" width="10" height="14" rx="2" fill="#ef4444"/>
+              <rect x="17" y="16" width="10" height="26" rx="2" fill="#3b82f6"/>
+              <rect x="31" y="4" width="10" height="38" rx="2" fill="#eab308"/>
+              <polyline points="8,26 22,14 36,2" fill="none" stroke="#4ade80" strokeWidth="2" strokeDasharray="3,2.5" strokeLinecap="round"/>
+            </svg>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: lime, fontFamily: 'DM Sans, sans-serif' }}>Go to GC Rankings</div>
+              <div style={{ fontSize: 11, color: 'rgba(232,224,208,0.4)', fontFamily: 'DM Sans, sans-serif' }}>gcrankings.com ↗</div>
+            </div>
+          </a>
         </div>
       </section>
 
@@ -399,12 +332,12 @@ export default function HomePage() {
       <section style={{ background: 'linear-gradient(135deg,#0a2014 0%,#1a4030 50%,#0a2014 100%)', padding: '100px 48px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 0%,rgba(74,222,128,0.1) 0%,transparent 60%)', pointerEvents: 'none' }}/>
         <div style={{ position: 'relative', maxWidth: 560, margin: '0 auto' }}>
-          <h2 className="ghl" style={{ fontSize: 'clamp(36px,4vw,64px)', color: cream, fontWeight: 900, lineHeight: 1.08, marginBottom: 18 }}>Ready to go deeper?</h2>
+          <h2 className="ghl" style={{ fontSize: 'clamp(36px,4vw,64px)', color: cream, fontWeight: 900, lineHeight: 1.08, marginBottom: 18 }}>Get early access</h2>
           <p style={{ fontSize: 18, color: 'rgba(232,224,208,0.5)', maxWidth: 460, margin: '0 auto 40px', fontWeight: 300, lineHeight: 1.65 }}>
-            Create a free account to unlock grade history, head‑to‑head comparisons and your complete career statistics.
+            Create a free account now — the same login works for GCLab and GC Rankings.
           </p>
           <Link href="/login?mode=signup" className="gbtn" style={{ fontSize: 16, padding: '15px 32px' }}>Create Free Account →</Link>
-          <p style={{ fontSize: 12, color: 'rgba(232,224,208,0.22)', marginTop: 16 }}>No credit card required · Takes 30 seconds</p>
+          <p style={{ fontSize: 12, color: 'rgba(232,224,208,0.22)', marginTop: 16 }}>Free · Takes 30 seconds</p>
         </div>
       </section>
 
