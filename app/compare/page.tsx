@@ -385,7 +385,6 @@ export default function ComparePage() {
   const [oppCountryStatsA, setOppCountryStatsA] = useState<any[]>([])
   const [oppCountryStatsB, setOppCountryStatsB] = useState<any[]>([])
   const [loadingData, setLoadingData] = useState(false)
-  const [showAllH2H, setShowAllH2H] = useState(false)
   const [winsSortA, setWinsSortA] = useState<'grade' | 'diff'>('grade')
   const [winsSortB, setWinsSortB] = useState<'grade' | 'diff'>('grade')
   const [recentPlayers, setRecentPlayers] = useState<Player[]>([])
@@ -736,12 +735,12 @@ export default function ComparePage() {
                 <StatCard label="eGrade" a={playerA?.egrade || '—'} b={playerB?.egrade || '—'} />
                 <StatCard
                   label={dateRange === 'all' ? 'Win % (career)' : 'Win % (period)'}
-                  a={dateRange !== 'all' ? (filteredGamesA.length ? `${Math.round(filteredGamesA.filter(g=>g.result==='win').length/filteredGamesA.length*100)}%` : '—') : (playerA ? `${playerA.win_percentage}%` : '—')}
-                  b={dateRange !== 'all' ? (filteredGamesB.length ? `${Math.round(filteredGamesB.filter(g=>g.result==='win').length/filteredGamesB.length*100)}%` : '—') : (playerB ? `${playerB.win_percentage}%` : '—')} />
+                  a={filteredGamesA.length ? `${Math.round(filteredGamesA.filter(g=>g.result==='win').length/filteredGamesA.length*100)}%` : '—'}
+                  b={filteredGamesB.length ? `${Math.round(filteredGamesB.filter(g=>g.result==='win').length/filteredGamesB.length*100)}%` : '—'} />
                 <StatCard
                   label={dateRange === 'all' ? 'Total Games' : 'Games (period)'}
-                  a={dateRange !== 'all' ? (filteredGamesA.length || '—') : (playerA?.games ?? '—')}
-                  b={dateRange !== 'all' ? (filteredGamesB.length || '—') : (playerB?.games ?? '—')} />
+                  a={filteredGamesA.length || '—'}
+                  b={filteredGamesB.length || '—'} />
                 <StatCard label="Peak dGrade" a={peakGrade(filteredGamesA) ?? (playerA?.dgrade ?? '—')} b={peakGrade(filteredGamesB) ?? (playerB?.dgrade ?? '—')} />
                 <StatCard label="Win Streak" a={streakA.maxWin || '—'} b={streakB.maxWin || '—'} />
                 <StatCard label="Loss Streak" a={streakA.maxLoss || '—'} b={streakB.maxLoss || '—'} higherIsBetter={false} />
@@ -769,7 +768,7 @@ export default function ComparePage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {(showAllH2H ? h2hGames : h2hGames.slice(0, 5)).map(g => (
+                        {h2hGames.map(g => (
                           <div key={g.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: g.result === 'win' ? 'rgba(21,128,61,0.06)' : 'rgba(29,78,216,0.06)', gap: 8 }}>
                             <span className="gmono" style={{ fontSize: 12, fontWeight: 700, width: 20, color: g.result === 'win' ? COL_A : COL_B }}>{g.result === 'win' ? 'W' : 'L'}</span>
                             <span className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.65)', flex: 1 }}>{g.event_name}</span>
@@ -778,11 +777,6 @@ export default function ComparePage() {
                           </div>
                         ))}
                       </div>
-                      {h2hGames.length > 5 && (
-                        <button onClick={() => setShowAllH2H(p => !p)} className="gsans" style={{ marginTop: 12, fontSize: 12, color: 'rgba(13,40,24,0.4)', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'center' }}>
-                          {showAllH2H ? 'Show less' : `Show all ${h2hGames.length} matches`}
-                        </button>
-                      )}
                     </>
                   )}
                 </div>
@@ -819,7 +813,7 @@ export default function ComparePage() {
                               <tr>
                                 <th style={{ ...TH('left'), paddingLeft: 12 }}>#</th>
                                 <th style={TH('left')}>Opponent</th>
-                                <th style={TH('right')}>You</th>
+                                <th style={TH('right')}>{name}</th>
                                 <th style={TH('right')}>Them</th>
                                 <th style={TH('right')}>Score</th>
                               </tr>
