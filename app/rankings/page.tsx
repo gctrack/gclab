@@ -51,11 +51,10 @@ const MOVER_PERIODS = [
   { label: '30 days', days: 30 },
   { label: '90 days', days: 90 },
   { label: '1 year', days: 365 },
-  { label: 'All Time', days: 0 },
 ]
 const PAGE_SIZES = [50, 100, 200]
 const NEW_PLAYER_PAGE_SIZE = 50
-const FIRST_SYNC_DATE = '2026-03-02'
+const FIRST_SYNC_DATE = '2026-03-06'
 const NEW_PLAYERS_SINCE = '2026-03-03T00:00:00Z'
 
 type SortKey = 'dgrade' | 'egrade' | 'world_ranking' | 'games' | 'win_percentage' | 'wcf_last_name'
@@ -94,6 +93,7 @@ export default function RankingsPage() {
   const [rnkSuggestions, setRnkSuggestions] = useState<any[]>([])
   const [highlightedPlayerId, setHighlightedPlayerId] = useState<string | null>(null)
   const highlightRef = useRef<HTMLTableRowElement | null>(null)
+  const rnkSearchTimeoutRef = useRef<any>(null)
   const [showColMenu, setShowColMenu] = useState(false)
   const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['alltime', 'country', 'dgrade', 'games', 'winpct', 'lastactive']))
 
@@ -129,6 +129,7 @@ export default function RankingsPage() {
   })
   const [historyFrom, setHistoryFrom] = useState('')
   const [historyTo, setHistoryTo] = useState('')
+  const [peakDgradeAllTime, setPeakDgradeAllTime] = useState<number | null>(null)
   const [lastSyncDate, setLastSyncDate] = useState<string | null>(null)
   const [importedCount, setImportedCount] = useState<number | null>(null)
   const [totalPlayers, setTotalPlayers] = useState<number | null>(null)
@@ -215,7 +216,30 @@ export default function RankingsPage() {
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url
-    a.download = `gclab-country-stats-${new Date().toISOString().split('T')[0]}.csv`
+    a.download = `gc-rankings-country-stats-${new Date().toISOString().split('T')[0]}.csv`
+    a.click(); URL.revokeObjectURL(url)
+  }
+
+  const downloadCountryPlayersCSV = () => {
+    const sorted = [...countryStats].sort((a, b) => (b.avg_top6_dgrade || 0) - (a.avg_top6_dgrade || 0))
+    const headers = ['Rank', 'Country', 'Avg Top-6 dGrade',
+      'Player 1', 'P1 dGrade', 'Player 2', 'P2 dGrade', 'Player 3', 'P3 dGrade',
+      'Player 4', 'P4 dGrade', 'Player 5', 'P5 dGrade', 'Player 6', 'P6 dGrade']
+    const rows = sorted.map((row, i) => {
+      const players = row.top6_active || []
+      const cols: (string | number)[] = [i + 1, getCountryName(row.country), row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '']
+      for (let n = 0; n < 6; n++) {
+        const p = players[n]
+        cols.push(p ? `${p.first_name} ${p.last_name}` : '')
+        cols.push(p ? p.dgrade : '')
+      }
+      return cols
+    })
+    const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url
+    a.download = `gc-rankings-country-players-${new Date().toISOString().split('T')[0]}.csv`
     a.click(); URL.revokeObjectURL(url)
   }
 
@@ -246,7 +270,7 @@ export default function RankingsPage() {
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url
-    a.download = `gclab-rankings-${activeOnly ? 'active' : 'alltime'}-${new Date().toISOString().split('T')[0]}.csv`
+    a.download = `gc-rankings-${activeOnly ? 'active' : 'alltime'}-${new Date().toISOString().split('T')[0]}.csv`
     a.click(); URL.revokeObjectURL(url)
   }
 
@@ -259,7 +283,7 @@ export default function RankingsPage() {
     if (data) {
       setMovers({
         gains: data.filter((p: any) => p.change > 0).sort((a: any, b: any) => b.change - a.change).slice(0, 10),
-        losses: data.filter((p: any) => p.change < 0).sort((a: any, b: any) => a.change - b.change).slice(0, 10),
+        losses: [],
       })
     }
     setLoading(false)
@@ -313,10 +337,20 @@ export default function RankingsPage() {
   const loadPlayerHistory = async (wcfPlayerId: string) => {
     const { data: player } = await supabase
       .from('wcf_players')
-      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url')
+      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url, games, win_percentage')
       .eq('id', wcfPlayerId)
       .single()
-    if (player) { setSelectedPlayer(player); await fetchHistory(player.id) }
+    if (player) {
+      setSelectedPlayer(player)
+      const { data: peakData } = await supabase
+        .from('wcf_dgrade_history')
+        .select('dgrade_value')
+        .eq('wcf_player_id', wcfPlayerId)
+        .order('dgrade_value', { ascending: false })
+        .limit(1)
+      setPeakDgradeAllTime(peakData?.[0]?.dgrade_value || null)
+      await fetchHistory(player.id)
+    }
   }
 
   const fetchHistory = async (playerId: string) => {
@@ -377,6 +411,17 @@ export default function RankingsPage() {
     setSearchQuery(`${player.wcf_first_name} ${player.wcf_last_name}`)
     setSearchSuggestions([])
     await fetchHistory(player.id)
+    // Fetch full player data (games, win_percentage) and peak dgrade
+    const [{ data: fullPlayer }, { data: peakData }] = await Promise.all([
+      supabase.from('wcf_players')
+        .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url, games, win_percentage')
+        .eq('id', player.id).single(),
+      supabase.from('wcf_dgrade_history')
+        .select('dgrade_value').eq('wcf_player_id', player.id)
+        .order('dgrade_value', { ascending: false }).limit(1),
+    ])
+    if (fullPlayer) setSelectedPlayer(fullPlayer)
+    setPeakDgradeAllTime(peakData?.[0]?.dgrade_value || null)
     // Save to recent players (max 5, no duplicates)
     const updated = [player, ...recentPlayers.filter((p: any) => p.id !== player.id)].slice(0, 5)
     setRecentPlayers(updated)
@@ -703,6 +748,7 @@ export default function RankingsPage() {
                         { key: 'games', label: 'Games (12mo)' },
                         { key: 'winpct', label: 'Win% (12mo)' },
                         { key: 'lastactive', label: 'Last Active' },
+                        { key: 'wcfprofile', label: 'WCF Profile' },
                       ].map(col => (
                         <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, cursor: 'pointer' }}>
                           <input type="checkbox" checked={visibleCols.has(col.key)}
@@ -726,35 +772,54 @@ export default function RankingsPage() {
                     onChange={e => {
                       const v = e.target.value
                       setRnkSearch(v)
+                      if (rnkSearchTimeoutRef.current) clearTimeout(rnkSearchTimeoutRef.current)
                       if (v.length < 2) { setRnkSuggestions([]); return }
-                      const lower = v.toLowerCase()
-                      setRnkSuggestions(rankings.filter(p =>
-                        `${p.wcf_first_name} ${p.wcf_last_name}`.toLowerCase().includes(lower)
-                      ).slice(0, 8))
+                      rnkSearchTimeoutRef.current = setTimeout(async () => {
+                        const parts = v.trim().split(' ')
+                        let q = supabase
+                          .from('wcf_players')
+                          .select('id, wcf_first_name, wcf_last_name, country, dgrade, world_ranking')
+                          .order('dgrade', { ascending: false })
+                          .limit(8)
+                        if (activeOnly) q = q.gte('last_active_year', activeYear)
+                        if (parts.length >= 2 && parts[1]) {
+                          q = q.ilike('wcf_first_name', `%${parts[0]}%`).ilike('wcf_last_name', `%${parts[1]}%`)
+                        } else {
+                          q = q.or(`wcf_last_name.ilike.%${v}%,wcf_first_name.ilike.%${v}%`)
+                        }
+                        const { data } = await q
+                        setRnkSuggestions(data || [])
+                      }, 250)
                     }}
-                    placeholder="Find a player…"
-                    style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #d5cfc5', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, background: 'white', width: 180, outline: 'none' }}
+                    placeholder="Find any player…"
+                    style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #d5cfc5', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, background: 'white', width: 220, outline: 'none' }}
                   />
                   {rnkSuggestions.length > 0 && (
-                    <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', border: '1px solid #e0dbd2', borderRadius: 8, zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', border: '1px solid #e0dbd2', borderRadius: 8, zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
                       {rnkSuggestions.map(p => (
-                        <button key={p.id} onClick={() => {
+                        <button key={p.id} onClick={async () => {
                           setRnkSearch(`${p.wcf_first_name} ${p.wcf_last_name}`)
                           setRnkSuggestions([])
-                          const idx = rankings.findIndex(r => r.id === p.id)
-                          if (idx >= 0) {
-                            const page = Math.floor(idx / pageSize)
-                            setRankingsPage(page)
-                            setHighlightedPlayerId(p.id)
-                            setTimeout(() => {
-                              highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                            }, 150)
-                          }
+                          // Find which page this player is on (by counting players ranked above them)
+                          let countQ = supabase.from('wcf_players')
+                            .select('id', { count: 'exact', head: true })
+                            .gt('dgrade', p.dgrade)
+                          if (activeOnly) countQ = countQ.gte('last_active_year', activeYear)
+                          const { count } = await countQ
+                          const targetPage = Math.floor((count || 0) / pageSize)
+                          setSortKey('dgrade')
+                          setSortDir('desc')
+                          setRankingsPage(targetPage)
+                          setHighlightedPlayerId(p.id)
+                          setTimeout(() => {
+                            highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                          }, 400)
                         }}
                         style={{ display: 'block', width: '100%', padding: '7px 12px', textAlign: 'left', background: 'none', border: 'none', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, cursor: 'pointer' }}
                         onMouseEnter={e => (e.currentTarget.style.background = '#f5f2ec')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                           {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
+                          <span style={{ float: 'right', color: 'rgba(13,40,24,0.4)', fontSize: 11, fontFamily: 'DM Mono, monospace' }}>#{p.world_ranking} · {p.dgrade}</span>
                         </button>
                       ))}
                     </div>
@@ -785,6 +850,7 @@ export default function RankingsPage() {
                     {visibleCols.has('games') && <th style={TH('right', true)} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>}
                     {visibleCols.has('winpct') && <th style={TH('right', true)} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>}
                     {visibleCols.has('lastactive') && <th style={TH('right')}>Last Active</th>}
+                    {visibleCols.has('wcfprofile') && <th style={TH('left')}>WCF Profile</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -808,6 +874,7 @@ export default function RankingsPage() {
                         {visibleCols.has('games') && <td style={TD('right', true)}>{player.games || '—'}</td>}
                         {visibleCols.has('winpct') && <td style={TD('right', true)}>{player.win_percentage ? `${player.win_percentage}%` : '—'}</td>}
                         {visibleCols.has('lastactive') && <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{player.last_active_year || '—'}</td>}
+                        {visibleCols.has('wcfprofile') && <td style={TD('left')}>{player.wcf_profile_url ? <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontSize: 12 }}>WCF →</a> : '—'}</td>}
                       </tr>
                     )
                   })}
@@ -842,50 +909,41 @@ export default function RankingsPage() {
                 </button>
               ))}
             </div>
-            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 18 }}>GC Rankings baseline set 6 Mar 2026 — changes detected by daily sync. Games and Win% are for the last 12 months.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
-              {[
-                { title: '📈 Biggest Gains', data: movers.gains, positive: true },
-                { title: '📉 Biggest Losses', data: movers.losses, positive: false },
-              ].map(({ title, data, positive }) => (
-                <div key={title}>
-                  <h3 className="ghl" style={{ fontSize: 15, color: positive ? '#16a34a' : '#dc2626', marginBottom: 12, fontWeight: 700 }}>{title}</h3>
-                  {data.length === 0 ? (
-                    <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.4)' }}>No changes detected yet.</p>
-                  ) : (
-                    <div className="rnk-card">
-                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
-                            <th style={TH('left')}>Player</th>
-                            <th style={TH('right')}>Change</th>
-                            <th style={TH('right')}>dGrade</th>
-                                            <th style={TH('right')}>Games (12 mo)</th>
-                            <th style={TH('right')}>Win% (12 mo)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.map((p) => (
-                            <tr key={p.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
-                              <td style={TD('left')}>
-                                <a href={p.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
-                                  {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
-                                </a>
-                              </td>
-                              <td style={{ ...TD('right', true), fontWeight: 700, color: positive ? '#16a34a' : '#dc2626' }}>
-                                {positive ? `+${p.change}` : p.change}
-                              </td>
-                              <td style={{ ...TD('right', true), fontWeight: 700, color: G }}>{p.current_dgrade}</td>
-                              <td style={TD('right', true)}>{p.games || '—'}</td>
-                              <td style={TD('right', true)}>{p.win_percentage ? `${p.win_percentage}%` : '—'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 18 }}>GC Rankings baseline set 6 Mar 2026 — biggest career dGrade gains tracked by daily sync. Games and Win% are for the last 12 months.</p>
+            <div>
+              <h3 className="ghl" style={{ fontSize: 15, color: '#16a34a', marginBottom: 12, fontWeight: 700 }}>📈 Biggest Gains</h3>
+              {movers.gains.length === 0 ? (
+                <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.4)' }}>No changes detected yet.</p>
+              ) : (
+                <div className="rnk-card">
+                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                        <th style={TH('left')}>Player</th>
+                        <th style={TH('right')}>Change</th>
+                        <th style={TH('right')}>dGrade</th>
+                        <th style={TH('right')}>Games (12 mo)</th>
+                        <th style={TH('right')}>Win% (12 mo)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {movers.gains.map((p) => (
+                        <tr key={p.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                          <td style={TD('left')}>
+                            <a href={p.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
+                              {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
+                            </a>
+                          </td>
+                          <td style={{ ...TD('right', true), fontWeight: 700, color: '#16a34a' }}>+{p.change}</td>
+                          <td style={{ ...TD('right', true), fontWeight: 700, color: G }}>{p.current_dgrade}</td>
+                          <td style={TD('right', true)}>{p.games || '—'}</td>
+                          <td style={TD('right', true)}>{p.win_percentage ? `${p.win_percentage}%` : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         )}
@@ -1013,9 +1071,9 @@ export default function RankingsPage() {
 
               {/* ── Table 1: Player Counts ── */}
               <div>
-                <div style={{ marginBottom: 10 }}>
+                <div style={{ minHeight: 54, marginBottom: 10 }}>
                   <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Player Counts</h3>
-                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Total registered and recently active players by country.</p>
+                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Total players in the database and recently active players by country.</p>
                 </div>
                 <div className="rnk-card">
                   <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
@@ -1023,8 +1081,8 @@ export default function RankingsPage() {
                       <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                         <th style={{ ...TH('left'), width: 32 }}>#</th>
                         <th style={TH('left')}>Country</th>
-                        <th style={TH('right', true)} onClick={() => handleCountrySort('total_players')}>Total{countryArrow('total_players')}</th>
-                        <th style={TH('right', true)} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
+                        <th style={{ ...TH('right', true), color: countrySortKey === 'total_players' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('total_players')}>Total{countryArrow('total_players')}</th>
+                        <th style={{ ...TH('right', true), color: countrySortKey === 'active_players' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1036,8 +1094,8 @@ export default function RankingsPage() {
                           <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
                             <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
                           </td>
-                          <td style={TD('right', true)}>{row.total_players}</td>
-                          <td style={{ ...TD('right', true), fontWeight: 600, color: '#16a34a' }}>{row.active_players}</td>
+                          <td style={{ ...TD('right', true), color: countrySortKey === 'total_players' ? '#16a34a' : undefined }}>{row.total_players}</td>
+                          <td style={{ ...TD('right', true), fontWeight: 600, color: countrySortKey === 'active_players' ? '#16a34a' : 'rgba(13,40,24,0.7)' }}>{row.active_players}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1045,20 +1103,20 @@ export default function RankingsPage() {
                 </div>
               </div>
 
-              {/* ── Table 2: WCF Team Seeding ── */}
+              {/* ── Table 2: Country GC Rankings ── */}
               <div>
-                <div style={{ marginBottom: 10 }}>
-                  <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>WCF Team Seeding</h3>
-                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Top 6 average dGrade — used by WCF for team event seeding. Click ▾ for player breakdown.</p>
+                <div style={{ minHeight: 54, marginBottom: 10 }}>
+                  <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Country GC Rankings</h3>
+                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Countries ranked by average dGrade of their top six eligible active players. Click ▾ for player breakdown.</p>
                 </div>
-                <div className="rnk-card">
+                <div className="rnk-card" style={{ overflow: 'visible' }}>
                   <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                         <th style={{ ...TH('left'), width: 32 }}>#</th>
                         <th style={TH('left')}>Country</th>
-                        <th style={TH('right', true)} onClick={() => handleCountrySort('avg_top6_dgrade')}>Active Avg{countryArrow('avg_top6_dgrade')}</th>
-                        <th style={TH('right', true)} onClick={() => handleCountrySort('avg_top6_alltime_dgrade')}>All Time Avg{countryArrow('avg_top6_alltime_dgrade')}</th>
+                        <th style={{ ...TH('right', true), color: countrySortKey === 'avg_top6_dgrade' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('avg_top6_dgrade')}>Active Avg{countryArrow('avg_top6_dgrade')}</th>
+                        <th style={{ ...TH('right', true), color: countrySortKey === 'avg_top6_alltime_dgrade' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('avg_top6_alltime_dgrade')}>All Time Avg{countryArrow('avg_top6_alltime_dgrade')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1070,17 +1128,17 @@ export default function RankingsPage() {
                           <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
                             <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
                           </td>
-                          <td style={{ ...TD('right', true), fontWeight: 700, color: G, position: 'relative' }}>
+                          <td className="relative" style={{ ...TD('right', true), fontWeight: 700, color: countrySortKey === 'avg_top6_dgrade' ? '#16a34a' : G, position: 'relative' }}>
                             <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'active' ? null : { country: row.country, type: 'active' })}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
                               {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
                               {row.top6_active && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
                             </button>
                             {tooltip?.country === row.country && tooltip?.type === 'active' && row.top6_active && (
-                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
+                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 200, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
                                 <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 Active — {getCountryName(row.country)}</p>
                                 {row.top6_active.map((p: any, idx: number) => (
-                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
                                     <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
                                     <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
                                   </div>
@@ -1088,17 +1146,17 @@ export default function RankingsPage() {
                               </div>
                             )}
                           </td>
-                          <td style={{ ...TD('right', true), fontWeight: 600, position: 'relative' }}>
+                          <td className="relative" style={{ ...TD('right', true), fontWeight: 600, color: countrySortKey === 'avg_top6_alltime_dgrade' ? '#16a34a' : 'rgba(13,40,24,0.7)', position: 'relative' }}>
                             <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'alltime' ? null : { country: row.country, type: 'alltime' })}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
                               {row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '—'}
                               {row.top6_alltime && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
                             </button>
                             {tooltip?.country === row.country && tooltip?.type === 'alltime' && row.top6_alltime && (
-                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 20, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
+                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 200, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
                                 <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 All Time — {getCountryName(row.country)}</p>
                                 {row.top6_alltime.map((p: any, idx: number) => (
-                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
                                     <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
                                     <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
                                   </div>
@@ -1114,6 +1172,63 @@ export default function RankingsPage() {
               </div>
 
             </div>
+
+            {/* ── Country Players Breakdown Table ── */}
+            {countryStats.length > 0 && (() => {
+              const sorted = [...countryStats]
+                .filter(r => r.top6_active && r.top6_active.length > 0)
+                .sort((a, b) => (b.avg_top6_dgrade || 0) - (a.avg_top6_dgrade || 0))
+              return (
+                <div style={{ marginTop: 28 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                    <div>
+                      <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Country GC Rankings — Player Breakdown</h3>
+                      <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Top 6 eligible active players per country, sorted by country rank.</p>
+                    </div>
+                    <button onClick={downloadCountryPlayersCSV}
+                      style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                      ↓ CSV
+                    </button>
+                  </div>
+                  <div className="rnk-card" style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', minWidth: 700 }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                          <th style={{ ...TH('left'), width: 32 }}>#</th>
+                          <th style={TH('left')}>Country</th>
+                          <th style={{ ...TH('right'), color: '#16a34a' }}>Avg dGrade</th>
+                          {[1,2,3,4,5,6].map(n => (
+                            <th key={n} style={TH('right')}>P{n}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sorted.map((row, i) => {
+                          const players = row.top6_active || []
+                          return (
+                            <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                              <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 11 }}>{i + 1}</td>
+                              <td style={{ ...TD('left'), fontWeight: 600, color: G, whiteSpace: 'nowrap' }}>
+                                <span style={{ marginRight: 6 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
+                              </td>
+                              <td style={{ ...TD('right', true), fontWeight: 700, color: '#16a34a' }}>{Math.round(row.avg_top6_dgrade)}</td>
+                              {[0,1,2,3,4,5].map(n => {
+                                const p = players[n]
+                                return (
+                                  <td key={n} style={{ ...TD('right'), whiteSpace: 'nowrap', color: 'rgba(13,40,24,0.65)' }}>
+                                    {p ? <><span style={{ marginRight: 4 }}>{p.last_name}</span><span className="gmono" style={{ fontWeight: 700, color: G, fontSize: 11 }}>{p.dgrade}</span></> : <span style={{ color: 'rgba(13,40,24,0.2)' }}>—</span>}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -1159,12 +1274,19 @@ export default function RankingsPage() {
                 <div style={{ marginTop: 12 }}>
                   <span className="gsans" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(13,40,24,0.4)', marginRight: 8 }}>Recent:</span>
                   {recentPlayers.map(p => (
-                    <button key={p.id} onClick={() => handleSelectPlayer(p)}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginRight: 6, marginBottom: 6, padding: '4px 12px', borderRadius: 20, border: '1px solid #d5cfc5', background: 'white', fontSize: 12, color: G, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = LIME)}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = '#d5cfc5')}>
-                      {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
-                    </button>
+                    <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6, marginBottom: 6, borderRadius: 20, border: '1px solid #d5cfc5', background: 'white', overflow: 'hidden' }}>
+                      <button onClick={() => handleSelectPlayer(p)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 8px 4px 12px', background: 'none', border: 'none', fontSize: 12, color: G, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                        {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
+                      </button>
+                      <button onClick={() => {
+                        const updated = recentPlayers.filter((r: any) => r.id !== p.id)
+                        setRecentPlayers(updated)
+                        try { localStorage.setItem('gclab_recent_players', JSON.stringify(updated)) } catch {}
+                      }}
+                        style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 8px', background: 'none', border: 'none', fontSize: 12, color: 'rgba(13,40,24,0.35)', cursor: 'pointer', lineHeight: 1 }}
+                        title="Remove">×</button>
+                    </span>
                   ))}
                 </div>
               )}
@@ -1190,51 +1312,60 @@ export default function RankingsPage() {
 
             {selectedPlayer && (
               <div>
-                {/* Player header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-                  <h3 className="ghl" style={{ fontSize: 20, color: G, fontWeight: 700 }}>
-                    {getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}
-                  </h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
-                    {userRole === 'super_admin' && (
-                      <button onClick={() => handleManualImport(selectedPlayer)} disabled={manualImporting}
-                        style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(37,99,235,0.3)', color: '#1d4ed8', background: 'rgba(37,99,235,0.05)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', opacity: manualImporting ? 0.5 : 1 }}>
-                        {manualImporting ? 'Importing...' : '↻ Re-import History'}
-                      </button>
+                {/* Player header — name + micro stats + range buttons */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <h3 className="gsans" style={{ fontSize: 22, color: G, fontWeight: 700, margin: '0 0 4px', lineHeight: 1.2 }}>
+                      {getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}
+                    </h3>
+                    <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)', margin: 0 }}>
+                      {getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade} · World #{selectedPlayer.world_ranking || '—'}
+                    </p>
+                    {userRole === 'super_admin' && manualImportLog.length > 0 && (
+                      <div className="gsans" style={{ marginTop: 8, background: '#f0ece4', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: 'rgba(13,40,24,0.55)', maxHeight: 120, overflowY: 'auto' }}>
+                        {manualImportLog.map((log, i) => <div key={i}>{log}</div>)}
+                      </div>
                     )}
-                    <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontSize: 12 }}>WCF Profile →</a>
                   </div>
-                  {userRole === 'super_admin' && manualImportLog.length > 0 && (
-                    <div className="gsans" style={{ width: '100%', marginTop: 8, background: '#f0ece4', borderRadius: 6, padding: '8px 12px', fontSize: 11, color: 'rgba(13,40,24,0.55)', maxHeight: 120, overflowY: 'auto' }}>
-                      {manualImportLog.map((log, i) => <div key={i}>{log}</div>)}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    {/* Range pills */}
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[{ key: '1y', label: '1Y' }, { key: '5y', label: '5Y' }, { key: 'all', label: 'All Time' }, { key: 'custom', label: 'Custom' }].map(r => (
+                        <button key={r.key} onClick={() => setHistoryRange(r.key)} className={`rnk-pill${historyRange === r.key ? ' on' : ''}`} style={{ fontSize: 12, padding: '4px 12px' }}>
+                          {r.label}
+                        </button>
+                      ))}
                     </div>
-                  )}
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {userRole === 'super_admin' && (
+                        <button onClick={() => handleManualImport(selectedPlayer)} disabled={manualImporting}
+                          style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(37,99,235,0.3)', color: '#1d4ed8', background: 'rgba(37,99,235,0.05)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', opacity: manualImporting ? 0.5 : 1 }}>
+                          {manualImporting ? 'Importing...' : '↻ Re-import'}
+                        </button>
+                      )}
+                      <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontSize: 12 }}>WCF Profile →</a>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Stat boxes */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 16 }}>
+                {/* Stat boxes — 5 metrics matching the image layout */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
                   {[
-                    { label: 'dGrade', value: selectedPlayer.dgrade, mono: true, bold: true, color: G },
-                    { label: 'World Rank', value: selectedPlayer.world_ranking ? `#${selectedPlayer.world_ranking}` : '—', mono: true, bold: false, color: 'rgba(13,40,24,0.7)' },
-                    ...(selectedPlayer.egrade ? [{ label: 'eGrade', value: selectedPlayer.egrade, mono: true, bold: false, color: AMBER }] : []),
-                    { label: 'Country', value: `${getFlag(selectedPlayer.country)} ${getCountryName(selectedPlayer.country)}`, mono: false, bold: false, color: 'rgba(13,40,24,0.7)' },
+                    { label: 'Total Games', value: selectedPlayer.games != null ? selectedPlayer.games.toLocaleString() : '—', color: G, accent: false },
+                    { label: 'Career Win %', value: selectedPlayer.win_percentage != null ? `${selectedPlayer.win_percentage}%` : '—', color: '#16a34a', accent: true },
+                    { label: 'Current dGrade', value: selectedPlayer.dgrade ? selectedPlayer.dgrade.toLocaleString() : '—', color: G, accent: false },
+                    { label: 'Peak dGrade', value: peakDgradeAllTime ? peakDgradeAllTime.toLocaleString() : (selectedPlayer.dgrade ? selectedPlayer.dgrade.toLocaleString() : '—'), color: AMBER, accent: true },
+                    { label: 'World Rank', value: selectedPlayer.world_ranking ? `#${selectedPlayer.world_ranking}` : '—', color: G, accent: false },
                   ].map(stat => (
-                    <div key={stat.label} className="rnk-card" style={{ padding: '12px 14px', textAlign: 'center' }}>
-                      <div className={stat.mono ? 'gmono' : 'gsans'} style={{ fontSize: stat.mono ? 22 : 14, fontWeight: stat.bold ? 700 : 600, color: stat.color, lineHeight: 1.2 }}>{stat.value}</div>
-                      <div className="gsans" style={{ fontSize: 10, color: 'rgba(13,40,24,0.4)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{stat.label}</div>
+                    <div key={stat.label} className="rnk-card" style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      <div className="gmono" style={{ fontSize: 24, fontWeight: 700, color: stat.color, lineHeight: 1.1 }}>{stat.value}</div>
+                      <div className="gsans" style={{ fontSize: 10, color: 'rgba(13,40,24,0.4)', marginTop: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{stat.label}</div>
                     </div>
                   ))}
                 </div>
 
                 {/* Range + toggle controls */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {[{ key: '1y', label: '1 Year' }, { key: '5y', label: '5 Years' }, { key: 'all', label: 'All Time' }, { key: 'custom', label: 'Custom' }].map(r => (
-                      <button key={r.key} onClick={() => setHistoryRange(r.key)} className={`rnk-pill${historyRange === r.key ? ' on' : ''}`} style={{ fontSize: 12, padding: '4px 12px' }}>
-                        {r.label}
-                      </button>
-                    ))}
-                  </div>
                   {historyRange === 'custom' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input type="date" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)}
@@ -1310,7 +1441,7 @@ export default function RankingsPage() {
                                       ? h.event_name
                                       : firstSync && h.recorded_at === firstSync.recorded_at
                                         ? <span style={{ color: 'rgba(13,40,24,0.35)' }}>First Sync {new Date(h.recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                        : <span style={{ color: 'rgba(13,40,24,0.35)' }}>Latest Sync {lastSyncDate ? new Date(lastSyncDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>}
+                                        : <span style={{ color: 'rgba(13,40,24,0.35)' }}>Latest Sync {new Date(h.recorded_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
                                 </td>
                                 <td style={{ padding: '7px 14px', textAlign: 'right', fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace' }}>{h.dgrade_value}</td>
                                 <td style={{ padding: '7px 14px', textAlign: 'right', fontWeight: 700, fontFamily: 'DM Mono, monospace' }}>
