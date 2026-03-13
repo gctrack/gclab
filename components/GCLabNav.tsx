@@ -153,7 +153,15 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
               border: '1px solid rgba(74,222,128,0.25)',
               color: LIME,
             }}>
-            <span>⚗️ GC Lab</span>
+            {/* GCLab beaker logo, scaled for nav */}
+            <svg width="13" height="16" viewBox="0 0 44 52" fill="none">
+              <rect x="13" y="2" width="18" height="8" rx="2" fill="rgba(74,222,128,0.1)" stroke={LIME} strokeWidth="1.6"/>
+              <path d="M13 10 L2 44 Q0 50 4 51 L40 51 Q44 50 42 44 L31 10 Z" fill="rgba(74,222,128,0.07)" stroke={LIME} strokeWidth="1.6" strokeLinejoin="round"/>
+              <circle cx="14" cy="40" r="6.5" fill="#ef4444"/>
+              <circle cx="30" cy="40" r="6.5" fill="#3b82f6"/>
+              <circle cx="22" cy="29" r="6.5" fill="#eab308"/>
+            </svg>
+            <span>GC Lab</span>
             <svg width="8" height="8" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.6 }}>
               <path d="M1 9L9 1M9 1H3M9 1V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -221,7 +229,14 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
               onClick={() => setOpen(false)}
               className="gcnav-tab"
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', textDecoration: 'none', fontSize: 14, color: LIME, fontWeight: 500 }}>
-              ⚗️ GC Lab
+              <svg width="14" height="17" viewBox="0 0 44 52" fill="none">
+                <rect x="13" y="2" width="18" height="8" rx="2" fill="rgba(74,222,128,0.1)" stroke={LIME} strokeWidth="1.6"/>
+                <path d="M13 10 L2 44 Q0 50 4 51 L40 51 Q44 50 42 44 L31 10 Z" fill="rgba(74,222,128,0.07)" stroke={LIME} strokeWidth="1.6" strokeLinejoin="round"/>
+                <circle cx="14" cy="40" r="6.5" fill="#ef4444"/>
+                <circle cx="30" cy="40" r="6.5" fill="#3b82f6"/>
+                <circle cx="22" cy="29" r="6.5" fill="#eab308"/>
+              </svg>
+              GC Lab
               <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.5 }}>
                 <path d="M1 9L9 1M9 1H3M9 1V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
