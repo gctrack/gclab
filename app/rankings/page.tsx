@@ -917,21 +917,34 @@ export default function RankingsPage() {
                   style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: filterCountry ? '#16a34a' : 'rgba(13,40,24,0.6)', background: 'white', fontFamily: 'DM Sans, sans-serif', fontWeight: filterCountry ? 600 : 400 }}>
                   <option value="">All Countries</option>
                   {(() => {
-                    // Top 8 countries by player count
-                    const top = countryList.slice(0, 8)
-                    const rest = countryList.slice(8).sort((a, b) => getCountryName(a).localeCompare(getCountryName(b)))
-                    return (
-                      <>
-                        <optgroup label="Most Players">
-                          {top.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)} ({countryPlayerCounts[c]})</option>)}
-                        </optgroup>
-                        {rest.length > 0 && (
-                          <optgroup label="Other Countries">
-                            {rest.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>)}
-                          </optgroup>
-                        )}
-                      </>
-                    )
+                    // WCF-style regional groupings
+                    const WCF_GROUPS = [
+                      { label: 'Australasia',     codes: ['AU', 'NZ'] },
+                      { label: 'UK & Ireland',    codes: ['GB-ENG', 'GB-SCT', 'GB-WLS', 'IE', 'IM', 'JE'] },
+                      { label: 'North America',   codes: ['US', 'CA', 'MX'] },
+                      { label: 'Mainland Europe', codes: ['AT', 'BE', 'BA', 'CH', 'CZ', 'DE', 'DK', 'ES', 'FI', 'FR', 'GR', 'IT', 'LT', 'LU', 'LV', 'NL', 'NO', 'PL', 'PT', 'RU', 'SE', 'UA'] },
+                      { label: 'Southern Hemisphere', codes: ['ZA', 'UY', 'MU'] },
+                      { label: 'Other',           codes: ['EG', 'HK', 'IR', 'JP', 'PS'] },
+                    ]
+                    // Sort groups by total player count desc so biggest groups appear first
+                    const groupsWithCounts = WCF_GROUPS.map(g => ({
+                      ...g,
+                      total: g.codes.reduce((s, c) => s + (countryPlayerCounts[c] || 0), 0),
+                      // Filter to only countries present in our DB, sorted by count desc
+                      present: g.codes
+                        .filter(c => countryPlayerCounts[c])
+                        .sort((a, b) => (countryPlayerCounts[b] || 0) - (countryPlayerCounts[a] || 0)),
+                    })).filter(g => g.present.length > 0)
+                      .sort((a, b) => b.total - a.total)
+                    return groupsWithCounts.map(g => (
+                      <optgroup key={g.label} label={g.label}>
+                        {g.present.map(c => (
+                          <option key={c} value={c}>
+                            {getFlag(c)} {getCountryName(c)} ({countryPlayerCounts[c]})
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
                   })()}
                 </select>
                 <button onClick={() => { setActiveOnly(true); setRankingsPage(0) }} className={`rnk-pill${activeOnly ? ' on' : ''}`}>
