@@ -417,11 +417,13 @@ export default function ComparePage() {
 
   useEffect(() => {
     const init = async () => {
+      // Page is public — auth is optional for nav personalisation only
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setSignedIn(false); setLoading(false); return }
-      setSignedIn(true)
-      const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setUserProfile(data)
+      setSignedIn(!!user)
+      if (user) {
+        const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        setUserProfile(data)
+      }
       setLoading(false)
     }
     init()
@@ -622,57 +624,10 @@ export default function ComparePage() {
   const nameA = playerA ? `${playerA.wcf_first_name} ${playerA.wcf_last_name}` : 'Player A'
   const nameB = playerB ? `${playerB.wcf_first_name} ${playerB.wcf_last_name}` : 'Player B'
 
-  if (loading || signedIn === null) return (
-    <div style={{ minHeight: '100vh', background: G, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(232,224,208,0.3)' }}>
-      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>Loading…
-    </div>
-  )
-
-  if (!signedIn) return (
-    <div style={{ minHeight: '100vh', background: '#f5f2ec', display: 'flex', flexDirection: 'column' }}>
-      <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
-      <GCLabNav role="" isSignedIn={false} currentPath="/compare" />
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
-        <div style={{ position: 'relative', width: '100%', maxWidth: 480 }}>
-          <div style={{ borderRadius: 18, overflow: 'hidden', border: '1px solid #e8e4de', background: 'white', filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none' }}>
-            <div style={{ padding: 20, borderBottom: '1px solid #f0ece6', background: '#fafaf8', display: 'flex', gap: 12 }}>
-              <div style={{ flex: 1, height: 36, background: '#e8e4de', borderRadius: 8 }}/>
-              <div style={{ width: 36, height: 36, background: '#bbf7d0', borderRadius: 8 }}/>
-              <div style={{ flex: 1, height: 36, background: '#e8e4de', borderRadius: 8 }}/>
-            </div>
-            <div style={{ padding: 20 }}>
-              <svg width="100%" height="140" viewBox="0 0 600 140">
-                <line x1="0" y1="35" x2="600" y2="35" stroke="#e8e4de" strokeWidth="1"/>
-                <line x1="0" y1="70" x2="600" y2="70" stroke="#e8e4de" strokeWidth="1"/>
-                <line x1="0" y1="105" x2="600" y2="105" stroke="#e8e4de" strokeWidth="1"/>
-                <path d="M0,110 C100,90 200,50 300,35 C400,20 500,40 600,60 L600,140 L0,140 Z" fill="rgba(21,128,61,0.1)"/>
-                <path d="M0,110 C100,90 200,50 300,35 C400,20 500,40 600,60" fill="none" stroke="#16a34a" strokeWidth="2.5"/>
-                <path d="M0,125 C100,115 200,85 300,70 C400,55 500,75 600,95 L600,140 L0,140 Z" fill="rgba(29,78,216,0.07)"/>
-                <path d="M0,125 C100,115 200,85 300,70 C400,55 500,75 600,95" fill="none" stroke="#2563eb" strokeWidth="2" strokeDasharray="5 3"/>
-              </svg>
-            </div>
-          </div>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(248,246,242,0.8)', backdropFilter: 'blur(4px)', borderRadius: 18 }}>
-            <div style={{ textAlign: 'center', padding: '32px 32px', maxWidth: 360 }}>
-              <div style={{ width: 56, height: 56, background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: 24 }}>⚔️</div>
-              <h2 className="ghl" style={{ fontSize: 22, color: G, marginBottom: 8 }}>Compare any two players</h2>
-              <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.55)', marginBottom: 24, lineHeight: 1.6 }}>Head-to-head grade history, win rates, performance trends. Pick any two players and see how they stack up over time.</p>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <a href="/login?mode=signup" style={{ background: G, color: LIME, padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif' }}>Create free account</a>
-                <a href="/login" style={{ border: '1.5px solid #d5cfc5', color: G, padding: '10px 22px', borderRadius: 10, fontSize: 13, fontFamily: 'DM Sans, sans-serif', textDecoration: 'none' }}>Sign in</a>
-              </div>
-              <p className="gsans" style={{ fontSize: 11, color: 'rgba(13,40,24,0.35)', marginTop: 12 }}>Free · No credit card · 30 seconds</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-
   return (
     <div style={{ minHeight: '100vh', background: '#f5f2ec' }}>
       <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
-      <GCLabNav role={userProfile?.role} isSignedIn={true} currentPath="/compare" />
+      <GCLabNav role={userProfile?.role} isSignedIn={signedIn ?? undefined} currentPath="/compare" />
 
       {/* Header */}
       <div style={{ background: G, position: 'relative', overflow: 'hidden' }}>

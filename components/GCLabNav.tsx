@@ -32,7 +32,7 @@ const NAV_LINKS = [
   { href: '/rankings',     label: 'WCF Rankings'         },
   { href: '/leaderboards', label: 'Stats & Leaderboards' },
   { href: '/compare',      label: 'Compare'              },
-  { href: '/history',      label: 'Player History'       },
+  { href: '/rankings?tab=Player+History', label: 'Player History' },
   { href: '/community',    label: 'Community'            },
 ]
 
@@ -41,14 +41,14 @@ const DESKTOP_TABS = [
   { href: '/profile',      label: 'My Profile',     public: false },
   { href: '/rankings',     label: 'WCF Rankings',   public: true  },
   { href: '/leaderboards', label: 'Leaderboards',   public: true  },
-  { href: '/compare',      label: 'Compare',        public: false },
-  { href: '/history',      label: 'Player History', public: true  },
+  { href: '/compare',      label: 'Compare',        public: true  },
+  { href: '/rankings?tab=Player+History', label: 'Player History', public: true },
   { href: '/community',    label: 'Community',      public: false },
 ]
 
 const navStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap');
-  .gcnav-logo { font-family: 'Playfair Display', serif; }
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap');
+  .gcnav-logo { font-family: 'DM Serif Display', serif; }
   .gcnav-tab  { font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
   .gcnav-desk { display: none; }
   @media (min-width: 900px) { .gcnav-desk { display: flex; align-items: center; gap: 1px; } }

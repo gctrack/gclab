@@ -45,7 +45,7 @@ const ML = `
   }
 `
 
-const TABS = ['Rankings', 'Movers', 'New Players', 'Country Rankings', 'Historical Rankings']
+const TABS = ['Rankings', 'Player History', 'Movers', 'New Players', 'Country Rankings']
 const MOVER_PERIODS = [
   { label: '7 days', days: 7 },
   { label: '30 days', days: 30 },
@@ -96,6 +96,10 @@ export default function RankingsPage() {
   const rnkSearchTimeoutRef = useRef<any>(null)
   const [showColMenu, setShowColMenu] = useState(false)
   const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['alltime', 'country', 'dgrade', 'games', 'winpct', 'lastactive']))
+  const colMenuRef = useRef<HTMLDivElement>(null)
+  const [filterCountry, setFilterCountry] = useState('')
+  const [lastSeenYears, setLastSeenYears] = useState<Record<string, number>>({})
+  const [countryPlayersSort, setCountryPlayersSort] = useState<'active' | 'alltime'>('alltime')
 
   const [movers, setMovers] = useState<{ gains: any[], losses: any[] }>({ gains: [], losses: [] })
   const [moverPeriod, setMoverPeriod] = useState(7)
@@ -107,7 +111,7 @@ export default function RankingsPage() {
   const [countryList, setCountryList] = useState<string[]>([])
 
   const [countryStats, setCountryStats] = useState<any[]>([])
-  const [countrySortKey, setCountrySortKey] = useState('active_players')
+  const [countrySortKey, setCountrySortKey] = useState('avg_top6_alltime_dgrade')
   const [countrySortDir, setCountrySortDir] = useState<SortDir>('desc')
   const [compareMode, setCompareMode] = useState(false)
   const [compareDate, setCompareDate] = useState('')
@@ -175,7 +179,35 @@ export default function RankingsPage() {
     init()
   }, [])
 
-  useEffect(() => { if (activeTab === 'Rankings') loadRankings() }, [activeTab, activeOnly, rankingsPage, pageSize, sortKey, sortDir])
+  useEffect(() => { if (activeTab === 'Rankings') loadRankings() }, [activeTab, activeOnly, rankingsPage, pageSize, sortKey, sortDir, filterCountry])
+
+  // Fetch last-seen year from history for visible players
+  useEffect(() => {
+    if (rankings.length === 0) { setLastSeenYears({}); return }
+    const ids = rankings.map((p: any) => p.id)
+    supabase.from('wcf_dgrade_history')
+      .select('wcf_player_id, recorded_at')
+      .in('wcf_player_id', ids)
+      .order('recorded_at', { ascending: false })
+      .limit(1000)
+      .then(({ data }) => {
+        if (!data) return
+        const map: Record<string, number> = {}
+        for (const row of data) {
+          if (!map[row.wcf_player_id]) map[row.wcf_player_id] = new Date(row.recorded_at).getFullYear()
+        }
+        setLastSeenYears(map)
+      })
+  }, [rankings])
+
+  // Close column menu when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (colMenuRef.current && !colMenuRef.current.contains(e.target as Node)) setShowColMenu(false)
+    }
+    if (showColMenu) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showColMenu])
   useEffect(() => { if (activeTab === 'Movers') loadMovers() }, [activeTab, moverPeriod])
   useEffect(() => { if (activeTab === 'New Players') { setNewPlayerPage(0); loadNewPlayers() } }, [activeTab, newPlayerDays, newPlayerCountry])
   useEffect(() => { if (activeTab === 'Country Rankings') loadCountryStats() }, [activeTab])
@@ -251,10 +283,36 @@ export default function RankingsPage() {
       .order(sortKey, { ascending: sortDir === 'asc' })
       .range(rankingsPage * pageSize, (rankingsPage + 1) * pageSize - 1)
     if (activeOnly) query = query.gte('last_active_year', activeYear)
+    if (filterCountry) query = query.eq('country', filterCountry)
     if (sortKey === 'egrade') query = query.not('egrade', 'is', null)
     const { data } = await query
     setRankings(data || [])
     setLoading(false)
+  }
+
+  const downloadAllCSV = async () => {
+    let query = supabase
+      .from('wcf_players')
+      .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, games, win_percentage, last_active_year, wcf_profile_url')
+      .order(sortKey, { ascending: sortDir === 'asc' })
+    if (activeOnly) query = query.gte('last_active_year', activeYear)
+    if (filterCountry) query = query.eq('country', filterCountry)
+    if (sortKey === 'egrade') query = query.not('egrade', 'is', null)
+    const { data } = await query
+    if (!data) return
+    const headers = ['Rank', 'All Time Rank', 'First Name', 'Last Name', 'Country', 'dGrade', 'eGrade', 'Games (12mo)', 'Win% (12mo)', 'Last Active']
+    const rows = data.map((player: any, i: number) => [
+      i + 1, player.world_ranking, player.wcf_first_name, player.wcf_last_name,
+      getCountryName(player.country), player.dgrade, player.egrade || '',
+      player.games || '', player.win_percentage ? `${player.win_percentage}%` : '',
+      player.last_active_year || '',
+    ])
+    const csv = [headers, ...rows].map(r => r.map((v: any) => `"${v}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url
+    a.download = `gc-rankings-${activeOnly ? 'active' : 'alltime'}${filterCountry ? '-' + filterCountry : ''}-all-${new Date().toISOString().split('T')[0]}.csv`
+    a.click(); URL.revokeObjectURL(url)
   }
 
   const downloadCSV = () => {
@@ -701,7 +759,7 @@ export default function RankingsPage() {
                 Rankings &amp; Stats
               </h1>
               <p className="gsans" style={{ margin: 0, fontSize: 13, color: 'rgba(13,40,24,0.45)' }}>
-                WCF Rankings · Updated daily
+                WCF Rankings · Last updated {lastSyncDate ? new Date(lastSyncDate).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : 'daily'}
               </p>
             </div>
           </div>
@@ -733,10 +791,14 @@ export default function RankingsPage() {
                 </select>
                 <button onClick={downloadCSV}
                   style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-                  ↓ CSV
+                  ↓ Page CSV
+                </button>
+                <button onClick={downloadAllCSV}
+                  style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                  ↓ All CSV
                 </button>
                 {/* Column toggles */}
-                <div style={{ position: 'relative' }}>
+                <div ref={colMenuRef} style={{ position: 'relative' }}>
                   <button onClick={() => setShowColMenu(v => !v)}
                     style={{ fontSize: 13, background: showColMenu ? '#f0f9f4' : 'white', border: `1px solid ${showColMenu ? '#4ade80' : '#d5cfc5'}`, color: showColMenu ? '#16a34a' : '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
                     ⊞ Columns
@@ -750,8 +812,8 @@ export default function RankingsPage() {
                         { key: 'egrade', label: 'eGrade' },
                         { key: 'games', label: 'Games (12mo)' },
                         { key: 'winpct', label: 'Win% (12mo)' },
-                        { key: 'lastactive', label: 'Last Active' },
-                        { key: 'wcfprofile', label: 'WCF Profile' },
+                        { key: 'lastactive', label: 'Last Active (WCF)' },
+                        { key: 'lastseen', label: 'Last Seen (our DB)' },
                       ].map(col => (
                         <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: G, cursor: 'pointer' }}>
                           <input type="checkbox" checked={visibleCols.has(col.key)}
@@ -828,8 +890,14 @@ export default function RankingsPage() {
                     </div>
                   )}
                 </div>
+                {/* Country filter */}
+                <select value={filterCountry} onChange={e => { setFilterCountry(e.target.value); setRankingsPage(0) }}
+                  style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: filterCountry ? '#16a34a' : 'rgba(13,40,24,0.6)', background: 'white', fontFamily: 'DM Sans, sans-serif', fontWeight: filterCountry ? 600 : 400 }}>
+                  <option value="">All Countries</option>
+                  {countryList.map(c => <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>)}
+                </select>
                 <button onClick={() => { setActiveOnly(true); setRankingsPage(0) }} className={`rnk-pill${activeOnly ? ' on' : ''}`}>
-                  Active last 12 months
+                  Active (12mo)
                 </button>
                 <button onClick={() => { setActiveOnly(false); setRankingsPage(0) }}
                   className={`rnk-pill${!activeOnly ? ' on' : ''}`}>
@@ -853,7 +921,7 @@ export default function RankingsPage() {
                     {visibleCols.has('games') && <th style={TH('right', true)} onClick={() => handleRankingSort('games')}>Games (12mo){sortArrow('games')}</th>}
                     {visibleCols.has('winpct') && <th style={TH('right', true)} onClick={() => handleRankingSort('win_percentage')}>Win% (12mo){sortArrow('win_percentage')}</th>}
                     {visibleCols.has('lastactive') && <th style={TH('right')}>Last Active</th>}
-                    {visibleCols.has('wcfprofile') && <th style={TH('left')}>WCF Profile</th>}
+                    {visibleCols.has('lastseen') && <th style={TH('right')}>Last Seen</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -877,7 +945,7 @@ export default function RankingsPage() {
                         {visibleCols.has('games') && <td style={TD('right', true)}>{player.games || '—'}</td>}
                         {visibleCols.has('winpct') && <td style={TD('right', true)}>{player.win_percentage ? `${player.win_percentage}%` : '—'}</td>}
                         {visibleCols.has('lastactive') && <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{player.last_active_year || '—'}</td>}
-                        {visibleCols.has('wcfprofile') && <td style={TD('left')}>{player.wcf_profile_url ? <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontSize: 12 }}>WCF →</a> : '—'}</td>}
+                        {visibleCols.has('lastseen') && <td style={{ ...TD('right'), color: 'rgba(13,40,24,0.45)', fontSize: 12 }}>{lastSeenYears[player.id] || '—'}</td>}
                       </tr>
                     )
                   })}
@@ -1030,10 +1098,11 @@ export default function RankingsPage() {
                 {countryBreakdown.length > 0 && (
                   <div style={{ flex: 1, minWidth: 200 }}>
                     <div className="gsans" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(13,40,24,0.4)', marginBottom: 8 }}>By Country</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 20px' }}>
                       {countryBreakdown.map(([country, count]) => (
-                        <div key={country} className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.7)', whiteSpace: 'nowrap' }}>
-                          {getFlag(country)} {getCountryName(country)} <span className="gmono" style={{ fontWeight: 600, color: G }}>{count as number}</span>
+                        <div key={country} className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.7)', whiteSpace: 'nowrap', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{getFlag(country)} {getCountryName(country)}</span>
+                          <span className="gmono" style={{ fontWeight: 600, color: G, marginLeft: 6 }}>{count as number}</span>
                         </div>
                       ))}
                     </div>
@@ -1111,7 +1180,75 @@ export default function RankingsPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, alignItems: 'start' }}>
 
-              {/* ── Table 1: Player Counts ── */}
+              {/* ── Table 1: Country GC Rankings (first) ── */}
+              <div>
+                <div style={{ minHeight: 54, marginBottom: 10 }}>
+                  <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Country GC Rankings</h3>
+                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Countries ranked by average dGrade of their top six eligible players. Click ▾ for player breakdown.</p>
+                </div>
+                <div className="rnk-card" style={{ overflow: 'visible' }}>
+                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                        <th style={{ ...TH('left'), width: 32 }}>#</th>
+                        <th style={TH('left')}>Country</th>
+                        <th style={{ ...TH('right', true), color: countrySortKey === 'avg_top6_alltime_dgrade' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('avg_top6_alltime_dgrade')}>All Time Avg{countryArrow('avg_top6_alltime_dgrade')}</th>
+                        <th style={{ ...TH('right', true), color: countrySortKey === 'avg_top6_dgrade' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('avg_top6_dgrade')}>Active Avg{countryArrow('avg_top6_dgrade')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {countryStats.length === 0 ? (
+                        <tr><td colSpan={4} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
+                      ) : [...countryStats].sort((a, b) => (b[countrySortKey] || 0) - (a[countrySortKey] || 0)).map((row, i) => (
+                        <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                          <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 12 }}>{i + 1}</td>
+                          <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
+                            <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
+                          </td>
+                          <td className="relative" style={{ ...TD('right', true), fontWeight: 700, color: countrySortKey === 'avg_top6_alltime_dgrade' ? '#16a34a' : G, position: 'relative' }}>
+                            <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'alltime' ? null : { country: row.country, type: 'alltime' })}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
+                              {row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '—'}
+                              {row.top6_alltime && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
+                            </button>
+                            {tooltip?.country === row.country && tooltip?.type === 'alltime' && row.top6_alltime && (
+                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 200, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
+                                <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 All Time — {getCountryName(row.country)}</p>
+                                {row.top6_alltime.map((p: any, idx: number) => (
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
+                                    <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
+                                    <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="relative" style={{ ...TD('right', true), fontWeight: 600, color: countrySortKey === 'avg_top6_dgrade' ? '#16a34a' : 'rgba(13,40,24,0.7)', position: 'relative' }}>
+                            <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'active' ? null : { country: row.country, type: 'active' })}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
+                              {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
+                              {row.top6_active && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
+                            </button>
+                            {tooltip?.country === row.country && tooltip?.type === 'active' && row.top6_active && (
+                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 200, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
+                                <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 Active — {getCountryName(row.country)}</p>
+                                {row.top6_active.map((p: any, idx: number) => (
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
+                                    <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
+                                    <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ── Table 2: Player Counts (second) ── */}
               <div>
                 <div style={{ minHeight: 54, marginBottom: 10 }}>
                   <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Player Counts</h3>
@@ -1130,7 +1267,7 @@ export default function RankingsPage() {
                     <tbody>
                       {countryStats.length === 0 ? (
                         <tr><td colSpan={4} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
-                      ) : countryStats.map((row, i) => (
+                      ) : [...countryStats].sort((a, b) => (b[countrySortKey] || 0) - (a[countrySortKey] || 0)).map((row, i) => (
                         <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
                           <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 12 }}>{i + 1}</td>
                           <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
@@ -1145,92 +1282,30 @@ export default function RankingsPage() {
                 </div>
               </div>
 
-              {/* ── Table 2: Country GC Rankings ── */}
-              <div>
-                <div style={{ minHeight: 54, marginBottom: 10 }}>
-                  <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Country GC Rankings</h3>
-                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Countries ranked by average dGrade of their top six eligible active players. Click ▾ for player breakdown.</p>
-                </div>
-                <div className="rnk-card" style={{ overflow: 'visible' }}>
-                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
-                        <th style={{ ...TH('left'), width: 32 }}>#</th>
-                        <th style={TH('left')}>Country</th>
-                        <th style={{ ...TH('right', true), color: countrySortKey === 'avg_top6_dgrade' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('avg_top6_dgrade')}>Active Avg{countryArrow('avg_top6_dgrade')}</th>
-                        <th style={{ ...TH('right', true), color: countrySortKey === 'avg_top6_alltime_dgrade' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('avg_top6_alltime_dgrade')}>All Time Avg{countryArrow('avg_top6_alltime_dgrade')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {countryStats.length === 0 ? (
-                        <tr><td colSpan={4} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
-                      ) : [...countryStats].sort((a, b) => (b.avg_top6_dgrade || 0) - (a.avg_top6_dgrade || 0)).map((row, i) => (
-                        <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
-                          <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 12 }}>{i + 1}</td>
-                          <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
-                            <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
-                          </td>
-                          <td className="relative" style={{ ...TD('right', true), fontWeight: 700, color: countrySortKey === 'avg_top6_dgrade' ? '#16a34a' : G, position: 'relative' }}>
-                            <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'active' ? null : { country: row.country, type: 'active' })}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
-                              {row.avg_top6_dgrade ? Math.round(row.avg_top6_dgrade) : '—'}
-                              {row.top6_active && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
-                            </button>
-                            {tooltip?.country === row.country && tooltip?.type === 'active' && row.top6_active && (
-                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 200, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
-                                <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 Active — {getCountryName(row.country)}</p>
-                                {row.top6_active.map((p: any, idx: number) => (
-                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
-                                    <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
-                                    <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                          <td className="relative" style={{ ...TD('right', true), fontWeight: 600, color: countrySortKey === 'avg_top6_alltime_dgrade' ? '#16a34a' : 'rgba(13,40,24,0.7)', position: 'relative' }}>
-                            <button onClick={() => setTooltip(tooltip?.country === row.country && tooltip?.type === 'alltime' ? null : { country: row.country, type: 'alltime' })}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0 }}>
-                              {row.avg_top6_alltime_dgrade ? Math.round(row.avg_top6_alltime_dgrade) : '—'}
-                              {row.top6_alltime && <span style={{ marginLeft: 4, color: 'rgba(13,40,24,0.4)', fontSize: 11 }}>▾</span>}
-                            </button>
-                            {tooltip?.country === row.country && tooltip?.type === 'alltime' && row.top6_alltime && (
-                              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 200, background: 'white', border: '1px solid #e5e1d8', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', padding: '10px 14px', width: 220, textAlign: 'left' }}>
-                                <p className="gsans" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(13,40,24,0.5)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 6 All Time — {getCountryName(row.country)}</p>
-                                {row.top6_alltime.map((p: any, idx: number) => (
-                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
-                                    <span style={{ color: G, fontFamily: 'DM Sans, sans-serif' }}>{idx + 1}. {p.first_name} {p.last_name}</span>
-                                    <span style={{ fontWeight: 700, color: G, fontFamily: 'DM Mono, monospace', marginLeft: 8 }}>{p.dgrade}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
             </div>
 
             {/* ── Country Players Breakdown Table ── */}
             {countryStats.length > 0 && (() => {
+              const avgKey = countryPlayersSort === 'alltime' ? 'avg_top6_alltime_dgrade' : 'avg_top6_dgrade'
+              const playerKey = countryPlayersSort === 'alltime' ? 'top6_alltime' : 'top6_active'
               const sorted = [...countryStats]
-                .filter(r => r.top6_active && r.top6_active.length > 0)
-                .sort((a, b) => (b.avg_top6_dgrade || 0) - (a.avg_top6_dgrade || 0))
+                .filter(r => r[playerKey] && r[playerKey].length > 0)
+                .sort((a, b) => (b[avgKey] || 0) - (a[avgKey] || 0))
               return (
                 <div style={{ marginTop: 28 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
                     <div>
                       <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Country GC Rankings — Player Breakdown</h3>
-                      <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Top 6 eligible active players per country, sorted by country rank.</p>
+                      <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Top 6 eligible players per country, sorted by country rank.</p>
                     </div>
-                    <button onClick={downloadCountryPlayersCSV}
-                      style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-                      ↓ CSV
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <button onClick={() => setCountryPlayersSort('alltime')} className={`rnk-pill${countryPlayersSort === 'alltime' ? ' on' : ''}`} style={{ fontSize: 12 }}>All Time</button>
+                      <button onClick={() => setCountryPlayersSort('active')} className={`rnk-pill${countryPlayersSort === 'active' ? ' on' : ''}`} style={{ fontSize: 12 }}>Active</button>
+                      <button onClick={downloadCountryPlayersCSV}
+                        style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                        ↓ CSV
+                      </button>
+                    </div>
                   </div>
                   <div className="rnk-card" style={{ overflow: 'hidden' }}>
                     {/* Column header */}
@@ -1241,7 +1316,7 @@ export default function RankingsPage() {
                       <div style={TH('left')}>Top 6 Players</div>
                     </div>
                     {sorted.map((row, i) => {
-                      const players = (row.top6_active || []) as any[]
+                      const players = (row[playerKey] || []) as any[]
                       return (
                         <div key={row.country} style={{ display: 'grid', gridTemplateColumns: '36px 180px 90px 1fr', borderTop: i === 0 ? 'none' : '1px solid #ede9e2', background: 'white', alignItems: 'start' }}>
                           {/* Rank */}
@@ -1251,7 +1326,9 @@ export default function RankingsPage() {
                             <span style={{ marginRight: 6 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
                           </div>
                           {/* Avg dGrade */}
-                          <div style={{ padding: '14px 12px 14px 0', textAlign: 'right', fontWeight: 700, color: '#16a34a', fontFamily: 'DM Mono, monospace', fontSize: 14 }}>{Math.round(row.avg_top6_dgrade)}</div>
+                          <div style={{ padding: '14px 12px 14px 0', textAlign: 'right', fontWeight: 700, color: '#16a34a', fontFamily: 'DM Mono, monospace', fontSize: 14 }}>
+                            {row[avgKey] ? Math.round(row[avgKey]) : '—'}
+                          </div>
                           {/* 2×3 player grid */}
                           <div style={{ padding: '10px 12px 10px 4px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px 12px' }}>
                             {[0,1,2,3,4,5].map(n => {
@@ -1275,7 +1352,7 @@ export default function RankingsPage() {
         )}
 
         {/* ── HISTORICAL RANKINGS ── */}
-        {activeTab === 'Historical Rankings' && (
+        {activeTab === 'Player History' && (
           <div>
             {/* Admin import count */}
             {userRole === 'super_admin' && importedCount !== null && totalPlayers !== null && (

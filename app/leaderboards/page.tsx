@@ -65,30 +65,7 @@ function fmtFull(d: string) {
   return new Date(d).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function shareText(title: string, player: HeroPlayer) {
-  return `GC Rankings — ${title}\n${getFlag(player.country)} ${player.name} (${countryName(player.country)}): ${player.value}\n${player.detail || ''}\ngcrankings.com/leaderboards`
-}
-
-function ShareButton({ text, label = 'Share' }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false)
-  const handleShare = async () => {
-    try {
-      if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({ title: 'GC Rankings', text })
-      } else {
-        await navigator.clipboard.writeText(text)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-      }
-    } catch {}
-  }
-  return (
-    <button onClick={handleShare}
-      style={{ fontSize: 11, padding: '3px 9px', borderRadius: 6, border: '1px solid #d5cfc5', background: copied ? 'rgba(74,222,128,0.1)' : 'white', color: copied ? '#16a34a' : 'rgba(13,40,24,0.45)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s' }}>
-      {copied ? '✓ Copied' : `↗ ${label}`}
-    </button>
-  )
-}
+// Sharing removed — text formatting wasn't suitable for sharing
 
 // ── Hero Card ───────────────────────────────────────────────────────────────
 function HeroCard({ label, sublabel, icon, accentColor, loading, player }: {
@@ -165,9 +142,6 @@ function HeroCard({ label, sublabel, icon, accentColor, loading, player }: {
               </div>
             )}
 
-            <div style={{ marginTop: 12 }}>
-              <ShareButton text={shareText(label, player)} />
-            </div>
           </div>
         ) : (
           <p className="gsans" style={{ color: 'rgba(13,40,24,0.35)', fontSize: 13 }}>No data available</p>
@@ -197,21 +171,11 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
     return ranked
   })()
 
-  const shareRows = () => {
-    const lines = rows.slice(0, 10).map((r, i) =>
-      `${i + 1}. ${getFlag(r.country)} ${r.wcf_first_name} ${r.wcf_last_name} (${countryName(r.country)})`
-    )
-    return `GC Rankings — ${title}\n${lines.join('\n')}\ngcrankings.com/leaderboards`
-  }
-
   return (
     <div className="ldr-card">
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid #e5e1d8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 16 }}>{icon}</span>
-          <h3 className="gsans" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: G }}>{title}</h3>
-        </div>
-        {!loading && rows.length > 0 && <ShareButton text={shareRows()} />}
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid #e5e1d8', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 16 }}>{icon}</span>
+        <h3 className="gsans" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: G }}>{title}</h3>
       </div>
       {loading ? (
         <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 7 }}>
@@ -256,20 +220,11 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
 
 // ── Upset Wins Table ─────────────────────────────────────────────────────────
 function UpsetTable({ rows, loading }: { rows: any[]; loading: boolean }) {
-  const shareRows = () => {
-    const lines = rows.slice(0, 10).map((r, i) =>
-      `${i + 1}. +${r.gap} gap — ${r.wcf_first_name} ${r.wcf_last_name} beat ${r.opponent_name}`
-    )
-    return `GC Rankings — Biggest Upset Wins\n${lines.join('\n')}\ngcrankings.com/leaderboards`
-  }
   return (
     <div className="ldr-card">
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid #e5e1d8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 16 }}>⚡</span>
-          <h3 className="gsans" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: G }}>Biggest Upset Wins — All Time</h3>
-        </div>
-        {!loading && rows.length > 0 && <ShareButton text={shareRows()} />}
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid #e5e1d8', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 16 }}>⚡</span>
+        <h3 className="gsans" style={{ margin: 0, fontSize: 14, fontWeight: 600, color: G }}>Biggest Upset Wins — All Time</h3>
       </div>
       {loading ? (
         <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 7 }}>
