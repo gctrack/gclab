@@ -266,6 +266,11 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
 
 // ── Upset Wins Table ─────────────────────────────────────────────────────────
 function UpsetTable({ rows, loading }: { rows: any[]; loading: boolean }) {
+  const [page, setPage] = useState(1)
+  const allRows = rows.slice(0, MAX_BASE)
+  const totalPages = Math.max(1, Math.ceil(allRows.length / PAGE_SIZE))
+  const displayed = allRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   return (
     <div className="ldr-card">
       <div style={{ padding: '14px 18px', borderBottom: '1px solid #e5e1d8', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -282,12 +287,12 @@ function UpsetTable({ rows, loading }: { rows: any[]; loading: boolean }) {
         <p className="gsans" style={{ padding: '20px', color: 'rgba(13,40,24,0.35)', fontSize: 13, margin: 0 }}>No data yet.</p>
       ) : (
         <div>
-          {rows.map((row, i) => (
+          {displayed.map((row, i) => (
             <div key={i} className="ldr-row" style={{
-              padding: '10px 18px', borderBottom: i < rows.length - 1 ? '1px solid #ede9e2' : 'none', background: 'white',
+              padding: '10px 18px', borderBottom: i < displayed.length - 1 ? '1px solid #ede9e2' : 'none', background: 'white',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: row.event_name ? 4 : 0 }}>
-                <span className="gmono" style={{ color: 'rgba(13,40,24,0.3)', fontSize: 11, width: 18, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+                <span className="gmono" style={{ color: 'rgba(13,40,24,0.3)', fontSize: 11, width: 18, textAlign: 'right', flexShrink: 0 }}>{(page - 1) * PAGE_SIZE + i + 1}</span>
                 <span className="gmono" style={{ fontSize: 13, fontWeight: 700, color: BALL_PINK, flexShrink: 0, minWidth: 42 }}>+{row.gap}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span style={{ fontSize: 14 }}>{getFlag(row.country)}</span>
@@ -310,6 +315,26 @@ function UpsetTable({ rows, loading }: { rows: any[]; loading: boolean }) {
               )}
             </div>
           ))}
+          {totalPages > 1 && (
+            <div style={{ borderTop: '1px solid #ede9e2', display: 'flex', alignItems: 'center', gap: 2, padding: '7px 14px' }}>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="gsans" style={{
+                background: 'none', border: 'none', cursor: page === 1 ? 'default' : 'pointer',
+                fontSize: 13, color: page === 1 ? 'rgba(13,40,24,0.2)' : 'rgba(13,40,24,0.45)', padding: '2px 4px',
+              }}>‹</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => setPage(p)} className="gsans" style={{
+                  background: page === p ? BALL_PINK : 'none',
+                  border: 'none', cursor: 'pointer', padding: '2px 7px',
+                  fontSize: 11, fontWeight: 700, borderRadius: 4,
+                  color: page === p ? 'white' : 'rgba(13,40,24,0.4)',
+                }}>{p}</button>
+              ))}
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="gsans" style={{
+                background: 'none', border: 'none', cursor: page === totalPages ? 'default' : 'pointer',
+                fontSize: 13, color: page === totalPages ? 'rgba(13,40,24,0.2)' : 'rgba(13,40,24,0.45)', padding: '2px 4px',
+              }}>›</button>
+            </div>
+          )}
         </div>
       )}
     </div>
