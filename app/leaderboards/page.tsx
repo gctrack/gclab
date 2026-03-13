@@ -159,25 +159,28 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
   renderExtra?: (row: any) => React.ReactNode
   tieKey?: string
 }) {
-  const [showTies, setShowTies] = useState(false)
+  const [page, setPage] = useState(1)
 
-  // Assign proper tied ranks (dense rank: first occurrence of value = rank)
-  const ranked = rows.map(r => {
-    if (!tieKey) return r
+  // Dense rank: all rows sharing the same tieKey value get the rank of the first occurrence
+  const ranked = rows.map((r, i) => {
+    if (!tieKey) return { ...r, _rank: i + 1 }
     const firstIdx = rows.findIndex(x => x[tieKey] === r[tieKey])
     return { ...r, _rank: firstIdx + 1 }
-  }).map((r, i) => ({ ...r, _rank: r._rank ?? i + 1 }))
+  })
+
+  // Count how many rows share each rank (to decide if = prefix is needed)
+  const rankCounts: Record<number, number> = {}
+  for (const r of ranked) rankCounts[r._rank] = (rankCounts[r._rank] || 0) + 1
+  const rankLabel = (r: any) => rankCounts[r._rank] > 1 ? `=${r._rank}` : `${r._rank}`
 
   const page1 = ranked.slice(0, 10)
-  const val10 = tieKey && rows.length > 10 ? rows[9]?.[tieKey] : null
-  const tiePage = val10 != null ? ranked.slice(10).filter(r => rows[ranked.indexOf(r)]?.[tieKey] === val10) : []
-  // Simpler: filter overflow rows matching the 10th value
-  const overflowTies = tieKey && rows.length > 10
-    ? ranked.slice(10).filter((_, i) => rows[10 + i]?.[tieKey] === val10)
+  // Overflow: rows beyond position 10 that tie with row at position 10
+  const val10 = tieKey && ranked.length > 10 ? ranked[9][tieKey] : null
+  const overflowTies = val10 != null
+    ? ranked.slice(10).filter(r => r[tieKey!] === val10)
     : []
-  const tieRank = overflowTies.length > 0 ? ranked[9]._rank : 0
 
-  const displayed = showTies ? [...page1, ...overflowTies] : page1
+  const displayed = page === 2 ? overflowTies : page1
 
   return (
     <div className="ldr-card">
@@ -198,12 +201,12 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
           {displayed.map((row, i) => (
             <div key={i} className="ldr-row" style={{
               padding: renderExtra ? '9px 18px 5px' : '9px 18px',
-              borderBottom: i < displayed.length - 1 || overflowTies.length > 0 ? '1px solid #ede9e2' : 'none',
+              borderBottom: i < displayed.length - 1 ? '1px solid #ede9e2' : 'none',
               background: 'white',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span className="gmono" style={{ color: 'rgba(13,40,24,0.3)', fontSize: 11, width: 18, textAlign: 'right', flexShrink: 0 }}>
-                  {row._rank === tieRank && tieRank > 0 ? `=${row._rank}` : row._rank}
+                  {rankLabel(row)}
                 </span>
                 <span style={{ fontSize: 15, flexShrink: 0 }}>{getFlag(row.country)}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -223,15 +226,23 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
             </div>
           ))}
           {overflowTies.length > 0 && (
-            <button onClick={() => setShowTies(v => !v)} className="gsans" style={{
-              width: '100%', padding: '9px 18px', background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 12, color: accentColor, fontWeight: 600, textAlign: 'left',
-              borderTop: showTies ? '1px solid #ede9e2' : 'none',
-            }}>
-              {showTies
-                ? '▲ Show less'
-                : `▼ Show ${overflowTies.length} more tied at =${tieRank}`}
-            </button>
+            <div style={{ borderTop: '1px solid #ede9e2', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 18px' }}>
+              <button onClick={() => setPage(1)} className="gsans" style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
+                fontSize: 12, fontWeight: 700,
+                color: page === 1 ? accentColor : 'rgba(13,40,24,0.35)',
+                borderRadius: 4,
+              }}>1</button>
+              <button onClick={() => setPage(2)} className="gsans" style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
+                fontSize: 12, fontWeight: 700,
+                color: page === 2 ? accentColor : 'rgba(13,40,24,0.35)',
+                borderRadius: 4,
+              }}>2</button>
+              <span className="gsans" style={{ fontSize: 11, color: 'rgba(13,40,24,0.3)', marginLeft: 2 }}>
+                {overflowTies.length} more tied at ={overflowTies[0]?._rank}
+              </span>
+            </div>
           )}
         </div>
       )}
