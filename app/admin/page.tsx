@@ -36,8 +36,8 @@ const G    = '#0d2818'
 const LIME = '#4ade80'
 
 const ML = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-  .ghl  { font-family: 'Playfair Display', serif; }
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  .ghl  { font-family: 'DM Serif Display', serif; }
   .gmono{ font-family: 'DM Mono', monospace; }
   .gsans{ font-family: 'DM Sans', sans-serif; }
   .adm-row:hover { background: rgba(13,40,24,0.02) !important; }

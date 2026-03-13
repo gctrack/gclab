@@ -18,8 +18,8 @@ const CARD_BG = 'rgba(255,255,255,0.055)'
 const CARD_BORDER = 'rgba(255,255,255,0.09)'
 
 const ML = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-  .ghl  { font-family: 'Playfair Display', serif; }
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  .ghl  { font-family: 'DM Serif Display', serif; }
   .gmono{ font-family: 'DM Mono', monospace; }
   .gsans{ font-family: 'DM Sans', sans-serif; }
   .dash-stat-card { transition: border-color 0.2s; }
