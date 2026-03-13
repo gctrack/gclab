@@ -629,15 +629,17 @@ export default function ComparePage() {
       <style dangerouslySetInnerHTML={{ __html: ML_STYLES }}/>
       <GCLabNav role={userProfile?.role} isSignedIn={signedIn ?? undefined} currentPath="/compare" />
 
-      {/* Header */}
-      <div style={{ background: G, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 80% 0%, rgba(74,222,128,0.07) 0%, transparent 55%)' }}/>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)', backgroundSize: '44px 44px' }}/>
-        <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '36px 24px 28px', position: 'relative', zIndex: 1 }}>
-          <h2 className="ghl" style={{ fontSize: 'clamp(24px,3vw,40px)', color: CREAM, fontWeight: 900, marginBottom: 8, letterSpacing: '-0.5px' }}>Compare Players</h2>
-          <p className="gsans" style={{ fontSize: 14, color: 'rgba(232,224,208,0.5)' }}>Head to head stats, grade history and career comparisons.</p>
+      {/* Header — cream + lime accent, matching Rankings page */}
+      <div style={{ background: '#f5f2ec', borderBottom: '1px solid #ddd8ce' }}>
+        <div style={{ padding: '28px 48px 24px', maxWidth: '80rem', margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            <div style={{ width: 4, background: LIME, borderRadius: 2, marginRight: 16, flexShrink: 0 }} />
+            <div>
+              <h1 className="ghl" style={{ fontSize: 'clamp(22px,2.5vw,34px)', color: G, fontWeight: 900, margin: '0 0 4px', lineHeight: 1.15 }}>Compare Players</h1>
+              <p className="gsans" style={{ margin: 0, fontSize: 13, color: 'rgba(13,40,24,0.45)' }}>Head to head stats, grade history and career comparisons.</p>
+            </div>
+          </div>
         </div>
-        <div style={{ height: 24, background: 'linear-gradient(180deg, #0d2818 0%, #f5f2ec 100%)' }}/>
       </div>
 
       <main style={{ maxWidth: '80rem', margin: '0 auto', padding: '0 24px 60px' }}>
