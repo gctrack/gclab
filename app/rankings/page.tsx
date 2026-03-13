@@ -97,6 +97,7 @@ export default function RankingsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchSuggestions, setSearchSuggestions] = useState<any[]>([])
   const searchTimeoutRef = useRef<any>(null)
+  const urlPlayerLoadedRef = useRef(false)
 
   // Chart tooltip
   const [chartTooltip, setChartTooltip] = useState<{ x: number, y: number, label: string } | null>(null)
@@ -275,6 +276,33 @@ export default function RankingsPage() {
   useEffect(() => { if (activeTab === 'Country Rankings') loadCountryStats() }, [activeTab])
   // Historical Rankings no longer auto-loads the signed-in user
   useEffect(() => { if (selectedPlayer) fetchHistory(selectedPlayer.id) }, [historyRange, historyFrom, historyTo])
+
+  // Auto-select player from ?player= URL param when navigating to Player History
+  useEffect(() => {
+    if (activeTab !== 'Player History') return
+    if (urlPlayerLoadedRef.current) return
+    urlPlayerLoadedRef.current = true
+    const playerName = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('player')
+      : null
+    if (!playerName) return
+    ;(async () => {
+      const parts = playerName.trim().split(' ')
+      let q = supabase
+        .from('wcf_players')
+        .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, wcf_profile_url')
+        .limit(1)
+      if (parts.length >= 2 && parts[1]) {
+        q = q.ilike('wcf_first_name', `%${parts[0]}%`).ilike('wcf_last_name', `%${parts[1]}%`)
+      } else {
+        q = q.or(`wcf_last_name.ilike.%${playerName}%,wcf_first_name.ilike.%${playerName}%`)
+      }
+      const { data } = await q
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
+      if (data?.[0]) handleSelectPlayer(data[0])
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
   useEffect(() => { if (compareMode) loadCompareStats() }, [compareMode, compareDate])
 
   const handleRankingSort = (key: SortKey) => {
@@ -1031,7 +1059,7 @@ export default function RankingsPage() {
                         <td style={{ ...TD('left', true), color: G }}>{i + rankingsPage * pageSize + 1}</td>
                         {visibleCols.has('alltime') && <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.45)' }}>{filterCountry ? (countryRanks[player.id] ?? '—') : player.world_ranking}</td>}
                         <td style={TD('left')}>
-                          <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
+                          <a href={`/rankings?tab=Player+History&player=${encodeURIComponent(`${player.wcf_first_name} ${player.wcf_last_name}`)}`} className="rnk-link gsans" style={{ fontWeight: 500 }}>
                             {player.wcf_first_name} {player.wcf_last_name}
                           </a>
                         </td>
@@ -1530,8 +1558,13 @@ export default function RankingsPage() {
                 {/* Player header — name + micro stats + range buttons */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
                   <div>
-                    <h3 className="gsans" style={{ fontSize: 22, color: G, fontWeight: 700, margin: '0 0 4px', lineHeight: 1.2 }}>
-                      {getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}
+                    <h3 className="gsans" style={{ fontSize: 22, color: G, fontWeight: 700, margin: '0 0 4px', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{getFlag(selectedPlayer.country)} {selectedPlayer.wcf_first_name} {selectedPlayer.wcf_last_name}</span>
+                      <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer"
+                        title="View WCF Profile"
+                        style={{ fontSize: 14, color: 'rgba(13,40,24,0.28)', textDecoration: 'none', lineHeight: 1, fontWeight: 400 }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#16a34a')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(13,40,24,0.28)')}>↗</a>
                     </h3>
                     <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.5)', margin: 0 }}>
                       {getCountryName(selectedPlayer.country)} · dGrade {selectedPlayer.dgrade} · World #{selectedPlayer.world_ranking || '—'}
@@ -1558,7 +1591,6 @@ export default function RankingsPage() {
                           {manualImporting ? 'Importing...' : '↻ Re-import'}
                         </button>
                       )}
-                      <a href={selectedPlayer.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontSize: 12 }}>WCF Profile →</a>
                     </div>
                   </div>
                 </div>
