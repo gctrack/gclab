@@ -137,6 +137,8 @@ export default function RankingsPage() {
   const [countryStats, setCountryStats] = useState<any[]>([])
   const [countrySortKey, setCountrySortKey] = useState('avg_top6_alltime_dgrade')
   const [countrySortDir, setCountrySortDir] = useState<SortDir>('desc')
+  const [playerCountSortKey, setPlayerCountSortKey] = useState('total_players')
+  const [playerCountSortDir, setPlayerCountSortDir] = useState<SortDir>('desc')
   const [compareMode, setCompareMode] = useState(false)
   const [compareDate, setCompareDate] = useState('')
   const [compareStats, setCompareStats] = useState<any[]>([])
@@ -326,6 +328,13 @@ export default function RankingsPage() {
   const countryArrow = (key: string) => countrySortKey === key ? (countrySortDir === 'desc' ? ' ↓' : ' ↑') : ' ↕'
   const thCountrySort = (key: string) =>
     `px-4 py-3 font-semibold cursor-pointer select-none text-right ${countrySortKey === key ? 'text-green-600' : 'text-gray-500 hover:text-green-600'}`
+
+  const handlePlayerCountSort = (key: string) => {
+    const newDir: SortDir = playerCountSortKey === key && playerCountSortDir === 'desc' ? 'asc' : 'desc'
+    setPlayerCountSortKey(key)
+    setPlayerCountSortDir(newDir)
+  }
+  const playerCountArrow = (key: string) => playerCountSortKey === key ? (playerCountSortDir === 'desc' ? ' ↓' : ' ↑') : ' ↕'
 
   const downloadCountryCSV = () => {
     const headers = ['Rank', 'Country', 'Total Players', 'Active (12mo)', 'Top 6 Active Avg dGrade', 'Top 6 All Time Avg dGrade']
@@ -1321,7 +1330,7 @@ export default function RankingsPage() {
                     <tbody>
                       {countryStats.length === 0 ? (
                         <tr><td colSpan={4} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
-                      ) : [...countryStats].sort((a, b) => (b[countrySortKey] || 0) - (a[countrySortKey] || 0)).map((row, i) => (
+                      ) : [...countryStats].sort((a, b) => countrySortDir === 'desc' ? (b[countrySortKey] || 0) - (a[countrySortKey] || 0) : (a[countrySortKey] || 0) - (b[countrySortKey] || 0)).map((row, i) => (
                         <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
                           <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 12 }}>{i + 1}</td>
                           <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
@@ -1382,21 +1391,21 @@ export default function RankingsPage() {
                       <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                         <th style={{ ...TH('left'), width: 32 }}>#</th>
                         <th style={TH('left')}>Country</th>
-                        <th style={{ ...TH('right', true), color: countrySortKey === 'total_players' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('total_players')}>Total{countryArrow('total_players')}</th>
-                        <th style={{ ...TH('right', true), color: countrySortKey === 'active_players' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('active_players')}>Active (12mo){countryArrow('active_players')}</th>
+                        <th style={{ ...TH('right', true), color: playerCountSortKey === 'total_players' ? '#16a34a' : undefined }} onClick={() => handlePlayerCountSort('total_players')}>Total{playerCountArrow('total_players')}</th>
+                        <th style={{ ...TH('right', true), color: playerCountSortKey === 'active_players' ? '#16a34a' : undefined }} onClick={() => handlePlayerCountSort('active_players')}>Active (12mo){playerCountArrow('active_players')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {countryStats.length === 0 ? (
                         <tr><td colSpan={4} style={{ padding: '20px 16px', textAlign: 'center', color: 'rgba(13,40,24,0.4)', fontFamily: 'DM Sans, sans-serif', fontSize: 13 }}>No data available.</td></tr>
-                      ) : [...countryStats].sort((a, b) => (b[countrySortKey] || 0) - (a[countrySortKey] || 0)).map((row, i) => (
+                      ) : [...countryStats].sort((a, b) => playerCountSortDir === 'desc' ? (b[playerCountSortKey] || 0) - (a[playerCountSortKey] || 0) : (a[playerCountSortKey] || 0) - (b[playerCountSortKey] || 0)).map((row, i) => (
                         <tr key={row.country} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
                           <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.35)', fontSize: 12 }}>{i + 1}</td>
                           <td style={{ ...TD('left'), fontWeight: 600, color: G }}>
                             <span style={{ marginRight: 8 }}>{getFlag(row.country)}</span>{getCountryName(row.country)}
                           </td>
-                          <td style={{ ...TD('right', true), color: countrySortKey === 'total_players' ? '#16a34a' : undefined }}>{row.total_players}</td>
-                          <td style={{ ...TD('right', true), fontWeight: 600, color: countrySortKey === 'active_players' ? '#16a34a' : 'rgba(13,40,24,0.7)' }}>{row.active_players}</td>
+                          <td style={{ ...TD('right', true), fontWeight: playerCountSortKey === 'total_players' ? 700 : undefined, color: playerCountSortKey === 'total_players' ? '#16a34a' : G }}>{row.total_players}</td>
+                          <td style={{ ...TD('right', true), fontWeight: 600, color: playerCountSortKey === 'active_players' ? '#16a34a' : 'rgba(13,40,24,0.7)' }}>{row.active_players}</td>
                         </tr>
                       ))}
                     </tbody>
