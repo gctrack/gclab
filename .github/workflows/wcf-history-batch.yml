@@ -1,8 +1,9 @@
 name: WCF History Batch Import
 
 on:
-  schedule:
-    - cron: '5,20,35,50 * * * *'
+  # Schedule disabled — WCF site unavailable, re-enable once fixed
+  # schedule:
+  #   - cron: '5,20,35,50 * * * *'
   workflow_dispatch:
     inputs:
       reason:
