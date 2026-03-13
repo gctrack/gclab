@@ -265,7 +265,9 @@ function CareerChart({ history, playerName, playerFlag, playerMeta, statStrip }:
             {label}
           </div>
         ))}
-        <a href="/rankings?tab=Historical+Rankings" style={{ marginLeft: 'auto', fontSize: 11, color: LIME, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif' }}>Full historical chart →</a>
+        {playerName && (
+          <a href={`/rankings?tab=Player+History&player=${encodeURIComponent(playerName)}`} style={{ marginLeft: 'auto', fontSize: 11, color: LIME, textDecoration: 'none', fontFamily: 'DM Sans, sans-serif' }}>Player History →</a>
+        )}
       </div>
     </div>
   )
