@@ -1294,8 +1294,7 @@ export default function RankingsPage() {
         {/* ── COUNTRY RANKINGS ── */}
         {activeTab === 'Country Rankings' && !loading && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
-              <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)' }}>Click column headers to sort. Active = played a ranked game in the last 12 months.</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 20 }}>
               <button onClick={downloadCountryCSV}
                 style={{ fontSize: 13, background: 'white', border: '1px solid #d5cfc5', color: '#374151', padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
                 ↓ CSV
@@ -1306,9 +1305,9 @@ export default function RankingsPage() {
 
               {/* ── Table 1: Country GC Rankings (first) ── */}
               <div>
-                <div style={{ minHeight: 54, marginBottom: 10 }}>
+                <div style={{ height: 54, marginBottom: 10, overflow: 'hidden' }}>
                   <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Country GC Rankings</h3>
-                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Countries ranked by average dGrade of their top six eligible players. Click ▾ for player breakdown.</p>
+                  <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Countries ranked by average dGrade of their top six eligible players. Click ▾ for breakdown.</p>
                 </div>
                 <div className="rnk-card" style={{ overflow: 'visible' }}>
                   <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
@@ -1317,7 +1316,7 @@ export default function RankingsPage() {
                         <th style={{ ...TH('left'), width: 32 }}>#</th>
                         <th style={TH('left')}>Country</th>
                         <th style={{ ...TH('right', true), color: countrySortKey === 'avg_top6_alltime_dgrade' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('avg_top6_alltime_dgrade')}>All Time Avg{countryArrow('avg_top6_alltime_dgrade')}</th>
-                        <th style={{ ...TH('right', true), color: countrySortKey === 'avg_top6_dgrade' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('avg_top6_dgrade')}>Active Avg{countryArrow('avg_top6_dgrade')}</th>
+                        <th style={{ ...TH('right', true), color: countrySortKey === 'avg_top6_dgrade' ? '#16a34a' : undefined }} onClick={() => handleCountrySort('avg_top6_dgrade')}>Active Avg (12MO){countryArrow('avg_top6_dgrade')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1374,7 +1373,7 @@ export default function RankingsPage() {
 
               {/* ── Table 2: Player Counts (second) ── */}
               <div>
-                <div style={{ minHeight: 54, marginBottom: 10 }}>
+                <div style={{ height: 54, marginBottom: 10, overflow: 'hidden' }}>
                   <h3 className="ghl" style={{ fontSize: 16, color: G, fontWeight: 700, margin: '0 0 2px' }}>Player Counts</h3>
                   <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', margin: 0 }}>Total players in the database and recently active players by country.</p>
                 </div>
