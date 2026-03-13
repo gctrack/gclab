@@ -127,6 +127,9 @@ const ML_STYLES = `
     font-family: 'DM Sans', sans-serif;
     transition: border-color 0.15s;
   }
+  @media (max-width: 480px) {
+    .cmp-search { font-size: 12px; padding: 9px 28px 9px 10px; }
+  }
   .cmp-search:focus { border-color: #0d2818; }
   .cmp-suggestion {
     width: 100%;
@@ -301,7 +304,7 @@ function PlayerSearch({ label, color, onSelect, selected, exclude, recentPlayers
           <button onClick={handleClear} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', fontSize: 18, color: 'rgba(13,40,24,0.35)', cursor: 'pointer', lineHeight: 1, padding: 0 }}>×</button>
         )}
         {(showRecent || showSuggestions) && (
-          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 30, background: 'white', border: '1px solid #e8e4de', borderRadius: 10, boxShadow: '0 4px 16px rgba(13,40,24,0.12)', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, minWidth: 260, zIndex: 30, background: 'white', border: '1px solid #e8e4de', borderRadius: 10, boxShadow: '0 4px 16px rgba(13,40,24,0.12)', overflow: 'hidden' }}>
             {showRecent && (
               <>
                 <div className="gsans" style={{ padding: '6px 14px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(13,40,24,0.35)', background: '#fafaf8', borderBottom: '1px solid #f0ece6' }}>Recent</div>
@@ -794,7 +797,7 @@ export default function ComparePage() {
             {(filteredGamesA.length > 0 || filteredGamesB.length > 0) && (
               <section>
                 <SectionTitle>Best Wins</SectionTitle>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 16 }}>
                   {([
                     { name: nameA, enriched: gamesAWithBefore, sort: winsSortA, setSort: setWinsSortA, color: COL_A },
                     { name: nameB, enriched: gamesBWithBefore, sort: winsSortB, setSort: setWinsSortB, color: COL_B },
@@ -875,7 +878,7 @@ export default function ComparePage() {
             {yearChartData.length > 0 && (
               <section>
                 <SectionTitle>Win % by Year</SectionTitle>
-                <div className="cmp-card" style={{ padding: 24 }}>
+                <div className="cmp-card" style={{ padding: 24, overflow: 'auto' }}>
                   <ResponsiveContainer width="100%" height={200}>
                     <LineChart data={yearChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0ece6" />
@@ -889,7 +892,7 @@ export default function ComparePage() {
                     </LineChart>
                   </ResponsiveContainer>
                   <div style={{ overflowX: 'auto', marginTop: 16 }}>
-                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                    <table style={{ width: '100%', minWidth: 420, fontSize: 12, borderCollapse: 'collapse' }}>
                       <thead>
                         <tr>
                           <th style={TH('left')}>Year</th>
@@ -1010,8 +1013,9 @@ export default function ComparePage() {
             {(oppCountryStatsA.length > 0 || oppCountryStatsB.length > 0) && (
               <section>
                 <SectionTitle>Results by Opponent Country</SectionTitle>
-                <div className="cmp-card">
-                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                <div className="cmp-card" style={{ overflow: 'auto' }}>
+                  <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', minWidth: 420, fontSize: 13, borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
                         <th style={TH('left')}>Country</th>
@@ -1054,6 +1058,7 @@ export default function ComparePage() {
                       })()}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </section>
             )}
@@ -1062,8 +1067,9 @@ export default function ComparePage() {
             {(countryStatsA.length > 0 || countryStatsB.length > 0) && (
               <section>
                 <SectionTitle>Results by Country Played In</SectionTitle>
-                <div className="cmp-card">
-                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                <div className="cmp-card" style={{ overflow: 'auto' }}>
+                  <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', minWidth: 420, fontSize: 13, borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
                         <th style={TH('left')}>Country</th>
@@ -1112,6 +1118,7 @@ export default function ComparePage() {
                       })()}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </section>
             )}

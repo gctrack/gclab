@@ -41,7 +41,7 @@ const ML = `
   }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
   @media (max-width: 768px) {
-    .ldr-pad { padding: 20px !important; }
+    .ldr-pad { padding: 16px !important; }
     .ldr-header { padding: 20px 20px 0 !important; }
   }
 `
@@ -217,7 +217,7 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
               borderBottom: i < displayed.length - 1 ? '1px solid #ede9e2' : 'none',
               background: 'white',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, overflow: 'hidden' }}>
                 <span className="gmono" style={{ color: 'rgba(13,40,24,0.3)', fontSize: 11, width: 18, textAlign: 'right', flexShrink: 0 }}>
                   {rankLabel(row)}
                 </span>
@@ -232,7 +232,7 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
                     </span>
                   )}
                 </div>
-                <span className="gsans" style={{ fontSize: 11, color: 'rgba(13,40,24,0.35)', flexShrink: 0 }}>{countryName(row.country)}</span>
+                <span className="gsans" style={{ fontSize: 11, color: 'rgba(13,40,24,0.35)', flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 70 }}>{countryName(row.country)}</span>
                 {renderValue(row)}
               </div>
               {renderExtra && renderExtra(row)}
@@ -461,7 +461,7 @@ export default function LeaderboardsPage() {
 
         {/* Volume & Games */}
         <Section title="Volume & Games" sub="Who has played the most — and who went on the longest winning tear"/>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(440px, 100%), 1fr))', gap: 18 }}>
           <LeaderTable title="Most Games Played" icon="🎮" accentColor={BALL_BLUE} rows={top10Games} loading={tablesLoading} tieKey="game_count"
             renderValue={row => <span className="gmono" style={{ fontSize: 13, fontWeight: 700, color: BALL_BLUE, flexShrink: 0 }}>{Number(row.game_count).toLocaleString()}</span>}/>
           <LeaderTable title="Longest Win Streak" icon="🔥" accentColor={BALL_RED} rows={top10Streak} loading={tablesLoading} tieKey="streak"
@@ -470,7 +470,7 @@ export default function LeaderboardsPage() {
 
         {/* Reach & Opponents */}
         <Section title="Reach & Opponents" sub="Who has travelled furthest and faced the widest field"/>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(440px, 100%), 1fr))', gap: 18 }}>
           <LeaderTable title="Most Travelled" icon="✈️" accentColor={BALL_GREEN} rows={top10Travelled} loading={tablesLoading} tieKey="country_count"
             renderValue={row => <span className="gmono" style={{ fontSize: 13, fontWeight: 700, color: BALL_GREEN, flexShrink: 0 }}>{row.country_count} countries</span>}
             renderExtra={row => row.countries_played?.length > 0 ? (
@@ -484,7 +484,7 @@ export default function LeaderboardsPage() {
 
         {/* Grade Achievements */}
         <Section title="Grade Achievements" sub="The biggest dGrade rises over a career and within a single event"/>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(440px, 100%), 1fr))', gap: 18 }}>
           <LeaderTable title="Biggest Career Rise" icon="📈" accentColor={BALL_BLACK} rows={top10CareerRise} loading={tablesLoading} tieKey="gain"
             renderValue={row => (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
