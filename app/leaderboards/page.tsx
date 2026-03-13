@@ -152,24 +152,32 @@ function HeroCard({ label, sublabel, icon, accentColor, loading, player }: {
 }
 
 // ── Top-10 Table ─────────────────────────────────────────────────────────────
-function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, subText, renderExtra }: {
+function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, subText, renderExtra, tieKey }: {
   title: string; icon: string; accentColor: string; rows: any[]; loading: boolean
   renderValue: (row: any) => React.ReactNode
   subText?: (row: any) => string | null
   renderExtra?: (row: any) => React.ReactNode
+  tieKey?: string
 }) {
-  // Show top 10; mark tied entries at position 10
-  const displayed = (() => {
-    if (rows.length <= 10) return rows.map((r, i) => ({ ...r, _rank: i + 1 }))
-    const ranked = rows.map((r, i) => ({ ...r, _rank: i + 1 }))
-    // Find value at position 10 and include all ties
-    const val10 = rows[9]
-    const tie11 = rows[10]
-    if (val10 && tie11) {
-      // Can't compare without knowing the value key, so just show up to fetched length
-    }
-    return ranked
-  })()
+  const [showTies, setShowTies] = useState(false)
+
+  // Assign proper tied ranks (dense rank: first occurrence of value = rank)
+  const ranked = rows.map(r => {
+    if (!tieKey) return r
+    const firstIdx = rows.findIndex(x => x[tieKey] === r[tieKey])
+    return { ...r, _rank: firstIdx + 1 }
+  }).map((r, i) => ({ ...r, _rank: r._rank ?? i + 1 }))
+
+  const page1 = ranked.slice(0, 10)
+  const val10 = tieKey && rows.length > 10 ? rows[9]?.[tieKey] : null
+  const tiePage = val10 != null ? ranked.slice(10).filter(r => rows[ranked.indexOf(r)]?.[tieKey] === val10) : []
+  // Simpler: filter overflow rows matching the 10th value
+  const overflowTies = tieKey && rows.length > 10
+    ? ranked.slice(10).filter((_, i) => rows[10 + i]?.[tieKey] === val10)
+    : []
+  const tieRank = overflowTies.length > 0 ? ranked[9]._rank : 0
+
+  const displayed = showTies ? [...page1, ...overflowTies] : page1
 
   return (
     <div className="ldr-card">
@@ -190,11 +198,13 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
           {displayed.map((row, i) => (
             <div key={i} className="ldr-row" style={{
               padding: renderExtra ? '9px 18px 5px' : '9px 18px',
-              borderBottom: i < displayed.length - 1 ? '1px solid #ede9e2' : 'none',
+              borderBottom: i < displayed.length - 1 || overflowTies.length > 0 ? '1px solid #ede9e2' : 'none',
               background: 'white',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="gmono" style={{ color: 'rgba(13,40,24,0.3)', fontSize: 11, width: 18, textAlign: 'right', flexShrink: 0 }}>{row._rank}</span>
+                <span className="gmono" style={{ color: 'rgba(13,40,24,0.3)', fontSize: 11, width: 18, textAlign: 'right', flexShrink: 0 }}>
+                  {row._rank === tieRank && tieRank > 0 ? `=${row._rank}` : row._rank}
+                </span>
                 <span style={{ fontSize: 15, flexShrink: 0 }}>{getFlag(row.country)}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <span className="gsans" style={{ fontSize: 13, fontWeight: 600, color: G, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -212,6 +222,17 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
               {renderExtra && renderExtra(row)}
             </div>
           ))}
+          {overflowTies.length > 0 && (
+            <button onClick={() => setShowTies(v => !v)} className="gsans" style={{
+              width: '100%', padding: '9px 18px', background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 12, color: accentColor, fontWeight: 600, textAlign: 'left',
+              borderTop: showTies ? '1px solid #ede9e2' : 'none',
+            }}>
+              {showTies
+                ? '▲ Show less'
+                : `▼ Show ${overflowTies.length} more tied at =${tieRank}`}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -346,10 +367,10 @@ export default function LeaderboardsPage() {
       { data: games }, { data: winRate }, { data: travelled }, { data: opponents },
       { data: careerRise }, { data: streak }, { data: eventJump }, { data: upsets },
     ] = await Promise.all([
-      supabase.rpc('get_top10_most_games'),        supabase.rpc('get_top10_win_rate'),
-      supabase.rpc('get_top10_most_travelled'),    supabase.rpc('get_top10_most_opponents'),
-      supabase.rpc('get_top10_career_rise'),       supabase.rpc('get_top10_longest_win_streak'),
-      supabase.rpc('get_top10_single_event_jump'), supabase.rpc('get_top10_upset_wins'),
+      supabase.rpc('get_top10_most_games').limit(20),        supabase.rpc('get_top10_win_rate').limit(20),
+      supabase.rpc('get_top10_most_travelled').limit(20),    supabase.rpc('get_top10_most_opponents').limit(20),
+      supabase.rpc('get_top10_career_rise').limit(20),       supabase.rpc('get_top10_longest_win_streak').limit(20),
+      supabase.rpc('get_top10_single_event_jump').limit(20), supabase.rpc('get_top10_upset_wins').limit(20),
     ])
     setTop10Games(games || []);        setTop10WinRate(winRate || [])
     setTop10Travelled(travelled || []); setTop10Opponents(opponents || [])
@@ -391,37 +412,37 @@ export default function LeaderboardsPage() {
         {/* Volume & Games */}
         <Section title="Volume & Games" sub="Who has played the most — and who went on the longest winning tear"/>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: 18 }}>
-          <LeaderTable title="Most Games Played" icon="🎮" accentColor={BALL_BLUE} rows={top10Games} loading={tablesLoading}
+          <LeaderTable title="Most Games Played" icon="🎮" accentColor={BALL_BLUE} rows={top10Games} loading={tablesLoading} tieKey="game_count"
             renderValue={row => <span className="gmono" style={{ fontSize: 13, fontWeight: 700, color: BALL_BLUE, flexShrink: 0 }}>{Number(row.game_count).toLocaleString()}</span>}/>
-          <LeaderTable title="Longest Win Streak" icon="🔥" accentColor={BALL_RED} rows={top10Streak} loading={tablesLoading}
+          <LeaderTable title="Longest Win Streak" icon="🔥" accentColor={BALL_RED} rows={top10Streak} loading={tablesLoading} tieKey="streak"
             renderValue={row => <span className="gmono" style={{ fontSize: 13, fontWeight: 700, color: BALL_RED, flexShrink: 0 }}>{row.streak} wins</span>}/>
         </div>
 
         {/* Reach & Opponents */}
         <Section title="Reach & Opponents" sub="Who has travelled furthest and faced the widest field"/>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: 18 }}>
-          <LeaderTable title="Most Travelled" icon="✈️" accentColor={BALL_GREEN} rows={top10Travelled} loading={tablesLoading}
+          <LeaderTable title="Most Travelled" icon="✈️" accentColor={BALL_GREEN} rows={top10Travelled} loading={tablesLoading} tieKey="country_count"
             renderValue={row => <span className="gmono" style={{ fontSize: 13, fontWeight: 700, color: BALL_GREEN, flexShrink: 0 }}>{row.country_count} countries</span>}
             renderExtra={row => row.countries_played?.length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, paddingLeft: 28, paddingBottom: 5, marginTop: 3 }}>
                 {row.countries_played.map((c: string) => <span key={c} title={countryName(c)} style={{ fontSize: 13, lineHeight: 1 }}>{getFlag(c)}</span>)}
               </div>
             ) : null}/>
-          <LeaderTable title="Most Unique Opponents" icon="🤝" accentColor={BALL_BLACK} rows={top10Opponents} loading={tablesLoading}
+          <LeaderTable title="Most Unique Opponents" icon="🤝" accentColor={BALL_BLACK} rows={top10Opponents} loading={tablesLoading} tieKey="opponent_count"
             renderValue={row => <span className="gmono" style={{ fontSize: 13, fontWeight: 700, color: BALL_BLACK, flexShrink: 0 }}>{Number(row.opponent_count).toLocaleString()}</span>}/>
         </div>
 
         {/* Grade Achievements */}
         <Section title="Grade Achievements" sub="The biggest dGrade rises over a career and within a single event"/>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))', gap: 18 }}>
-          <LeaderTable title="Biggest Career Rise" icon="📈" accentColor={BALL_BLACK} rows={top10CareerRise} loading={tablesLoading}
+          <LeaderTable title="Biggest Career Rise" icon="📈" accentColor={BALL_BLACK} rows={top10CareerRise} loading={tablesLoading} tieKey="gain"
             renderValue={row => (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
                 <span className="gmono" style={{ fontSize: 13, fontWeight: 700, color: BALL_BLACK }}>+{row.gain}</span>
                 <span className="gmono" style={{ fontSize: 10, color: 'rgba(13,40,24,0.35)' }}>{row.min_dgrade}→{row.max_dgrade}</span>
               </div>
             )}/>
-          <LeaderTable title="Biggest Single-Event Jump" icon="🚀" accentColor={BALL_BLUE} rows={top10EventJump} loading={tablesLoading}
+          <LeaderTable title="Biggest Single-Event Jump" icon="🚀" accentColor={BALL_BLUE} rows={top10EventJump} loading={tablesLoading} tieKey="jump"
             subText={row => row.event_name && row.event_date ? `${row.event_name} · ${fmtFull(row.event_date)}` : row.event_name || null}
             renderValue={row => (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
@@ -434,7 +455,7 @@ export default function LeaderboardsPage() {
         {/* Win Rate */}
         <Section title="Best Win Rate" sub="Career win percentage — minimum 100 games"/>
         <div style={{ maxWidth: 540 }}>
-          <LeaderTable title="Best Career Win Rate" icon="🏆" accentColor={BALL_YELLOW} rows={top10WinRate} loading={tablesLoading}
+          <LeaderTable title="Best Career Win Rate" icon="🏆" accentColor={BALL_YELLOW} rows={top10WinRate} loading={tablesLoading} tieKey="win_rate"
             renderValue={row => (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, flexShrink: 0 }}>
                 <span className="gmono" style={{ fontSize: 13, fontWeight: 700, color: BALL_YELLOW }}>{row.win_rate}%</span>
