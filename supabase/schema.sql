@@ -162,6 +162,29 @@ create table public.shots (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- Discussion groups (for gated forum areas: clubs, custom groups, etc.)
+create table public.discussion_groups (
+  id          uuid default uuid_generate_v4() primary key,
+  slug        text not null unique,
+  name        text not null,
+  description text,
+  type        text not null default 'custom' check (type in ('club', 'custom')),
+  club_id     uuid references public.clubs(id) on delete set null,
+  created_by  uuid references public.profiles(id) on delete set null,
+  created_at  timestamp with time zone default now() not null
+);
+
+-- Group membership (role: owner | admin | member)
+create table public.discussion_group_members (
+  id        uuid default uuid_generate_v4() primary key,
+  group_id  uuid references public.discussion_groups(id) on delete cascade not null,
+  user_id   uuid references public.profiles(id) on delete cascade not null,
+  role      text not null default 'member' check (role in ('owner', 'admin', 'member')),
+  added_by  uuid references public.profiles(id) on delete set null,
+  added_at  timestamp with time zone default now() not null,
+  unique (group_id, user_id)
+);
+
 -- Feature flags
 create table public.feature_flags (
   id uuid default uuid_generate_v4() primary key,

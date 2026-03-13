@@ -43,6 +43,7 @@ const ML = `
 type Thread = {
   id: string; title: string; created_by: string; created_at: string
   post_count: number; last_post_at: string; category?: string
+  group_id?: string | null   // null = public; set = gated to discussion_group members
   author_name?: string; author_avatar?: string
 }
 type Post = {
