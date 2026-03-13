@@ -46,6 +46,27 @@ const ML = `
 `
 
 const TABS = ['Rankings', 'Player History', 'Movers', 'New Players', 'Country Rankings']
+
+// Country codes that belong to each composite region / top-pick value
+const REGION_CODES: Record<string, string[]> = {
+  'UK':                  ['GB-ENG', 'GB-SCT', 'GB-WLS'],
+  'Australasia':         ['AU', 'NZ'],
+  'Europe':              ['GB-ENG', 'GB-SCT', 'GB-WLS', 'IE', 'IM', 'JE',
+                          'AT', 'BE', 'BA', 'CH', 'CZ', 'DE', 'DK', 'ES', 'FI', 'FR',
+                          'GR', 'IT', 'LT', 'LU', 'LV', 'NL', 'NO', 'PL', 'PT', 'RU', 'SE', 'UA'],
+  'Mainland Europe':     ['AT', 'BE', 'BA', 'CH', 'CZ', 'DE', 'DK', 'ES', 'FI', 'FR',
+                          'GR', 'IT', 'LT', 'LU', 'LV', 'NL', 'NO', 'PL', 'PT', 'RU', 'SE', 'UA'],
+  'North America':       ['US', 'CA', 'MX'],
+  'UK and Ireland':      ['GB-ENG', 'GB-SCT', 'GB-WLS', 'IE', 'IM', 'JE'],
+  'Northern Hemisphere': ['CA', 'MX', 'US',
+                          'GB-ENG', 'GB-SCT', 'GB-WLS', 'IE', 'IM', 'JE',
+                          'AT', 'BE', 'BA', 'CH', 'CZ', 'DE', 'DK', 'ES', 'FI', 'FR',
+                          'GR', 'IT', 'LT', 'LU', 'LV', 'NL', 'NO', 'PL', 'PT', 'RU', 'SE', 'UA',
+                          'EG', 'HK', 'IR', 'JP', 'PS'],
+  'Southern Hemisphere': ['AU', 'NZ', 'ZA', 'UY', 'MU'],
+}
+// Individual country codes shown as top picks (excluded from alphabetical list)
+const TOP_PICK_CODES = new Set(['AU', 'EG', 'NZ', 'ES', 'US'])
 const MOVER_PERIODS = [
   { label: '7 days', days: 7 },
   { label: '30 days', days: 30 },
@@ -95,7 +116,7 @@ export default function RankingsPage() {
   const highlightRef = useRef<HTMLTableRowElement | null>(null)
   const rnkSearchTimeoutRef = useRef<any>(null)
   const [showColMenu, setShowColMenu] = useState(false)
-  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['alltime', 'country', 'dgrade', 'games', 'winpct', 'lastactive']))
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(['alltime', 'country', 'dgrade', 'games', 'winpct', 'lastseen']))
   const colMenuRef = useRef<HTMLDivElement>(null)
   const [filterCountry, setFilterCountry] = useState('')
   const [lastSeenYears, setLastSeenYears] = useState<Record<string, number>>({})
@@ -305,7 +326,11 @@ export default function RankingsPage() {
       .order(sortKey, { ascending: sortDir === 'asc' })
       .range(rankingsPage * pageSize, (rankingsPage + 1) * pageSize - 1)
     if (activeOnly) query = query.gte('last_active_year', activeYear)
-    if (filterCountry) query = query.eq('country', filterCountry)
+    if (filterCountry) {
+      const codes = REGION_CODES[filterCountry]
+      if (codes) query = query.in('country', codes)
+      else query = query.eq('country', filterCountry)
+    }
     if (sortKey === 'egrade') query = query.not('egrade', 'is', null)
     const { data } = await query
     setRankings(data || [])
@@ -318,7 +343,11 @@ export default function RankingsPage() {
       .select('id, wcf_first_name, wcf_last_name, country, dgrade, egrade, world_ranking, games, win_percentage, last_active_year, wcf_profile_url')
       .order(sortKey, { ascending: sortDir === 'asc' })
     if (activeOnly) query = query.gte('last_active_year', activeYear)
-    if (filterCountry) query = query.eq('country', filterCountry)
+    if (filterCountry) {
+      const codes = REGION_CODES[filterCountry]
+      if (codes) query = query.in('country', codes)
+      else query = query.eq('country', filterCountry)
+    }
     if (sortKey === 'egrade') query = query.not('egrade', 'is', null)
     const { data } = await query
     if (!data) return
@@ -912,40 +941,37 @@ export default function RankingsPage() {
                     </div>
                   )}
                 </div>
-                {/* Country filter */}
+                {/* Country filter — matches WCF structure */}
                 <select value={filterCountry} onChange={e => { setFilterCountry(e.target.value); setRankingsPage(0) }}
                   style={{ border: '1px solid #d5cfc5', borderRadius: 7, padding: '5px 10px', fontSize: 13, color: filterCountry ? '#16a34a' : 'rgba(13,40,24,0.6)', background: 'white', fontFamily: 'DM Sans, sans-serif', fontWeight: filterCountry ? 600 : 400 }}>
                   <option value="">All Countries</option>
-                  {(() => {
-                    // WCF-style regional groupings
-                    const WCF_GROUPS = [
-                      { label: 'Australasia',     codes: ['AU', 'NZ'] },
-                      { label: 'UK & Ireland',    codes: ['GB-ENG', 'GB-SCT', 'GB-WLS', 'IE', 'IM', 'JE'] },
-                      { label: 'North America',   codes: ['US', 'CA', 'MX'] },
-                      { label: 'Mainland Europe', codes: ['AT', 'BE', 'BA', 'CH', 'CZ', 'DE', 'DK', 'ES', 'FI', 'FR', 'GR', 'IT', 'LT', 'LU', 'LV', 'NL', 'NO', 'PL', 'PT', 'RU', 'SE', 'UA'] },
-                      { label: 'Southern Hemisphere', codes: ['ZA', 'UY', 'MU'] },
-                      { label: 'Other',           codes: ['EG', 'HK', 'IR', 'JP', 'PS'] },
-                    ]
-                    // Sort groups by total player count desc so biggest groups appear first
-                    const groupsWithCounts = WCF_GROUPS.map(g => ({
-                      ...g,
-                      total: g.codes.reduce((s, c) => s + (countryPlayerCounts[c] || 0), 0),
-                      // Filter to only countries present in our DB, sorted by count desc
-                      present: g.codes
-                        .filter(c => countryPlayerCounts[c])
-                        .sort((a, b) => (countryPlayerCounts[b] || 0) - (countryPlayerCounts[a] || 0)),
-                    })).filter(g => g.present.length > 0)
-                      .sort((a, b) => b.total - a.total)
-                    return groupsWithCounts.map(g => (
-                      <optgroup key={g.label} label={g.label}>
-                        {g.present.map(c => (
-                          <option key={c} value={c}>
-                            {getFlag(c)} {getCountryName(c)} ({countryPlayerCounts[c]})
-                          </option>
-                        ))}
-                      </optgroup>
+                  {/* Top picks: countries with most players — individual codes */}
+                  {(['AU', 'EG', 'NZ', 'ES'] as const).filter(c => countryPlayerCounts[c]).map(c => (
+                    <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>
+                  ))}
+                  {/* UK as composite (ENG + SCT + WLS) */}
+                  <option value="UK">🇬🇧 UK</option>
+                  {countryPlayerCounts['US'] && <option value="US">🇺🇸 USA</option>}
+                  {/* Divider */}
+                  <optgroup label="──────────────────" />
+                  {/* Regions — selecting returns all countries within that territory */}
+                  <option value="Australasia">Australasia</option>
+                  <option value="Europe">Europe</option>
+                  <option value="Mainland Europe">Mainland Europe</option>
+                  <option value="North America">North America</option>
+                  <option value="UK and Ireland">UK and Ireland</option>
+                  <option value="Northern Hemisphere">Northern Hemisphere</option>
+                  <option value="Southern Hemisphere">Southern Hemisphere</option>
+                  {/* Divider */}
+                  <optgroup label="──────────────────" />
+                  {/* Remaining individual countries alphabetically, top picks excluded */}
+                  {countryList
+                    .filter(c => !TOP_PICK_CODES.has(c))
+                    .sort((a, b) => getCountryName(a).localeCompare(getCountryName(b)))
+                    .map(c => (
+                      <option key={c} value={c}>{getFlag(c)} {getCountryName(c)}</option>
                     ))
-                  })()}
+                  }
                 </select>
                 <button onClick={() => { setActiveOnly(true); setRankingsPage(0) }} className={`rnk-pill${activeOnly ? ' on' : ''}`}>
                   Active (12mo)
