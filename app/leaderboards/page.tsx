@@ -161,10 +161,20 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
 }) {
   const [page, setPage] = useState(1)
 
+  // Sort: keep primary order (desc by value) but sort ties alphabetically
+  const sorted = tieKey
+    ? [...rows].sort((a, b) => {
+        if (b[tieKey] !== a[tieKey]) return b[tieKey] - a[tieKey]
+        const ln = (a.wcf_last_name || '').localeCompare(b.wcf_last_name || '')
+        if (ln !== 0) return ln
+        return (a.wcf_first_name || '').localeCompare(b.wcf_first_name || '')
+      })
+    : rows
+
   // Dense rank: all rows sharing the same tieKey value get the rank of the first occurrence
-  const ranked = rows.map((r, i) => {
+  const ranked = sorted.map((r, i) => {
     if (!tieKey) return { ...r, _rank: i + 1 }
-    const firstIdx = rows.findIndex(x => x[tieKey] === r[tieKey])
+    const firstIdx = sorted.findIndex(x => x[tieKey] === r[tieKey])
     return { ...r, _rank: firstIdx + 1 }
   })
 
