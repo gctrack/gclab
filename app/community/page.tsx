@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
 import { getFlag, countryName } from '@/lib/countries'
+import { trackEvent } from '@/lib/analytics'
 
 const G    = '#0d2818'
 const LIME = '#4ade80'
@@ -539,6 +540,7 @@ export default function CommunityPage() {
       await supabase.from('forum_threads')
         .update({ post_count: (activeThread.post_count || 0) + 1, last_post_at: new Date().toISOString() })
         .eq('id', activeThread.id)
+      trackEvent('post_created', { category: activeThread.category ?? 'General Discussion' })
     }
   }
 
@@ -549,6 +551,7 @@ export default function CommunityPage() {
       .select().single()
     if (thread) {
       await supabase.from('forum_posts').insert({ thread_id: thread.id, user_id: currentUser.id, content: body })
+      trackEvent('thread_created', { category })
       setShowNewThread(false)
       await loadThreads()
     }

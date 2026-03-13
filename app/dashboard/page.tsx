@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
 import WcfMatchBanner from '@/components/WcfMatchBanner'
 import { getFlag, countryName } from '@/lib/countries'
+import { trackEvent } from '@/lib/analytics'
 
 const G    = '#0d2818'
 const LIME = '#4ade80'
@@ -377,6 +378,7 @@ export default function DashboardPage() {
       if (!u) { setSignedIn(false); setLoading(false); return }
       setSignedIn(true)
       setUser(u)
+      trackEvent('dashboard_view')
 
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', u.id).single()
       setProfile(prof)

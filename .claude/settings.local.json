@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Read(//Users/office/Documents/gclab/**)",
+      "Bash(cp /Users/office/Documents/gclab/.env.local /Users/office/Documents/gclab/.claude/worktrees/interesting-easley/.env.local)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rm:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}

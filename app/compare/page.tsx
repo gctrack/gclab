@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import GCLabNav from '@/components/GCLabNav'
 import { getFlag, countryName as countryFullName } from '@/lib/countries'
+import { trackEvent } from '@/lib/analytics'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Legend
@@ -471,6 +472,12 @@ export default function ComparePage() {
     else { setGamesA([]); setHistoryA([]); setCountryStatsA([]) }
     if (playerB) promises.push(fetchPlayerData(playerB, setGamesB, setHistoryB, setCountryStatsB))
     else { setGamesB([]); setHistoryB([]); setCountryStatsB([]) }
+    if (playerA && playerB) {
+      trackEvent('compare_run', {
+        player_a: `${playerA.wcf_first_name} ${playerA.wcf_last_name}`,
+        player_b: `${playerB.wcf_first_name} ${playerB.wcf_last_name}`,
+      })
+    }
     Promise.all(promises).then(() => setLoadingData(false))
   }, [playerA, playerB])
 
