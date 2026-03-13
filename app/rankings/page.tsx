@@ -283,7 +283,7 @@ export default function RankingsPage() {
     if (data) {
       setMovers({
         gains: data.filter((p: any) => p.change > 0).sort((a: any, b: any) => b.change - a.change).slice(0, 10),
-        losses: [],
+        losses: data.filter((p: any) => p.change < 0).sort((a: any, b: any) => a.change - b.change).slice(0, 10),
       })
     }
     setLoading(false)
@@ -909,41 +909,80 @@ export default function RankingsPage() {
                 </button>
               ))}
             </div>
-            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 18 }}>GC Rankings baseline set 6 Mar 2026 — biggest career dGrade gains tracked by daily sync. Games and Win% are for the last 12 months.</p>
-            <div>
-              <h3 className="ghl" style={{ fontSize: 15, color: '#16a34a', marginBottom: 12, fontWeight: 700 }}>📈 Biggest Gains</h3>
-              {movers.gains.length === 0 ? (
-                <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.4)' }}>No changes detected yet.</p>
-              ) : (
-                <div className="rnk-card">
-                  <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
-                        <th style={TH('left')}>Player</th>
-                        <th style={TH('right')}>Change</th>
-                        <th style={TH('right')}>dGrade</th>
-                        <th style={TH('right')}>Games (12 mo)</th>
-                        <th style={TH('right')}>Win% (12 mo)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {movers.gains.map((p) => (
-                        <tr key={p.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
-                          <td style={TD('left')}>
-                            <a href={p.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
-                              {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
-                            </a>
-                          </td>
-                          <td style={{ ...TD('right', true), fontWeight: 700, color: '#16a34a' }}>+{p.change}</td>
-                          <td style={{ ...TD('right', true), fontWeight: 700, color: G }}>{p.current_dgrade}</td>
-                          <td style={TD('right', true)}>{p.games || '—'}</td>
-                          <td style={TD('right', true)}>{p.win_percentage ? `${p.win_percentage}%` : '—'}</td>
+            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.4)', marginBottom: 18 }}>GC Rankings baseline set 6 Mar 2026 — biggest career dGrade gains and losses tracked by daily sync. Games and Win% are for the last 12 months.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              {/* Gains */}
+              <div>
+                <h3 className="ghl" style={{ fontSize: 15, color: '#16a34a', marginBottom: 12, fontWeight: 700 }}>📈 Biggest Gains</h3>
+                {movers.gains.length === 0 ? (
+                  <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.4)' }}>No changes detected yet.</p>
+                ) : (
+                  <div className="rnk-card">
+                    <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                          <th style={TH('left')}>Player</th>
+                          <th style={TH('right')}>Change</th>
+                          <th style={TH('right')}>dGrade</th>
+                          <th style={TH('right')}>Games</th>
+                          <th style={TH('right')}>Win%</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody>
+                        {movers.gains.map((p) => (
+                          <tr key={p.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                            <td style={TD('left')}>
+                              <a href={p.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
+                                {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
+                              </a>
+                            </td>
+                            <td style={{ ...TD('right', true), fontWeight: 700, color: '#16a34a' }}>+{p.change}</td>
+                            <td style={{ ...TD('right', true), fontWeight: 700, color: G }}>{p.current_dgrade}</td>
+                            <td style={TD('right', true)}>{p.games || '—'}</td>
+                            <td style={TD('right', true)}>{p.win_percentage ? `${p.win_percentage}%` : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              {/* Losses */}
+              <div>
+                <h3 className="ghl" style={{ fontSize: 15, color: '#dc2626', marginBottom: 12, fontWeight: 700 }}>📉 Biggest Losses</h3>
+                {movers.losses.length === 0 ? (
+                  <p className="gsans" style={{ fontSize: 13, color: 'rgba(13,40,24,0.4)' }}>No changes detected yet.</p>
+                ) : (
+                  <div className="rnk-card">
+                    <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
+                          <th style={TH('left')}>Player</th>
+                          <th style={TH('right')}>Change</th>
+                          <th style={TH('right')}>dGrade</th>
+                          <th style={TH('right')}>Games</th>
+                          <th style={TH('right')}>Win%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {movers.losses.map((p) => (
+                          <tr key={p.id} className="rnk-row" style={{ borderTop: '1px solid #ede9e2', background: 'white' }}>
+                            <td style={TD('left')}>
+                              <a href={p.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
+                                {getFlag(p.country)} {p.wcf_first_name} {p.wcf_last_name}
+                              </a>
+                            </td>
+                            <td style={{ ...TD('right', true), fontWeight: 700, color: '#dc2626' }}>{p.change}</td>
+                            <td style={{ ...TD('right', true), fontWeight: 700, color: G }}>{p.current_dgrade}</td>
+                            <td style={TD('right', true)}>{p.games || '—'}</td>
+                            <td style={TD('right', true)}>{p.win_percentage ? `${p.win_percentage}%` : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
