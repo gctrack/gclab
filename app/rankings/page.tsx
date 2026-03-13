@@ -120,6 +120,7 @@ export default function RankingsPage() {
   const colMenuRef = useRef<HTMLDivElement>(null)
   const [filterCountry, setFilterCountry] = useState('')
   const [lastSeenYears, setLastSeenYears] = useState<Record<string, number>>({})
+  const [countryRanks, setCountryRanks] = useState<Record<string, number>>({})
   const [countryPlayersSort, setCountryPlayersSort] = useState<'active' | 'alltime'>('alltime')
 
   const [movers, setMovers] = useState<{ gains: any[], losses: any[] }>({ gains: [], losses: [] })
@@ -242,6 +243,24 @@ export default function RankingsPage() {
       setLastSeenYears(map)
     })
   }, [rankings])
+
+  // When a country filter is active, fetch all-time ranks within that country/region
+  // so the "All Time" column can show country rank rather than global world rank
+  useEffect(() => {
+    if (!filterCountry) { setCountryRanks({}); return }
+    let q = supabase.from('wcf_players')
+      .select('id')
+      .order('dgrade', { ascending: false })
+    const codes = REGION_CODES[filterCountry]
+    if (codes) q = q.in('country', codes)
+    else q = q.eq('country', filterCountry)
+    q.then(({ data }) => {
+      if (!data) return
+      const ranks: Record<string, number> = {}
+      data.forEach((p: any, i: number) => { ranks[p.id] = i + 1 })
+      setCountryRanks(ranks)
+    })
+  }, [filterCountry])
 
   // Close column menu when clicking outside
   useEffect(() => {
@@ -988,7 +1007,7 @@ export default function RankingsPage() {
                 <thead>
                   <tr style={{ background: 'rgba(13,40,24,0.04)', borderBottom: '1px solid #e5e1d8' }}>
                     <th style={TH('left')}>Rank</th>
-                    {visibleCols.has('alltime') && <th style={TH('left')}>All Time</th>}
+                    {visibleCols.has('alltime') && <th style={TH('left')}>{filterCountry ? 'All Time*' : 'All Time'}</th>}
                     <th style={TH('left', true)} onClick={() => handleRankingSort('wcf_last_name')}>
                       Player{sortArrow('wcf_last_name')}
                     </th>
@@ -1009,8 +1028,8 @@ export default function RankingsPage() {
                         ref={isHighlighted ? highlightRef : null}
                         className="rnk-row"
                         style={{ borderTop: '1px solid #ede9e2', background: isHighlighted ? 'rgba(74,222,128,0.1)' : 'white', transition: 'background 0.3s' }}>
-                        <td style={{ ...TD('left', true), color: G }}>{activeOnly ? i + rankingsPage * pageSize + 1 : '—'}</td>
-                        {visibleCols.has('alltime') && <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.45)' }}>{player.world_ranking}</td>}
+                        <td style={{ ...TD('left', true), color: G }}>{i + rankingsPage * pageSize + 1}</td>
+                        {visibleCols.has('alltime') && <td style={{ ...TD('left', true), color: 'rgba(13,40,24,0.45)' }}>{filterCountry ? (countryRanks[player.id] ?? '—') : player.world_ranking}</td>}
                         <td style={TD('left')}>
                           <a href={player.wcf_profile_url} target="_blank" rel="noopener noreferrer" className="rnk-link gsans" style={{ fontWeight: 500 }}>
                             {player.wcf_first_name} {player.wcf_last_name}
