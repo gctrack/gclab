@@ -152,6 +152,9 @@ function HeroCard({ label, sublabel, icon, accentColor, loading, player }: {
 }
 
 // ── Top-10 Table ─────────────────────────────────────────────────────────────
+const PAGE_SIZE = 10
+const MAX_BASE  = 50   // max 5 pages; extended only if position 50 is mid-tie
+
 function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, subText, renderExtra, tieKey }: {
   title: string; icon: string; accentColor: string; rows: any[]; loading: boolean
   renderValue: (row: any) => React.ReactNode
@@ -159,25 +162,38 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
   renderExtra?: (row: any) => React.ReactNode
   tieKey?: string
 }) {
-  const [showTies, setShowTies] = useState(false)
+  const [page, setPage] = useState(1)
 
-  // Assign proper tied ranks (dense rank: first occurrence of value = rank)
-  const ranked = rows.map(r => {
-    if (!tieKey) return r
-    const firstIdx = rows.findIndex(x => x[tieKey] === r[tieKey])
+  // Sort ties alphabetically, keep value order otherwise
+  const sorted = tieKey
+    ? [...rows].sort((a, b) => {
+        if (b[tieKey] !== a[tieKey]) return b[tieKey] - a[tieKey]
+        const ln = (a.wcf_last_name || '').localeCompare(b.wcf_last_name || '')
+        if (ln !== 0) return ln
+        return (a.wcf_first_name || '').localeCompare(b.wcf_first_name || '')
+      })
+    : rows
+
+  // Dense rank
+  const ranked = sorted.map((r, i) => {
+    if (!tieKey) return { ...r, _rank: i + 1 }
+    const firstIdx = sorted.findIndex(x => x[tieKey] === r[tieKey])
     return { ...r, _rank: firstIdx + 1 }
-  }).map((r, i) => ({ ...r, _rank: r._rank ?? i + 1 }))
+  })
 
-  const page1 = ranked.slice(0, 10)
-  const val10 = tieKey && rows.length > 10 ? rows[9]?.[tieKey] : null
-  const tiePage = val10 != null ? ranked.slice(10).filter(r => rows[ranked.indexOf(r)]?.[tieKey] === val10) : []
-  // Simpler: filter overflow rows matching the 10th value
-  const overflowTies = tieKey && rows.length > 10
-    ? ranked.slice(10).filter((_, i) => rows[10 + i]?.[tieKey] === val10)
-    : []
-  const tieRank = overflowTies.length > 0 ? ranked[9]._rank : 0
+  // Count per rank for = prefix
+  const rankCounts: Record<number, number> = {}
+  for (const r of ranked) rankCounts[r._rank] = (rankCounts[r._rank] || 0) + 1
+  const rankLabel = (r: any) => rankCounts[r._rank] > 1 ? `=${r._rank}` : `${r._rank}`
 
-  const displayed = showTies ? [...page1, ...overflowTies] : page1
+  // Cutoff: first MAX_BASE rows + any overflow tied with position MAX_BASE
+  const base = ranked.slice(0, MAX_BASE)
+  const val50 = tieKey && ranked.length > MAX_BASE ? ranked[MAX_BASE - 1][tieKey] : null
+  const overflow = val50 != null ? ranked.slice(MAX_BASE).filter(r => r[tieKey!] === val50) : []
+  const allRows = [...base, ...overflow]
+
+  const totalPages = Math.max(1, Math.ceil(allRows.length / PAGE_SIZE))
+  const displayed  = allRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div className="ldr-card">
@@ -198,12 +214,12 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
           {displayed.map((row, i) => (
             <div key={i} className="ldr-row" style={{
               padding: renderExtra ? '9px 18px 5px' : '9px 18px',
-              borderBottom: i < displayed.length - 1 || overflowTies.length > 0 ? '1px solid #ede9e2' : 'none',
+              borderBottom: i < displayed.length - 1 ? '1px solid #ede9e2' : 'none',
               background: 'white',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span className="gmono" style={{ color: 'rgba(13,40,24,0.3)', fontSize: 11, width: 18, textAlign: 'right', flexShrink: 0 }}>
-                  {row._rank === tieRank && tieRank > 0 ? `=${row._rank}` : row._rank}
+                  {rankLabel(row)}
                 </span>
                 <span style={{ fontSize: 15, flexShrink: 0 }}>{getFlag(row.country)}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -222,16 +238,25 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
               {renderExtra && renderExtra(row)}
             </div>
           ))}
-          {overflowTies.length > 0 && (
-            <button onClick={() => setShowTies(v => !v)} className="gsans" style={{
-              width: '100%', padding: '9px 18px', background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 12, color: accentColor, fontWeight: 600, textAlign: 'left',
-              borderTop: showTies ? '1px solid #ede9e2' : 'none',
-            }}>
-              {showTies
-                ? '▲ Show less'
-                : `▼ Show ${overflowTies.length} more tied at =${tieRank}`}
-            </button>
+          {totalPages > 1 && (
+            <div style={{ borderTop: '1px solid #ede9e2', display: 'flex', alignItems: 'center', gap: 2, padding: '7px 14px' }}>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="gsans" style={{
+                background: 'none', border: 'none', cursor: page === 1 ? 'default' : 'pointer',
+                fontSize: 13, color: page === 1 ? 'rgba(13,40,24,0.2)' : 'rgba(13,40,24,0.45)', padding: '2px 4px',
+              }}>‹</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => setPage(p)} className="gsans" style={{
+                  background: page === p ? accentColor : 'none',
+                  border: 'none', cursor: 'pointer', padding: '2px 7px',
+                  fontSize: 11, fontWeight: 700, borderRadius: 4,
+                  color: page === p ? 'white' : 'rgba(13,40,24,0.4)',
+                }}>{p}</button>
+              ))}
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="gsans" style={{
+                background: 'none', border: 'none', cursor: page === totalPages ? 'default' : 'pointer',
+                fontSize: 13, color: page === totalPages ? 'rgba(13,40,24,0.2)' : 'rgba(13,40,24,0.45)', padding: '2px 4px',
+              }}>›</button>
+            </div>
           )}
         </div>
       )}
@@ -241,6 +266,11 @@ function LeaderTable({ title, icon, accentColor, rows, loading, renderValue, sub
 
 // ── Upset Wins Table ─────────────────────────────────────────────────────────
 function UpsetTable({ rows, loading }: { rows: any[]; loading: boolean }) {
+  const [page, setPage] = useState(1)
+  const allRows = rows.slice(0, MAX_BASE)
+  const totalPages = Math.max(1, Math.ceil(allRows.length / PAGE_SIZE))
+  const displayed = allRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   return (
     <div className="ldr-card">
       <div style={{ padding: '14px 18px', borderBottom: '1px solid #e5e1d8', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -257,12 +287,12 @@ function UpsetTable({ rows, loading }: { rows: any[]; loading: boolean }) {
         <p className="gsans" style={{ padding: '20px', color: 'rgba(13,40,24,0.35)', fontSize: 13, margin: 0 }}>No data yet.</p>
       ) : (
         <div>
-          {rows.map((row, i) => (
+          {displayed.map((row, i) => (
             <div key={i} className="ldr-row" style={{
-              padding: '10px 18px', borderBottom: i < rows.length - 1 ? '1px solid #ede9e2' : 'none', background: 'white',
+              padding: '10px 18px', borderBottom: i < displayed.length - 1 ? '1px solid #ede9e2' : 'none', background: 'white',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: row.event_name ? 4 : 0 }}>
-                <span className="gmono" style={{ color: 'rgba(13,40,24,0.3)', fontSize: 11, width: 18, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+                <span className="gmono" style={{ color: 'rgba(13,40,24,0.3)', fontSize: 11, width: 18, textAlign: 'right', flexShrink: 0 }}>{(page - 1) * PAGE_SIZE + i + 1}</span>
                 <span className="gmono" style={{ fontSize: 13, fontWeight: 700, color: BALL_PINK, flexShrink: 0, minWidth: 42 }}>+{row.gap}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span style={{ fontSize: 14 }}>{getFlag(row.country)}</span>
@@ -285,6 +315,26 @@ function UpsetTable({ rows, loading }: { rows: any[]; loading: boolean }) {
               )}
             </div>
           ))}
+          {totalPages > 1 && (
+            <div style={{ borderTop: '1px solid #ede9e2', display: 'flex', alignItems: 'center', gap: 2, padding: '7px 14px' }}>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="gsans" style={{
+                background: 'none', border: 'none', cursor: page === 1 ? 'default' : 'pointer',
+                fontSize: 13, color: page === 1 ? 'rgba(13,40,24,0.2)' : 'rgba(13,40,24,0.45)', padding: '2px 4px',
+              }}>‹</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => setPage(p)} className="gsans" style={{
+                  background: page === p ? BALL_PINK : 'none',
+                  border: 'none', cursor: 'pointer', padding: '2px 7px',
+                  fontSize: 11, fontWeight: 700, borderRadius: 4,
+                  color: page === p ? 'white' : 'rgba(13,40,24,0.4)',
+                }}>{p}</button>
+              ))}
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="gsans" style={{
+                background: 'none', border: 'none', cursor: page === totalPages ? 'default' : 'pointer',
+                fontSize: 13, color: page === totalPages ? 'rgba(13,40,24,0.2)' : 'rgba(13,40,24,0.45)', padding: '2px 4px',
+              }}>›</button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -367,10 +417,10 @@ export default function LeaderboardsPage() {
       { data: games }, { data: winRate }, { data: travelled }, { data: opponents },
       { data: careerRise }, { data: streak }, { data: eventJump }, { data: upsets },
     ] = await Promise.all([
-      supabase.rpc('get_top10_most_games').limit(20),        supabase.rpc('get_top10_win_rate').limit(20),
-      supabase.rpc('get_top10_most_travelled').limit(20),    supabase.rpc('get_top10_most_opponents').limit(20),
-      supabase.rpc('get_top10_career_rise').limit(20),       supabase.rpc('get_top10_longest_win_streak').limit(20),
-      supabase.rpc('get_top10_single_event_jump').limit(20), supabase.rpc('get_top10_upset_wins').limit(20),
+      supabase.rpc('get_top10_most_games').limit(500),        supabase.rpc('get_top10_win_rate').limit(500),
+      supabase.rpc('get_top10_most_travelled').limit(500),    supabase.rpc('get_top10_most_opponents').limit(500),
+      supabase.rpc('get_top10_career_rise').limit(500),       supabase.rpc('get_top10_longest_win_streak').limit(500),
+      supabase.rpc('get_top10_single_event_jump').limit(500), supabase.rpc('get_top10_upset_wins').limit(500),
     ])
     setTop10Games(games || []);        setTop10WinRate(winRate || [])
     setTop10Travelled(travelled || []); setTop10Opponents(opponents || [])
