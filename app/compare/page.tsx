@@ -389,6 +389,7 @@ export default function ComparePage() {
   const [winsSortA, setWinsSortA] = useState<'grade' | 'diff'>('grade')
   const [winsSortB, setWinsSortB] = useState<'grade' | 'diff'>('grade')
   const [recentPlayers, setRecentPlayers] = useState<Player[]>([])
+  const [dateRange, setDateRange] = useState<'all' | '12mo' | '2yr' | '5yr' | '3mo' | '6mo'>('all')
 
   useEffect(() => {
     try {
@@ -414,6 +415,15 @@ export default function ComparePage() {
     const ea = a.event_name || '', eb = b.event_name || ''
     return ea < eb ? -1 : ea > eb ? 1 : 0
   })
+
+  const filterGamesByDate = (games: Game[]) => {
+    if (dateRange === 'all') return games
+    const months = { '3mo': 3, '6mo': 6, '12mo': 12, '2yr': 24, '5yr': 60 }[dateRange]
+    const cutoff = new Date()
+    cutoff.setMonth(cutoff.getMonth() - months)
+    const cutoffStr = cutoff.toISOString().slice(0, 10)
+    return games.filter(g => g.event_date && g.event_date >= cutoffStr)
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -497,13 +507,16 @@ export default function ComparePage() {
         }))
         .sort((a, b) => b.games - a.games))
     }
-    buildOppStats(gamesA, setOppCountryStatsA)
-    buildOppStats(gamesB, setOppCountryStatsB)
-  }, [gamesA, gamesB])
+    buildOppStats(filterGamesByDate(gamesA), setOppCountryStatsA)
+    buildOppStats(filterGamesByDate(gamesB), setOppCountryStatsB)
+  }, [gamesA, gamesB, dateRange])
 
-  // ── Derived stats ────────────────────────────────────────────────────────
+  // ── Derived stats — all computed on date-filtered slices ─────────────────
 
-  const h2hGames = gamesA
+  const filteredGamesA = filterGamesByDate(gamesA)
+  const filteredGamesB = filterGamesByDate(gamesB)
+
+  const h2hGames = filteredGamesA
     .filter(g => g.opponent_first_name === playerB?.wcf_first_name && g.opponent_last_name === playerB?.wcf_last_name)
     .sort((a, b) => (b.event_date || '').localeCompare(a.event_date || ''))
   const h2hWins = h2hGames.filter(g => g.result === 'win').length
@@ -520,8 +533,8 @@ export default function ComparePage() {
     }
     return map
   }
-  const yearA = yearStats(gamesA)
-  const yearB = yearStats(gamesB)
+  const yearA = yearStats(filteredGamesA)
+  const yearB = yearStats(filteredGamesB)
   const allYears = Array.from(new Set([...Object.keys(yearA), ...Object.keys(yearB)]))
     .map(Number).sort((a, b) => a - b)
 
@@ -536,8 +549,8 @@ export default function ComparePage() {
     const wins = relevant.filter(g => g.result === 'win').length
     return { w: wins, t: relevant.length }
   })
-  const bandsA = bandStats(gamesA)
-  const bandsB = bandStats(gamesB)
+  const bandsA = bandStats(filteredGamesA)
+  const bandsB = bandStats(filteredGamesB)
 
   const recentForm = (games: Game[], n: number) => {
     const sorted = sortGames(games)
@@ -558,8 +571,8 @@ export default function ComparePage() {
     }
     return { maxWin, maxLoss }
   }
-  const streakA = streaks(gamesA)
-  const streakB = streaks(gamesB)
+  const streakA = streaks(filteredGamesA)
+  const streakB = streaks(filteredGamesB)
 
   const withBefore = (games: Game[]) => sortGames(games).map((g, i) => {
     const prev = i > 0 ? games[i - 1] : null
@@ -570,8 +583,8 @@ export default function ComparePage() {
     const oppGradeBefore = prevOpp?.opp_dgrade_after || g.opp_dgrade_after
     return { ...g, myGradeBefore, oppGradeBefore, diff: (oppGradeBefore || 0) - (myGradeBefore || 0) }
   })
-  const gamesAWithBefore = withBefore(gamesA)
-  const gamesBWithBefore = withBefore(gamesB)
+  const gamesAWithBefore = withBefore(filteredGamesA)
+  const gamesBWithBefore = withBefore(filteredGamesB)
 
   const topWins = (enriched: typeof gamesAWithBefore, sortBy: 'grade' | 'diff') => {
     const wins = enriched.filter(g => g.result === 'win' && g.oppGradeBefore)
@@ -580,16 +593,16 @@ export default function ComparePage() {
   }
 
   const commonOpponents = () => {
-    if (!gamesA.length || !gamesB.length) return []
+    if (!filteredGamesA.length || !filteredGamesB.length) return []
     const oppMapA: Record<string, { w: number; t: number }> = {}
-    for (const g of gamesA) {
+    for (const g of filteredGamesA) {
       const key = `${g.opponent_first_name} ${g.opponent_last_name}`
       if (!oppMapA[key]) oppMapA[key] = { w: 0, t: 0 }
       oppMapA[key].t++
       if (g.result === 'win') oppMapA[key].w++
     }
     const oppMapB: Record<string, { w: number; t: number }> = {}
-    for (const g of gamesB) {
+    for (const g of filteredGamesB) {
       const key = `${g.opponent_first_name} ${g.opponent_last_name}`
       if (!oppMapB[key]) oppMapB[key] = { w: 0, t: 0 }
       oppMapB[key].t++
@@ -619,8 +632,8 @@ export default function ComparePage() {
     }).filter((_, i, arr) => i === 0 || arr[i].date !== arr[i - 1].date)
   })()
 
-  const hasData = gamesA.length > 0 || gamesB.length > 0
-  const bothHaveData = gamesA.length > 0 && gamesB.length > 0
+  const hasData = filteredGamesA.length > 0 || filteredGamesB.length > 0 || gamesA.length > 0 || gamesB.length > 0
+  const bothHaveData = filteredGamesA.length > 0 && filteredGamesB.length > 0
   const nameA = playerA ? `${playerA.wcf_first_name} ${playerA.wcf_last_name}` : 'Player A'
   const nameB = playerB ? `${playerB.wcf_first_name} ${playerB.wcf_last_name}` : 'Player B'
 
@@ -642,11 +655,11 @@ export default function ComparePage() {
         </div>
       </div>
 
-      <main style={{ maxWidth: '80rem', margin: '0 auto', padding: '0 24px 60px' }}>
+      <main style={{ maxWidth: '80rem', margin: '0 auto', padding: '24px 24px 60px' }}>
 
-        {/* Search + PDF button */}
+        {/* Search + date range + PDF */}
         <div className="cmp-card no-print" style={{ padding: 24, marginBottom: 24, overflow: 'visible' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: playerA || playerB ? 0 : 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
             <PlayerSearch label="Player 1" color="green" selected={playerA} recentPlayers={recentPlayers.filter(r => r.id !== playerB?.id)}
               onSelect={(p) => { setPlayerA(p); setGamesA([]); setHistoryA([]); if (p) saveRecentPlayer(p) }}
               exclude={playerB?.id || null} />
@@ -654,15 +667,40 @@ export default function ComparePage() {
               onSelect={(p) => { setPlayerB(p); setGamesB([]); setHistoryB([]); if (p) saveRecentPlayer(p) }}
               exclude={playerA?.id || null} />
           </div>
-          {loadingData && (
-            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.35)', textAlign: 'center', marginTop: 16 }}>Loading player data…</p>
-          )}
-          {hasData && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-              <button onClick={() => window.print()} className="cmp-pill" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+
+          {/* Date range + PDF row — shown once either player is selected */}
+          {(playerA || playerB) && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.45)', marginRight: 4 }}>Period:</span>
+                {([
+                  { label: 'All Time', value: 'all' },
+                  { label: '5 Years',  value: '5yr' },
+                  { label: '2 Years',  value: '2yr' },
+                  { label: '12 Months', value: '12mo' },
+                  { label: '6 Months', value: '6mo' },
+                  { label: '3 Months', value: '3mo' },
+                ] as const).map(opt => (
+                  <button key={opt.value} onClick={() => setDateRange(opt.value)}
+                    className="cmp-pill"
+                    style={{ padding: '4px 12px', fontSize: 12,
+                      background: dateRange === opt.value ? 'rgba(74,222,128,0.12)' : 'white',
+                      borderColor: dateRange === opt.value ? '#4ade80' : '#d5cfc5',
+                      color: dateRange === opt.value ? '#16a34a' : '#374151',
+                      fontWeight: dateRange === opt.value ? 600 : 400,
+                    }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => window.print()} className="cmp-pill" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
                 <span>🖨️</span><span>Print / Save PDF</span>
               </button>
             </div>
+          )}
+
+          {loadingData && (
+            <p className="gsans" style={{ fontSize: 12, color: 'rgba(13,40,24,0.35)', textAlign: 'center', marginTop: 12 }}>Loading player data…</p>
           )}
         </div>
 
@@ -696,9 +734,15 @@ export default function ComparePage() {
                 <StatCard label="World Ranking" a={playerA ? `#${playerA.world_ranking}` : '—'} b={playerB ? `#${playerB.world_ranking}` : '—'} higherIsBetter={false} />
                 <StatCard label="dGrade" a={playerA?.dgrade ?? '—'} b={playerB?.dgrade ?? '—'} />
                 <StatCard label="eGrade" a={playerA?.egrade || '—'} b={playerB?.egrade || '—'} />
-                <StatCard label="Win % (career)" a={playerA ? `${playerA.win_percentage}%` : '—'} b={playerB ? `${playerB.win_percentage}%` : '—'} />
-                <StatCard label="Total Games" a={playerA?.games ?? '—'} b={playerB?.games ?? '—'} />
-                <StatCard label="Peak dGrade" a={peakGrade(gamesA) ?? (playerA?.dgrade ?? '—')} b={peakGrade(gamesB) ?? (playerB?.dgrade ?? '—')} />
+                <StatCard
+                  label={dateRange === 'all' ? 'Win % (career)' : 'Win % (period)'}
+                  a={dateRange !== 'all' ? (filteredGamesA.length ? `${Math.round(filteredGamesA.filter(g=>g.result==='win').length/filteredGamesA.length*100)}%` : '—') : (playerA ? `${playerA.win_percentage}%` : '—')}
+                  b={dateRange !== 'all' ? (filteredGamesB.length ? `${Math.round(filteredGamesB.filter(g=>g.result==='win').length/filteredGamesB.length*100)}%` : '—') : (playerB ? `${playerB.win_percentage}%` : '—')} />
+                <StatCard
+                  label={dateRange === 'all' ? 'Total Games' : 'Games (period)'}
+                  a={dateRange !== 'all' ? (filteredGamesA.length || '—') : (playerA?.games ?? '—')}
+                  b={dateRange !== 'all' ? (filteredGamesB.length || '—') : (playerB?.games ?? '—')} />
+                <StatCard label="Peak dGrade" a={peakGrade(filteredGamesA) ?? (playerA?.dgrade ?? '—')} b={peakGrade(filteredGamesB) ?? (playerB?.dgrade ?? '—')} />
                 <StatCard label="Win Streak" a={streakA.maxWin || '—'} b={streakB.maxWin || '—'} />
                 <StatCard label="Loss Streak" a={streakA.maxLoss || '—'} b={streakB.maxLoss || '—'} higherIsBetter={false} />
               </div>
@@ -746,7 +790,7 @@ export default function ComparePage() {
             )}
 
             {/* Best Wins */}
-            {(gamesA.length > 0 || gamesB.length > 0) && (
+            {(filteredGamesA.length > 0 || filteredGamesB.length > 0) && (
               <section>
                 <SectionTitle>Best Wins</SectionTitle>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -909,8 +953,8 @@ export default function ComparePage() {
                 <SectionTitle>Recent Form</SectionTitle>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                   {[10, 20, 50].map(n => {
-                    const fA = recentForm(gamesA, n)
-                    const fB = recentForm(gamesB, n)
+                    const fA = recentForm(filteredGamesA, n)
+                    const fB = recentForm(filteredGamesB, n)
                     return (
                       <div key={n} className="cmp-card" style={{ padding: '14px 16px', textAlign: 'center' }}>
                         <p className="gsans" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(13,40,24,0.4)', marginBottom: 10 }}>Last {n} games</p>
