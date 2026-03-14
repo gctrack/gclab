@@ -1,13 +1,13 @@
 name: WCF Daily Sync
 
-# PAUSED 2026-03-14: WCF individual player pages (player.php?year=...) are broken.
-# Sync can detect dgrade changes from rank_list but cannot fetch event details,
-# causing silent history gaps. Resume when WCF confirms pages are restored.
-# To re-enable: uncomment the schedule block below.
+# NOTE 2026-03-14: WCF year pages (player.php?year=...) are down.
+# Event detail fetching disabled in wcf-sync route until pages recover.
+# Grade changes, new players, and ranking updates continue to sync normally.
+# Affected players are flagged via needs_history_repull for backfill when WCF restores.
 on:
-  # schedule:
-  #   - cron: '0 6 * * *'   # Daily at 06:00 UTC — restore this to resume
-  workflow_dispatch:        # Manual trigger still works via GitHub Actions UI
+  schedule:
+    - cron: '0 6 * * *'   # Daily at 06:00 UTC
+  workflow_dispatch:
 
 jobs:
   sync:
