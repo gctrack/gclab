@@ -200,6 +200,12 @@ function LogGameContent() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // ── Modal state ───────────────────────────────────────────────────────────
+  const [showAddPlayer, setShowAddPlayer] = useState(false)
+  const [showAddVenue,  setShowAddVenue]  = useState(false)
+  const [addPlayerPrefill, setAddPlayerPrefill] = useState('')
+  const [addVenuePrefill,  setAddVenuePrefill]  = useState('')
+
   const opponentRef = useRef<HTMLDivElement>(null)
   const venueRef    = useRef<HTMLDivElement>(null)
 
@@ -426,7 +432,7 @@ function LogGameContent() {
                   </div>
                 ))}
                 <div className="dropdown-item"
-                  onClick={() => { router.push('/gclab/log/new-opponent') }}>
+                  onClick={() => { setShowOpponentDrop(false); setAddPlayerPrefill(form.opponentSearch); setShowAddPlayer(true) }}>
                   <span style={{ color: LIME, fontSize: 13 }}>+ Add new player…</span>
                 </div>
               </div>
@@ -434,7 +440,7 @@ function LogGameContent() {
 
             {showOpponentDrop && form.opponentSearch.trim().length >= 2 && opponentResults.length === 0 && !form.opponent && (
               <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: '#0f2e1a', border: `1px solid ${BORDER}`, borderRadius: 8, marginTop: 4, overflow: 'hidden' }}>
-                <div className="dropdown-item" onClick={() => router.push('/gclab/log/new-opponent')}>
+                <div className="dropdown-item" onClick={() => { setShowOpponentDrop(false); setAddPlayerPrefill(form.opponentSearch); setShowAddPlayer(true) }}>
                   <span style={{ color: LIME, fontSize: 13 }}>+ Add "{form.opponentSearch}" as new player</span>
                 </div>
               </div>
@@ -475,7 +481,7 @@ function LogGameContent() {
                     {(v.city || v.country) && <div style={{ color: 'rgba(232,224,208,0.35)', fontSize: 11, fontFamily: 'DM Mono, monospace', marginTop: 2 }}>{[v.city, v.country].filter(Boolean).join(' · ')}</div>}
                   </div>
                 ))}
-                <div className="dropdown-item" onClick={() => router.push('/gclab/log/new-venue')}>
+                <div className="dropdown-item" onClick={() => { setShowVenueDrop(false); setAddVenuePrefill(form.venueSearch); setShowAddVenue(true) }}>
                   <span style={{ color: LIME, fontSize: 13 }}>+ Add new venue…</span>
                 </div>
               </div>
@@ -609,6 +615,33 @@ function LogGameContent() {
         </div>
 
       </div>
+
+      {/* ── Modals ──────────────────────────────────────────────────────── */}
+      {showAddPlayer && (
+        <AddPlayerModal
+          prefillName={addPlayerPrefill}
+          userCountry={profile?.country ?? null}
+          userId={user!.id}
+          onSave={(opp) => {
+            setForm(f => ({ ...f, opponent: opp, opponentSearch: opp.display_name }))
+            setShowAddPlayer(false)
+          }}
+          onClose={() => setShowAddPlayer(false)}
+        />
+      )}
+      {showAddVenue && (
+        <AddVenueModal
+          prefillName={addVenuePrefill}
+          userCountry={profile?.country ?? null}
+          userId={user!.id}
+          onSave={(venue) => {
+            setForm(f => ({ ...f, venue, venueSearch: venue.canonical_name }))
+            setShowAddVenue(false)
+          }}
+          onClose={() => setShowAddVenue(false)}
+        />
+      )}
+
     </div>
   )
 }
@@ -634,4 +667,211 @@ function Section({ label, optional, children }: { label: string; optional?: bool
       {children}
     </div>
   )
+}
+
+// ── Modal backdrop ────────────────────────────────────────────────────────────
+function ModalBackdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 0 0' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ background: '#0f2e1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 520, padding: '24px 20px 40px', maxHeight: '92vh', overflowY: 'auto' }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// ── Add Player Modal ──────────────────────────────────────────────────────────
+function AddPlayerModal({ prefillName, userCountry, userId, onSave, onClose }: {
+  prefillName: string
+  userCountry: string | null
+  userId: string
+  onSave: (opp: Opponent) => void
+  onClose: () => void
+}) {
+  const supabase = createClient()
+  const nameParts = prefillName.trim().split(' ')
+  const [firstName, setFirstName] = useState(nameParts[0] ?? '')
+  const [lastName,  setLastName]  = useState(nameParts.slice(1).join(' ') ?? '')
+  const [country,   setCountry]   = useState(userCountry ?? '')
+  const [dgrade,    setDgrade]    = useState('')
+  const [isPublic,  setIsPublic]  = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function save() {
+    if (!firstName.trim() || !lastName.trim()) { setErr('First and last name required'); return }
+    setSaving(true); setErr(null)
+    const { data, error } = await supabase
+      .from('recreational_players')
+      .insert({
+        first_name:   firstName.trim(),
+        last_name:    lastName.trim(),
+        country:      country.trim() || null,
+        approx_dgrade: dgrade ? parseInt(dgrade) : null,
+        is_public:    isPublic,
+        created_by:   userId,
+      })
+      .select('id')
+      .single()
+    setSaving(false)
+    if (error) { setErr(error.message); return }
+    onSave({
+      id: data.id,
+      display_name: `${firstName.trim()} ${lastName.trim()}`,
+      first_name: firstName.trim(),
+      last_name:  lastName.trim(),
+      country:    country.trim() || null,
+      dgrade:     dgrade ? parseInt(dgrade) : null,
+      source:     'recreational',
+      priority:   1,
+    })
+  }
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <span style={{ color: '#e8e0d0', fontSize: 17, fontFamily: 'DM Serif Display, serif' }}>Add new player</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(232,224,208,0.4)', fontSize: 22, cursor: 'pointer', padding: '0 4px' }}>×</button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <div>
+          <ModalLabel>First name *</ModalLabel>
+          <input className="log-input" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Jane" />
+        </div>
+        <div>
+          <ModalLabel>Last name *</ModalLabel>
+          <input className="log-input" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Smith" />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <div>
+          <ModalLabel>Country</ModalLabel>
+          <input className="log-input" value={country} onChange={e => setCountry(e.target.value)} placeholder="CA" maxLength={10} />
+        </div>
+        <div>
+          <ModalLabel>Approx dGrade</ModalLabel>
+          <input className="log-input" type="number" value={dgrade} onChange={e => setDgrade(e.target.value)} placeholder="e.g. 1800" min={500} max={3000} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <button
+          onClick={() => setIsPublic(p => !p)}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+          <div style={{ width: 36, height: 20, borderRadius: 10, background: isPublic ? 'rgba(74,222,128,0.3)' : 'rgba(255,255,255,0.08)', border: `1px solid ${isPublic ? 'rgba(74,222,128,0.5)' : 'rgba(255,255,255,0.15)'}`, position: 'relative', transition: 'all 0.15s' }}>
+            <div style={{ width: 14, height: 14, borderRadius: '50%', background: isPublic ? '#4ade80' : 'rgba(232,224,208,0.3)', position: 'absolute', top: 2, left: isPublic ? 18 : 2, transition: 'all 0.15s' }} />
+          </div>
+          <span style={{ color: 'rgba(232,224,208,0.6)', fontSize: 13, fontFamily: 'DM Sans, sans-serif' }}>
+            {isPublic ? 'Public — other users can find this player' : 'Private — only visible to you'}
+          </span>
+        </button>
+      </div>
+
+      {err && <div style={{ color: '#ef4444', fontSize: 12, fontFamily: 'DM Mono, monospace', marginBottom: 12 }}>{err}</div>}
+
+      <button className="submit-btn" disabled={saving} onClick={save}>
+        {saving ? 'Saving…' : 'Add player'}
+      </button>
+    </ModalBackdrop>
+  )
+}
+
+// ── Add Venue Modal ───────────────────────────────────────────────────────────
+function AddVenueModal({ prefillName, userCountry, userId, onSave, onClose }: {
+  prefillName: string
+  userCountry: string | null
+  userId: string
+  onSave: (venue: VenueResult) => void
+  onClose: () => void
+}) {
+  const supabase = createClient()
+  const [name,    setName]    = useState(prefillName)
+  const [short,   setShort]   = useState('')
+  const [country, setCountry] = useState(userCountry ?? '')
+  const [region,  setRegion]  = useState('')
+  const [city,    setCity]    = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function save() {
+    if (!name.trim()) { setErr('Venue name required'); return }
+    setSaving(true); setErr(null)
+    const { data, error } = await supabase
+      .from('venues')
+      .insert({
+        canonical_name: name.trim(),
+        short_name:     short.trim() || null,
+        country:        country.trim() || null,
+        region:         region.trim() || null,
+        city:           city.trim() || null,
+        created_by:     userId,
+        verified:       false,
+        source:         'manual',
+      })
+      .select('id, canonical_name, short_name, country, city')
+      .single()
+    setSaving(false)
+    if (error) { setErr(error.message); return }
+
+    // If a short name was given, add it as an alias
+    if (short.trim()) {
+      await supabase.from('venue_aliases').insert({
+        venue_id:   data.id,
+        alias:      short.trim(),
+        created_by: userId,
+      }).then(() => {})  // best-effort, ignore duplicate errors
+    }
+
+    onSave(data as VenueResult)
+  }
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <span style={{ color: '#e8e0d0', fontSize: 17, fontFamily: 'DM Serif Display, serif' }}>Add new venue</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(232,224,208,0.4)', fontSize: 22, cursor: 'pointer', padding: '0 4px' }}>×</button>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <ModalLabel>Full name *</ModalLabel>
+        <input className="log-input" value={name} onChange={e => setName(e.target.value)} placeholder="North Toronto Croquet Club" />
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <ModalLabel>Short name / abbreviation</ModalLabel>
+        <input className="log-input" value={short} onChange={e => setShort(e.target.value)} placeholder="NTCC" />
+        <div style={{ color: 'rgba(232,224,208,0.25)', fontSize: 11, fontFamily: 'DM Mono, monospace', marginTop: 4 }}>Added as a searchable alias</div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }}>
+        <div>
+          <ModalLabel>Country</ModalLabel>
+          <input className="log-input" value={country} onChange={e => setCountry(e.target.value)} placeholder="CA" maxLength={10} />
+        </div>
+        <div>
+          <ModalLabel>Province / State</ModalLabel>
+          <input className="log-input" value={region} onChange={e => setRegion(e.target.value)} placeholder="ON" maxLength={10} />
+        </div>
+        <div>
+          <ModalLabel>City</ModalLabel>
+          <input className="log-input" value={city} onChange={e => setCity(e.target.value)} placeholder="Toronto" />
+        </div>
+      </div>
+
+      {err && <div style={{ color: '#ef4444', fontSize: 12, fontFamily: 'DM Mono, monospace', marginBottom: 12 }}>{err}</div>}
+
+      <button className="submit-btn" disabled={saving} onClick={save}>
+        {saving ? 'Saving…' : 'Add venue'}
+      </button>
+    </ModalBackdrop>
+  )
+}
+
+function ModalLabel({ children }: { children: React.ReactNode }) {
+  return <div style={{ color: 'rgba(232,224,208,0.5)', fontSize: 11, fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{children}</div>
 }
