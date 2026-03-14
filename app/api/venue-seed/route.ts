@@ -231,28 +231,14 @@ export async function GET(request: Request) {
       last_scraped_at: now,
     }
 
-    // Upsert on canonical_name — safe because names are unique per country
-    const { data: existing } = await supabase
+    const { error, data: row } = await supabase
       .from('venues')
+      .upsert(payload, { onConflict: 'canonical_name,country' })
       .select('id')
-      .eq('canonical_name', club.canonical_name)
-      .eq('country', 'CA')
       .maybeSingle()
 
-    if (existing) {
-      const { error } = await supabase
-        .from('venues')
-        .update({ ...payload })
-        .eq('id', existing.id)
-      if (error) errors.push(`${club.canonical_name}: ${error.message}`)
-      else updated++
-    } else {
-      const { error } = await supabase
-        .from('venues')
-        .insert(payload)
-      if (error) errors.push(`${club.canonical_name}: ${error.message}`)
-      else inserted++
-    }
+    if (error) errors.push(`${club.canonical_name}: ${error.message}`)
+    else { inserted++ }  // upsert counts both; differentiation not critical here
   }
 
   // Seed aliases for well-known shorthand names
