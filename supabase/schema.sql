@@ -205,3 +205,117 @@ insert into public.feature_flags (feature_name, min_tier, description) values
   ('basic_game_logging', 'free', 'Log game results manually'),
   ('spectator_mode', 'free', 'Log shots for games you are watching'),
   ('video_review', 'free', 'Log shots from recorded video');
+-- =============================================================================
+-- Game Logging (migration: 20260314_game_logging.sql)
+-- =============================================================================
+
+-- Shot type enum: setup | roquet | hoop | stop_shot | block | jump | jaws | in_off
+-- Distance buckets: roquet(<7,7-14,14+) hoop(0-3,4-6,7,7+) jump(1-2,3-4,4+)
+
+-- Venues
+create table public.venues (
+  id            uuid primary key default gen_random_uuid(),
+  name          text not null,
+  country       text,
+  region        text,
+  city          text,
+  club_wcf_id   text,
+  hoop_type     text,   -- quadway | colonial | other
+  ball_type     text,   -- barlow | dawson | other
+  lawn_surface  text,   -- natural | astroturf | carpet
+  lawn_speed    text,   -- slow | medium | fast
+  court_count   int,
+  notes         text,
+  created_by    uuid references auth.users(id),
+  verified      bool default false,
+  created_at    timestamptz default now()
+);
+
+-- Player profile extensions (home club, memberships, usual location)
+create table public.player_profiles (
+  user_id               uuid primary key references auth.users(id) on delete cascade,
+  home_club_id          uuid references public.venues(id),
+  other_venue_ids       uuid[],
+  usual_playing_location text,
+  equipment_notes       text,
+  public                bool default true,
+  updated_at            timestamptz default now()
+);
+
+-- Match container for best-of-3/5 series
+create table public.matches (
+  id              uuid primary key default gen_random_uuid(),
+  format          text not null default 'single',  -- single | bo3 | bo5
+  venue_id        uuid references public.venues(id),
+  event_name      text,
+  player1_wcf_id  text,
+  player2_wcf_id  text,
+  player1_user_id uuid references auth.users(id),
+  player2_user_id uuid references auth.users(id),
+  player1_name    text,
+  player2_name    text,
+  winner_wcf_id   text,
+  played_at       date,
+  source          text default 'manual',  -- manual | watch | spectator | youtube
+  youtube_url     text,
+  submitted_by    uuid references auth.users(id),
+  status          text default 'approved',  -- pending | approved | rejected
+  notes           text,
+  created_at      timestamptz default now()
+);
+
+-- Individual game record (core logging table)
+create table public.logged_games (
+  id              uuid primary key default gen_random_uuid(),
+  match_id        uuid references public.matches(id),
+  game_number     int,
+  venue_id        uuid references public.venues(id),
+  game_date       date not null default current_date,
+  game_type       text not null default 'casual',  -- tournament | club | practice | casual
+  points_to       int not null default 13,          -- 13 or 19
+  player1_wcf_id  text,
+  player2_wcf_id  text,
+  player1_user_id uuid references auth.users(id),
+  player2_user_id uuid references auth.users(id),
+  player1_name    text,
+  player2_name    text,
+  player1_dgrade  numeric(6,2),   -- snapshot at time of game
+  player2_dgrade  numeric(6,2),
+  player1_starts  bool,           -- true = player1 played hoop 1
+  player1_score   int,
+  player2_score   int,
+  has_hoops       bool default false,
+  has_shots       bool default false,
+  shot_data_complete bool default false,  -- false = partial / key shots only
+  source          text default 'manual',
+  submitted_by    uuid references auth.users(id),
+  status          text default 'approved',
+  youtube_url     text,
+  notes           text,
+  created_at      timestamptz default now()
+);
+
+-- Hoop-by-hoop results
+create table public.logged_game_hoops (
+  id           uuid primary key default gen_random_uuid(),
+  game_id      uuid not null references public.logged_games(id) on delete cascade,
+  hoop_number  int not null,   -- 1–13 or 1–19
+  won_by       text not null,  -- player1 | player2
+  notes        text
+);
+
+-- Shot-by-shot detail (from watch or post-game entry)
+create table public.logged_game_shots (
+  id                  uuid primary key default gen_random_uuid(),
+  game_id             uuid not null references public.logged_games(id) on delete cascade,
+  hoop_number         int,
+  shooter             text not null,   -- player1 | player2
+  shot_type           text not null,   -- see enum above
+  distance_bucket     text,            -- null where not applicable
+  success             bool not null,
+  resulted_in_jaws    bool default false,
+  resulted_in_snuggle bool default false,
+  from_memory         bool default false,
+  sequence_in_hoop    int,
+  notes               text
+);
