@@ -78,6 +78,18 @@ function RankingsLogo() {
   )
 }
 
+// GCLab beaker logo
+function LabLogo() {
+  return (
+    <svg width="30" height="38" viewBox="0 0 44 52" fill="none">
+      <rect x="13" y="2" width="18" height="8" rx="2" fill="rgba(74,222,128,0.15)" stroke="#4ade80" strokeWidth="1.6"/>
+      <path d="M13 10 L2 44 Q0 50 4 51 L40 51 Q44 50 42 44 L31 10 Z" fill="rgba(74,222,128,0.08)" stroke="#4ade80" strokeWidth="1.6" strokeLinejoin="round"/>
+      <circle cx="14" cy="40" r="6.5" fill="#ef4444"/>
+      <circle cx="30" cy="40" r="6.5" fill="#3b82f6"/>
+      <circle cx="22" cy="29" r="6.5" fill="#eab308"/>
+    </svg>
+  )
+}
 
 function LoginPageInner() {
   const searchParams = useSearchParams()
@@ -152,18 +164,45 @@ function LoginPageInner() {
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
           <div style={{ width: '100%', maxWidth: 400 }}>
 
-            {/* Brand header */}
+            {/* Dual-brand header */}
             <div className="fade-up" style={{ textAlign: 'center', marginBottom: 36 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 72, height: 72, borderRadius: 18,
-                  background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)',
-                }}>
-                  <RankingsLogo/>
+              {/* Both logos */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 18 }}>
+                {/* GC Rankings */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 68, height: 68, borderRadius: 16,
+                    background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)',
+                  }}>
+                    <RankingsLogo/>
+                  </div>
+                  <span className="ghl" style={{ color: CREAM, fontSize: 13, lineHeight: 1 }}>GC Rankings</span>
                 </div>
-                <span className="ghl" style={{ color: CREAM, fontSize: 22, lineHeight: 1 }}>GC Rankings</span>
+
+                {/* Connector */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <div style={{ width: 24, height: 1, background: 'rgba(74,222,128,0.25)' }}/>
+                  <span className="gsans" style={{ color: 'rgba(232,224,208,0.25)', fontSize: 10, letterSpacing: '0.1em' }}>+</span>
+                  <div style={{ width: 24, height: 1, background: 'rgba(74,222,128,0.25)' }}/>
+                </div>
+
+                {/* GCLab */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 68, height: 68, borderRadius: 16,
+                    background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)',
+                  }}>
+                    <LabLogo/>
+                  </div>
+                  <span className="ghl" style={{ color: CREAM, fontSize: 13, lineHeight: 1 }}>GC Lab</span>
+                </div>
               </div>
+
+              <p className="gsans" style={{ color: 'rgba(232,224,208,0.35)', fontSize: 12, margin: 0, letterSpacing: '0.04em' }}>
+                One account · both platforms
+              </p>
             </div>
 
             {/* Card */}

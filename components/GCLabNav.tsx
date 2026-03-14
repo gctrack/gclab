@@ -31,7 +31,6 @@ const NAV_LINKS = [
   { href: '/leaderboards', label: 'Leaderboards'         },
   { href: '/compare',      label: 'Compare'              },
   { href: '/rankings?tab=Player+History', label: 'Player History', exactMatch: true },
-  { href: '/community',    label: 'Community'            },
   { href: '/dashboard',    label: 'Dashboard'            },
 ]
 
@@ -40,7 +39,6 @@ const DESKTOP_TABS = [
   { href: '/leaderboards', label: 'Leaderboards',  public: true  },
   { href: '/compare',      label: 'Compare',       public: true  },
   { href: '/rankings?tab=Player+History', label: 'Player History', public: true, exactMatch: true },
-  { href: '/community',    label: 'Community',     public: true  },
   { href: '/dashboard',    label: 'Dashboard',     public: true  },
   { href: '/profile',      label: 'My Profile',    public: false, hideWhenSignedOut: true },
 ]
@@ -137,35 +135,6 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
             )
           })}
 
-          {/* GC Lab — special external item */}
-          <span style={{ width: 1, height: 20, background: 'rgba(74,222,128,0.2)', margin: '0 6px', flexShrink: 0 }}/>
-          <a
-            href="https://gclab.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="gcnav-tab gcnav-lab"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '5px 10px', borderRadius: 6,
-              fontSize: 12, fontWeight: 500,
-              textDecoration: 'none', whiteSpace: 'nowrap',
-              background: 'rgba(74,222,128,0.08)',
-              border: '1px solid rgba(74,222,128,0.25)',
-              color: LIME,
-            }}>
-            {/* GCLab beaker logo, scaled for nav */}
-            <svg width="13" height="16" viewBox="0 0 44 52" fill="none">
-              <rect x="13" y="2" width="18" height="8" rx="2" fill="rgba(74,222,128,0.1)" stroke={LIME} strokeWidth="1.6"/>
-              <path d="M13 10 L2 44 Q0 50 4 51 L40 51 Q44 50 42 44 L31 10 Z" fill="rgba(74,222,128,0.07)" stroke={LIME} strokeWidth="1.6" strokeLinejoin="round"/>
-              <circle cx="14" cy="40" r="6.5" fill="#ef4444"/>
-              <circle cx="30" cy="40" r="6.5" fill="#3b82f6"/>
-              <circle cx="22" cy="29" r="6.5" fill="#eab308"/>
-            </svg>
-            <span>GC Lab</span>
-            <svg width="8" height="8" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.6 }}>
-              <path d="M1 9L9 1M9 1H3M9 1V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </a>
         </div>
 
         {/* Hamburger */}
@@ -222,28 +191,6 @@ export default function GCLabNav({ role, isSignedIn: isSignedInProp, currentPath
                 </a>
               </>
             )}
-
-            {/* GC Lab — special item */}
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }}/>
-            <a
-              href="https://gclab.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setOpen(false)}
-              className="gcnav-tab"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', textDecoration: 'none', fontSize: 14, color: LIME, fontWeight: 500 }}>
-              <svg width="14" height="17" viewBox="0 0 44 52" fill="none">
-                <rect x="13" y="2" width="18" height="8" rx="2" fill="rgba(74,222,128,0.1)" stroke={LIME} strokeWidth="1.6"/>
-                <path d="M13 10 L2 44 Q0 50 4 51 L40 51 Q44 50 42 44 L31 10 Z" fill="rgba(74,222,128,0.07)" stroke={LIME} strokeWidth="1.6" strokeLinejoin="round"/>
-                <circle cx="14" cy="40" r="6.5" fill="#ef4444"/>
-                <circle cx="30" cy="40" r="6.5" fill="#3b82f6"/>
-                <circle cx="22" cy="29" r="6.5" fill="#eab308"/>
-              </svg>
-              GC Lab
-              <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.5 }}>
-                <path d="M1 9L9 1M9 1H3M9 1V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </a>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }}/>
             {signedIn ? (
